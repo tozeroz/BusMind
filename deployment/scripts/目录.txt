@@ -1,0 +1,2 @@
+这是用于保留目录结构的占位文件。
+当前目录：deployment/scripts
