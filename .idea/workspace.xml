@@ -1,27 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="e1c25ae5-b02f-4e01-ac53-eeab4a6aeddc" name="更改" comment="">
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ai-service/examples/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ai-service/prompts/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ai-service/src/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/algorithm-service/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/api-docs/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/dictionary/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/mock/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/processed/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/raw/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/sql/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/deploy/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/api/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/integration/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/reports/.gitkeep" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/目录说明.md" beforeDir="false" afterPath="$PROJECT_DIR$/目录说明.md" afterDir="false" />
+    <list default="true" id="e1c25ae5-b02f-4e01-ac53-eeab4a6aeddc" name="更改" comment="项目初始化目录">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -36,6 +17,18 @@
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "yaya11111111"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/tozeroz/BusMind.git",
+    "accountId": "e974553b-c59c-4ac4-a185-4a98c4241b11"
+  }
+}]]></component>
   <component name="ProjectColorInfo"><![CDATA[{
   "associatedIndex": 4,
   "fromUser": false
@@ -70,9 +63,22 @@
       <option name="presentableId" value="Default" />
       <updated>1783389350093</updated>
     </task>
+    <task id="LOCAL-00001" summary="项目初始化目录">
+      <option name="closed" value="true" />
+      <created>1783389754911</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1783389754911</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="项目初始化目录" />
+    <option name="LAST_COMMIT_MESSAGE" value="项目初始化目录" />
   </component>
 </project>
