@@ -1,3 +1,3 @@
 import request from './request'
 
-export const sendAiMessage = (data) => request.post('/ai/chat', data)
+export const sendAiMessage = (data) => request.post('/ai/travel', data)

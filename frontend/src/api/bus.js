@@ -1,6 +1,12 @@
 import request from './request'
 
-export const getLines = () => request.get('/bus/lines')
-export const getLineDetail = (lineId) => request.get(`/bus/lines/${lineId}`)
-export const getVehicles = (params) => request.get('/bus/vehicles', { params })
-export const getPassengerFlow = (params) => request.get('/history/crowd', { params })
+export const getEta = (params) => request.get('/eta', { params })
+
+export const predictPassengerLoad = (data) => request.post('/passenger-load-prediction', data)
+
+export const estimateWalkingTime = (data) => request.post('/walking-time-estimation', data)
+
+export const evaluateTravelExperience = (data) =>
+  request.post('/travel-experience/evaluate', data)
+
+export const recommendRoutes = (data) => request.post('/recommend-routes', data)

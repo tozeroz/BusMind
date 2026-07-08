@@ -10,9 +10,6 @@
       </div>
       <nav class="nav-list">
         <a class="router-link-active">数据概览</a>
-        <a>路线查询</a>
-        <a>车辆状态</a>
-        <a>客流数据</a>
       </nav>
       <RouterLink class="admin-exit" to="/login">退出管理端</RouterLink>
     </aside>

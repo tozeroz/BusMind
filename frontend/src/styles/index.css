@@ -785,6 +785,36 @@ label {
   color: #fff;
 }
 
+.recommend-preview {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-top: 14px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.recommend-preview p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.recommend-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recommend-meta span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 13px;
+}
+
 .home-side-stats {
   display: grid;
   gap: 12px;

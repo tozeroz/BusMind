@@ -74,6 +74,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { sendAiMessage } from '@/api/ai'
 
 const input = ref('')
 const activeConversation = ref(1)
@@ -112,17 +113,42 @@ const getTime = () => {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
-const ask = (text) => {
+const ask = async (text) => {
   const question = text.trim()
   if (!question) return
   messages.value.push({ id: Date.now(), role: 'user', time: getTime(), content: question })
+  const replyId = Date.now() + 1
   messages.value.push({
-    id: Date.now() + 1,
+    id: replyId,
     role: 'assistant',
     time: getTime(),
-    content: '根据当前模拟数据，建议选择校园 2 号线。后续接入后端后，这里会调用 AI 接口并结合实时客流量、ETA 和线路数据生成回答。'
+    content: '正在请求后端 AI 出行助手...'
   })
   input.value = ''
+
+  try {
+    const response = await sendAiMessage({
+      mode: 'suggest',
+      question,
+      start_station_id: 1,
+      end_station_id: 3,
+      preference: 'balanced'
+    })
+    const answer = response.data?.answer
+    const reminders = response.data?.reminders || []
+    const reminderText = reminders.length ? `\n\n提醒：${reminders.join('；')}` : ''
+    const target = messages.value.find((message) => message.id === replyId)
+    if (target) {
+      target.content = `${answer || '后端未返回回答。'}${reminderText}`
+      target.time = getTime()
+    }
+  } catch (error) {
+    const target = messages.value.find((message) => message.id === replyId)
+    if (target) {
+      target.content = '后端 AI 接口暂不可用，当前显示本地演示回答：建议选择校园 2 号线，预计等待 8 分钟，客流适中，乘坐体验较好。'
+      target.time = getTime()
+    }
+  }
 }
 
 const newChat = () => {
