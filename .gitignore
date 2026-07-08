@@ -1,0 +1,81 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*.tmp
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+backend/logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+coverage/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Database / local runtime
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql.gz
+
+# Generated data and model artifacts
+data/raw/*
+data/processed/*
+data/simulated/*
+data/external/*
+database/backup/*
+algorithm/model_files/*
+*.pkl
+*.joblib
+*.model
+*.onnx
+
+# Keep empty directories
+!**/.gitkeep
+
+# Local secrets and credentials
+*.pem
+*.key
+*.crt
+credentials.json
+token.json
