@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import Field, model_validator
+
+from backend.app.schemas.common import StrictModel
+from backend.app.schemas.passenger_load import LoadLevel
+
+
+class ExperienceWeights(StrictModel):
+    w_load: float = Field(default=0.50, ge=0, le=1)
+    w_walk: float = Field(default=0.30, ge=0, le=1)
+    w_transfer: float = Field(default=0.20, ge=0, le=1)
+
+
+class TravelExperienceRequest(StrictModel):
+    predicted_load_rate: float | None = Field(default=None, ge=0, le=1)
+    predicted_load_level: LoadLevel | None = None
+    transfer_count: int = Field(ge=0)
+    walk_time_minutes: float = Field(ge=0)
+    weights: ExperienceWeights | None = None
+
+    @model_validator(mode="after")
+    def load_information_required(self) -> "TravelExperienceRequest":
+        if self.predicted_load_rate is None and self.predicted_load_level is None:
+            raise ValueError("predicted_load_rate 与 predicted_load_level 至少提供一个")
+        return self
+
+
+class TravelExperienceResult(StrictModel):
+    load_score: float = Field(ge=0, le=100)
+    walk_score: float = Field(ge=0, le=100)
+    transfer_score: float = Field(ge=0, le=100)
+    experience_score: float = Field(ge=0, le=100)
+    factor_weights: ExperienceWeights
+    factor_values: dict[str, Any]
+    reason: str
