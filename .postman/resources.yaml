@@ -1,0 +1,15 @@
+# Use this workspace to collaborate
+workspace:
+  id: 5f62c793-93df-4aaa-88fe-b7c70183d80f
+
+localResources:
+  collections:
+    - ../tools/postman/BusMind-Service-B.postman_collection.json
+  environments:
+    - ../tools/postman/BusMind-Local.postman_environment.json
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
+cloudResources:
+  collections:
+    ../postman/collections/BusMind Service B: 7909a8c4-6ac8-4059-b697-936cdd185fa1

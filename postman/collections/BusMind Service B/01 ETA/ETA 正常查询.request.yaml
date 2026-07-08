@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{base_url}}/eta?vehicle_id={{vehicle_id}}&target_station_id={{station_id\
+  }}&line_id={{line_id}}"
+method: GET
+headers:
+  Content-Type: application/json
+queryParams:
+  vehicle_id: "{{vehicle_id}}"
+  target_station_id: "{{station_id}}"
+  line_id: "{{line_id}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 422, 503]); });
+      pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });
+      pm.test('Business request succeeded', function () { const j = pm.response.json(); pm.expect(j.code).to.eql(0); pm.expect(j.message).to.eql('success'); });
+      pm.test('ETA fields valid', function () { const d=pm.response.json().data; pm.expect(d.predicted_eta_minutes).to.be.at.least(0); pm.expect(d).to.have.property('arrival_time'); pm.expect(d).to.have.property('model_version'); });
+    language: text/javascript
+order: 1000
