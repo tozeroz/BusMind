@@ -60,9 +60,11 @@ frontend/build/
 
 # Generated data and model artifacts
 data/raw/*
+!data/raw/.gitkeep
+!data/raw/collect_scripts/
+!data/raw/collect_scripts/**
 data/processed/*
-data/simulated/*
-data/external/*
+!data/processed/.gitkeep
 database/backup/*
 algorithm/model_files/*
 *.pkl

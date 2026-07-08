@@ -1,0 +1,4 @@
+$kind: collection
+description: ETA、客载量预计、步行时长、出行体验推荐和 DeepSeek AI 助手。
+variables:
+  base_url: http://127.0.0.1:8000/api/v1
