@@ -1,0 +1,1060 @@
+0 verbose cli D:\Node\node.exe D:\Node\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.16.0
+2 info using node@v24.18.0
+3 silly config load:file:D:\Node\node_modules\npm\npmrc
+4 silly config load:file:D:\文档\工作\小学期2\BusMind-main\frontend\.npmrc
+5 silly config load:file:C:\Users\acer1\.npmrc
+6 silly config load:file:D:\Node\node_global\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install" "--cache" ".\\.npm-cache"
+9 verbose logfile logs-max:10 dir:D:\文档\工作\小学期2\BusMind-main\frontend\.npm-cache\_logs\2026-07-07T11_47_39_955Z-
+10 verbose logfile D:\文档\工作\小学期2\BusMind-main\frontend\.npm-cache\_logs\2026-07-07T11_47_39_955Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 silly idealTree buildDeps
+14 silly fetch manifest @vitejs/plugin-vue@^5.2.1
+15 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vitejs%2fplugin-vue cache-miss
+16 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vitejs%2fplugin-vue 194ms (cache miss)
+17 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vitejs%2fplugin-vue set size:undefined disposed:false
+18 silly fetch manifest vite@^6.0.5
+19 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/vite cache-miss
+20 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/npm 8303ms
+21 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/vite 8979ms (cache miss)
+22 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/vite set size:undefined disposed:false
+23 silly fetch manifest @types/node@^18.0.0 || ^20.0.0 || >=22.0.0
+24 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@types%2fnode cache-miss
+25 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@types%2fnode 2360ms (cache miss)
+26 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@types%2fnode set size:undefined disposed:false
+27 silly fetch manifest jiti@>=1.21.0
+28 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/jiti cache-miss
+29 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/jiti 169ms (cache miss)
+30 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/jiti set size:undefined disposed:false
+31 silly fetch manifest less@*
+32 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/less cache-miss
+33 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/less 40ms (cache miss)
+34 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/less set size:undefined disposed:false
+35 silly fetch manifest lightningcss@^1.21.0
+36 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/lightningcss cache-miss
+37 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/lightningcss 40ms (cache miss)
+38 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/lightningcss set size:undefined disposed:false
+39 silly fetch manifest sass@*
+40 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/sass cache-miss
+41 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/sass 44ms (cache miss)
+42 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/sass set size:undefined disposed:false
+43 silly fetch manifest sass-embedded@*
+44 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/sass-embedded cache-miss
+45 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/sass-embedded 81ms (cache miss)
+46 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/sass-embedded set size:undefined disposed:false
+47 silly fetch manifest stylus@*
+48 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/stylus cache-miss
+49 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/stylus 32ms (cache miss)
+50 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/stylus set size:undefined disposed:false
+51 silly fetch manifest sugarss@*
+52 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/sugarss cache-miss
+53 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/sugarss 32ms (cache miss)
+54 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/sugarss set size:undefined disposed:false
+55 silly fetch manifest postcss@^8.3.3
+56 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/postcss cache-miss
+57 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/postcss 47ms (cache miss)
+58 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/postcss set size:undefined disposed:false
+59 silly fetch manifest terser@^5.16.0
+60 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/terser cache-miss
+61 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/terser 56ms (cache miss)
+62 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/terser set size:undefined disposed:false
+63 silly fetch manifest tsx@^4.8.1
+64 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/tsx cache-miss
+65 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/tsx 44ms (cache miss)
+66 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/tsx set size:undefined disposed:false
+67 silly fetch manifest yaml@^2.4.2
+68 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/yaml cache-miss
+69 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/yaml 57ms (cache miss)
+70 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/yaml set size:undefined disposed:false
+71 silly fetch manifest vue@^3.5.13
+72 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/vue cache-miss
+73 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/vue 121ms (cache miss)
+74 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/vue set size:undefined disposed:false
+75 silly fetch manifest typescript@*
+76 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/typescript cache-miss
+77 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/typescript 689ms (cache miss)
+78 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/typescript set size:undefined disposed:false
+79 silly fetch manifest axios@^1.7.9
+80 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/axios cache-miss
+81 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/axios 69ms (cache miss)
+82 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/axios set size:undefined disposed:false
+83 silly fetch manifest vue-router@^4.5.0
+84 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/vue-router cache-miss
+85 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/vue-router 83ms (cache miss)
+86 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/vue-router set size:undefined disposed:false
+87 silly placeDep ROOT @vitejs/plugin-vue@5.2.4 OK for: busmind-frontend@0.1.0 want: ^5.2.1
+88 silly placeDep ROOT vue@3.5.39 OK for: @vitejs/plugin-vue@5.2.4 want: ^3.2.25
+89 silly placeDep ROOT vite@6.4.3 OK for: @vitejs/plugin-vue@5.2.4 want: ^5.0.0 || ^6.0.0
+90 silly placeDep ROOT axios@1.18.1 OK for: busmind-frontend@0.1.0 want: ^1.7.9
+91 silly placeDep ROOT vue-router@4.6.4 OK for: busmind-frontend@0.1.0 want: ^4.5.0
+92 silly fetch manifest fdir@^6.4.4
+93 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/fdir cache-miss
+94 silly fetch manifest rollup@^4.34.9
+95 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/rollup cache-miss
+96 silly fetch manifest esbuild@^0.25.0
+97 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/esbuild cache-miss
+98 silly fetch manifest postcss@^8.5.3
+99 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/postcss cache-miss
+100 silly fetch manifest picomatch@^4.0.2
+101 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/picomatch cache-miss
+102 silly fetch manifest tinyglobby@^0.2.13
+103 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/tinyglobby cache-miss
+104 silly fetch manifest fsevents@~2.3.3
+105 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/fsevents cache-miss
+106 silly fetch manifest @vue/shared@3.5.39
+107 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fshared cache-miss
+108 silly fetch manifest @vue/runtime-dom@3.5.39
+109 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fruntime-dom cache-miss
+110 silly fetch manifest @vue/server-renderer@3.5.39
+111 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fserver-renderer cache-miss
+112 silly fetch manifest @vue/compiler-dom@3.5.39
+113 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-dom cache-miss
+114 silly fetch manifest @vue/compiler-sfc@3.5.39
+115 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-sfc cache-miss
+116 silly fetch manifest form-data@^4.0.5
+117 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/form-data cache-miss
+118 silly fetch manifest proxy-from-env@^2.1.0
+119 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/proxy-from-env cache-miss
+120 silly fetch manifest follow-redirects@^1.16.0
+121 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/follow-redirects cache-miss
+122 silly fetch manifest https-proxy-agent@^5.0.1
+123 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/https-proxy-agent cache-miss
+124 silly fetch manifest @vue/devtools-api@^6.6.4
+125 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fdevtools-api cache-miss
+126 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/fdir 36ms (cache miss)
+127 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/fdir set size:undefined disposed:false
+128 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/https-proxy-agent 68ms (cache miss)
+129 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/https-proxy-agent set size:undefined disposed:false
+130 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/proxy-from-env 149ms (cache miss)
+131 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/proxy-from-env set size:undefined disposed:false
+132 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/postcss 155ms (cache updated)
+133 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/postcss set size:undefined disposed:false
+134 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/tinyglobby 159ms (cache miss)
+135 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/tinyglobby set size:undefined disposed:false
+136 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/picomatch 251ms (cache miss)
+137 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/picomatch set size:undefined disposed:false
+138 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/form-data 276ms (cache miss)
+139 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/form-data set size:undefined disposed:false
+140 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/fsevents 390ms (cache miss)
+141 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/fsevents set size:undefined disposed:false
+142 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/follow-redirects 420ms (cache miss)
+143 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/follow-redirects set size:undefined disposed:false
+144 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fdevtools-api 599ms (cache miss)
+145 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fdevtools-api set size:undefined disposed:false
+146 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-sfc 811ms (cache miss)
+147 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-sfc set size:undefined disposed:false
+148 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fserver-renderer 916ms (cache miss)
+149 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fserver-renderer set size:undefined disposed:false
+150 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fshared 1081ms (cache miss)
+151 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fshared set size:undefined disposed:false
+152 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-dom 1132ms (cache miss)
+153 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-dom set size:undefined disposed:false
+154 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fruntime-dom 1135ms (cache miss)
+155 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fruntime-dom set size:undefined disposed:false
+156 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/esbuild 1200ms (cache miss)
+157 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/esbuild set size:undefined disposed:false
+158 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/rollup 1351ms (cache miss)
+159 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/rollup set size:undefined disposed:false
+160 silly placeDep ROOT follow-redirects@1.16.0 OK for: axios@1.18.1 want: ^1.16.0
+161 silly placeDep ROOT form-data@4.0.6 OK for: axios@1.18.1 want: ^4.0.5
+162 silly placeDep ROOT https-proxy-agent@5.0.1 OK for: axios@1.18.1 want: ^5.0.1
+163 silly placeDep ROOT proxy-from-env@2.1.0 OK for: axios@1.18.1 want: ^2.1.0
+164 silly fetch manifest hasown@^2.0.4
+165 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/hasown cache-miss
+166 silly fetch manifest asynckit@^0.4.0
+167 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/asynckit cache-miss
+168 silly fetch manifest mime-types@^2.1.35
+169 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/mime-types cache-miss
+170 silly fetch manifest combined-stream@^1.0.8
+171 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/combined-stream cache-miss
+172 silly fetch manifest es-set-tostringtag@^2.1.0
+173 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/es-set-tostringtag cache-miss
+174 silly fetch manifest debug@4
+175 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/debug cache-miss
+176 silly fetch manifest agent-base@6
+177 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/agent-base cache-miss
+178 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/hasown 51ms (cache miss)
+179 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/hasown set size:undefined disposed:false
+180 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/combined-stream 110ms (cache miss)
+181 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/combined-stream set size:undefined disposed:false
+182 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/es-set-tostringtag 110ms (cache miss)
+183 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/es-set-tostringtag set size:undefined disposed:false
+184 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/asynckit 112ms (cache miss)
+185 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/asynckit set size:undefined disposed:false
+186 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/mime-types 123ms (cache miss)
+187 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/mime-types set size:undefined disposed:false
+188 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/agent-base 128ms (cache miss)
+189 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/agent-base set size:undefined disposed:false
+190 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/debug 159ms (cache miss)
+191 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/debug set size:undefined disposed:false
+192 silly placeDep ROOT asynckit@0.4.0 OK for: form-data@4.0.6 want: ^0.4.0
+193 silly placeDep ROOT combined-stream@1.0.8 OK for: form-data@4.0.6 want: ^1.0.8
+194 silly placeDep ROOT es-set-tostringtag@2.1.0 OK for: form-data@4.0.6 want: ^2.1.0
+195 silly placeDep ROOT hasown@2.0.4 OK for: form-data@4.0.6 want: ^2.0.4
+196 silly placeDep ROOT mime-types@2.1.35 OK for: form-data@4.0.6 want: ^2.1.35
+197 silly fetch manifest delayed-stream@~1.0.0
+198 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/delayed-stream cache-miss
+199 silly fetch manifest es-errors@^1.3.0
+200 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/es-errors cache-miss
+201 silly fetch manifest get-intrinsic@^1.2.6
+202 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/get-intrinsic cache-miss
+203 silly fetch manifest has-tostringtag@^1.0.2
+204 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/has-tostringtag cache-miss
+205 silly fetch manifest hasown@^2.0.2
+206 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/hasown cache-miss
+207 silly fetch manifest function-bind@^1.1.2
+208 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/function-bind cache-miss
+209 silly fetch manifest mime-db@1.52.0
+210 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/mime-db cache-miss
+211 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/has-tostringtag 18ms (cache miss)
+212 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/has-tostringtag set size:undefined disposed:false
+213 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/function-bind 18ms (cache miss)
+214 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/function-bind set size:undefined disposed:false
+215 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/es-errors 23ms (cache miss)
+216 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/es-errors set size:undefined disposed:false
+217 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/hasown 27ms (cache updated)
+218 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/hasown set size:undefined disposed:false
+219 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/get-intrinsic 41ms (cache miss)
+220 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/get-intrinsic set size:undefined disposed:false
+221 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/delayed-stream 45ms (cache miss)
+222 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/delayed-stream set size:undefined disposed:false
+223 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/mime-db 61ms (cache miss)
+224 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/mime-db set size:undefined disposed:false
+225 silly placeDep ROOT delayed-stream@1.0.0 OK for: combined-stream@1.0.8 want: ~1.0.0
+226 silly placeDep ROOT es-errors@1.3.0 OK for: es-set-tostringtag@2.1.0 want: ^1.3.0
+227 silly placeDep ROOT get-intrinsic@1.3.0 OK for: es-set-tostringtag@2.1.0 want: ^1.2.6
+228 silly placeDep ROOT has-tostringtag@1.0.2 OK for: es-set-tostringtag@2.1.0 want: ^1.0.2
+229 silly fetch manifest gopd@^1.2.0
+230 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/gopd cache-miss
+231 silly fetch manifest get-proto@^1.0.1
+232 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/get-proto cache-miss
+233 silly fetch manifest has-symbols@^1.1.0
+234 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/has-symbols cache-miss
+235 silly fetch manifest es-object-atoms@^1.1.1
+236 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/es-object-atoms cache-miss
+237 silly fetch manifest math-intrinsics@^1.1.0
+238 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/math-intrinsics cache-miss
+239 silly fetch manifest es-define-property@^1.0.1
+240 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/es-define-property cache-miss
+241 silly fetch manifest call-bind-apply-helpers@^1.0.2
+242 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/call-bind-apply-helpers cache-miss
+243 silly fetch manifest has-symbols@^1.0.3
+244 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/has-symbols cache-miss
+245 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/math-intrinsics 16ms (cache miss)
+246 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/math-intrinsics set size:undefined disposed:false
+247 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/gopd 17ms (cache miss)
+248 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/gopd set size:undefined disposed:false
+249 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/es-object-atoms 18ms (cache miss)
+250 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/es-object-atoms set size:undefined disposed:false
+251 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/has-symbols 27ms (cache miss)
+252 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/has-symbols set size:undefined disposed:false
+253 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/has-symbols 28ms (cache miss)
+254 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/has-symbols set size:undefined disposed:false
+255 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/get-proto 39ms (cache miss)
+256 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/get-proto set size:undefined disposed:false
+257 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/es-define-property 56ms (cache miss)
+258 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/es-define-property set size:undefined disposed:false
+259 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/call-bind-apply-helpers 164ms (cache miss)
+260 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/call-bind-apply-helpers set size:undefined disposed:false
+261 silly placeDep ROOT call-bind-apply-helpers@1.0.2 OK for: get-intrinsic@1.3.0 want: ^1.0.2
+262 silly placeDep ROOT es-define-property@1.0.1 OK for: get-intrinsic@1.3.0 want: ^1.0.1
+263 silly placeDep ROOT es-object-atoms@1.1.2 OK for: get-intrinsic@1.3.0 want: ^1.1.1
+264 silly placeDep ROOT function-bind@1.1.2 OK for: get-intrinsic@1.3.0 want: ^1.1.2
+265 silly placeDep ROOT get-proto@1.0.1 OK for: get-intrinsic@1.3.0 want: ^1.0.1
+266 silly placeDep ROOT gopd@1.2.0 OK for: get-intrinsic@1.3.0 want: ^1.2.0
+267 silly placeDep ROOT has-symbols@1.1.0 OK for: get-intrinsic@1.3.0 want: ^1.1.0
+268 silly placeDep ROOT math-intrinsics@1.1.0 OK for: get-intrinsic@1.3.0 want: ^1.1.0
+269 silly fetch manifest dunder-proto@^1.0.1
+270 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/dunder-proto cache-miss
+271 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/dunder-proto 24ms (cache miss)
+272 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/dunder-proto set size:undefined disposed:false
+273 silly placeDep ROOT dunder-proto@1.0.1 OK for: get-proto@1.0.1 want: ^1.0.1
+274 silly placeDep ROOT agent-base@6.0.2 OK for: https-proxy-agent@5.0.1 want: 6
+275 silly placeDep ROOT debug@4.4.3 OK for: https-proxy-agent@5.0.1 want: 4
+276 silly fetch manifest ms@^2.1.3
+277 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/ms cache-miss
+278 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/ms 96ms (cache miss)
+279 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/ms set size:undefined disposed:false
+280 silly placeDep ROOT ms@2.1.3 OK for: debug@4.4.3 want: ^2.1.3
+281 silly placeDep ROOT mime-db@1.52.0 OK for: mime-types@2.1.35 want: 1.52.0
+282 silly placeDep ROOT esbuild@0.25.12 OK for: vite@6.4.3 want: ^0.25.0
+283 silly placeDep ROOT fdir@6.5.0 OK for: vite@6.4.3 want: ^6.4.4
+284 silly placeDep ROOT fsevents@2.3.3 OK for: vite@6.4.3 want: ~2.3.3
+285 silly placeDep ROOT picomatch@4.0.5 OK for: vite@6.4.3 want: ^4.0.2
+286 silly placeDep ROOT postcss@8.5.16 OK for: vite@6.4.3 want: ^8.5.3
+287 silly placeDep ROOT rollup@4.62.2 OK for: vite@6.4.3 want: ^4.34.9
+288 silly placeDep ROOT tinyglobby@0.2.17 OK for: vite@6.4.3 want: ^0.2.13
+289 silly fetch manifest @esbuild/aix-ppc64@0.25.12
+290 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2faix-ppc64 cache-miss
+291 silly fetch manifest @esbuild/linux-arm@0.25.12
+292 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-arm cache-miss
+293 silly fetch manifest @esbuild/linux-x64@0.25.12
+294 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-x64 cache-miss
+295 silly fetch manifest @esbuild/sunos-x64@0.25.12
+296 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fsunos-x64 cache-miss
+297 silly fetch manifest @esbuild/win32-x64@0.25.12
+298 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fwin32-x64 cache-miss
+299 silly fetch manifest @esbuild/darwin-x64@0.25.12
+300 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fdarwin-x64 cache-miss
+301 silly fetch manifest @esbuild/linux-ia32@0.25.12
+302 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-ia32 cache-miss
+303 silly fetch manifest @esbuild/netbsd-x64@0.25.12
+304 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fnetbsd-x64 cache-miss
+305 silly fetch manifest @esbuild/win32-ia32@0.25.12
+306 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fwin32-ia32 cache-miss
+307 silly fetch manifest @esbuild/android-arm@0.25.12
+308 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fandroid-arm cache-miss
+309 silly fetch manifest @esbuild/android-x64@0.25.12
+310 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fandroid-x64 cache-miss
+311 silly fetch manifest @esbuild/freebsd-x64@0.25.12
+312 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2ffreebsd-x64 cache-miss
+313 silly fetch manifest @esbuild/linux-arm64@0.25.12
+314 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-arm64 cache-miss
+315 silly fetch manifest @esbuild/linux-ppc64@0.25.12
+316 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-ppc64 cache-miss
+317 silly fetch manifest @esbuild/linux-s390x@0.25.12
+318 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-s390x cache-miss
+319 silly fetch manifest @esbuild/openbsd-x64@0.25.12
+320 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fopenbsd-x64 cache-miss
+321 silly fetch manifest @esbuild/win32-arm64@0.25.12
+322 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fwin32-arm64 cache-miss
+323 silly fetch manifest @esbuild/darwin-arm64@0.25.12
+324 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fdarwin-arm64 cache-miss
+325 silly fetch manifest @esbuild/netbsd-arm64@0.25.12
+326 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fnetbsd-arm64 cache-miss
+327 silly fetch manifest @esbuild/android-arm64@0.25.12
+328 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fandroid-arm64 cache-miss
+329 silly fetch manifest @esbuild/freebsd-arm64@0.25.12
+330 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2ffreebsd-arm64 cache-miss
+331 silly fetch manifest @esbuild/linux-loong64@0.25.12
+332 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-loong64 cache-miss
+333 silly fetch manifest @esbuild/linux-riscv64@0.25.12
+334 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-riscv64 cache-miss
+335 silly fetch manifest @esbuild/openbsd-arm64@0.25.12
+336 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fopenbsd-arm64 cache-miss
+337 silly fetch manifest @esbuild/linux-mips64el@0.25.12
+338 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-mips64el cache-miss
+339 silly fetch manifest @esbuild/openharmony-arm64@0.25.12
+340 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fopenharmony-arm64 cache-miss
+341 silly fetch manifest nanoid@^3.3.12
+342 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/nanoid cache-miss
+343 silly fetch manifest picocolors@^1.1.1
+344 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/picocolors cache-miss
+345 silly fetch manifest source-map-js@^1.2.1
+346 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/source-map-js cache-miss
+347 silly fetch manifest @types/estree@1.0.9
+348 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@types%2festree cache-miss
+349 silly fetch manifest @rollup/rollup-darwin-arm64@4.62.2
+350 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-darwin-arm64 cache-miss
+351 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2faix-ppc64 76ms (cache miss)
+352 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2faix-ppc64 set size:undefined disposed:false
+353 silly fetch manifest @rollup/rollup-android-arm64@4.62.2
+354 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-android-arm64 cache-miss
+355 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fdarwin-x64 123ms (cache miss)
+356 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fdarwin-x64 set size:undefined disposed:false
+357 silly fetch manifest @rollup/rollup-win32-arm64-msvc@4.62.2
+358 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-arm64-msvc cache-miss
+359 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-arm 153ms (cache miss)
+360 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-arm set size:undefined disposed:false
+361 silly fetch manifest @rollup/rollup-freebsd-arm64@4.62.2
+362 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-freebsd-arm64 cache-miss
+363 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-s390x 156ms (cache miss)
+364 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-s390x set size:undefined disposed:false
+365 silly fetch manifest @rollup/rollup-linux-arm64-gnu@4.62.2
+366 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm64-gnu cache-miss
+367 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-ia32 173ms (cache miss)
+368 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-ia32 set size:undefined disposed:false
+369 silly fetch manifest @rollup/rollup-linux-arm64-musl@4.62.2
+370 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm64-musl cache-miss
+371 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fwin32-ia32 193ms (cache miss)
+372 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fwin32-ia32 set size:undefined disposed:false
+373 silly fetch manifest @rollup/rollup-android-arm-eabi@4.62.2
+374 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-android-arm-eabi cache-miss
+375 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-ppc64 195ms (cache miss)
+376 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-ppc64 set size:undefined disposed:false
+377 silly fetch manifest @rollup/rollup-linux-arm-gnueabihf@4.62.2
+378 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm-gnueabihf cache-miss
+379 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fwin32-arm64 263ms (cache miss)
+380 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fwin32-arm64 set size:undefined disposed:false
+381 silly fetch manifest @rollup/rollup-linux-arm-musleabihf@4.62.2
+382 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm-musleabihf cache-miss
+383 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fopenbsd-x64 288ms (cache miss)
+384 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fopenbsd-x64 set size:undefined disposed:false
+385 silly fetch manifest @rollup/rollup-win32-ia32-msvc@4.62.2
+386 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-ia32-msvc cache-miss
+387 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fwin32-x64 318ms (cache miss)
+388 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fwin32-x64 set size:undefined disposed:false
+389 silly fetch manifest @rollup/rollup-linux-loong64-gnu@4.62.2
+390 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-loong64-gnu cache-miss
+391 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-arm64 321ms (cache miss)
+392 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-arm64 set size:undefined disposed:false
+393 silly fetch manifest @rollup/rollup-linux-loong64-musl@4.62.2
+394 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-loong64-musl cache-miss
+395 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fandroid-x64 323ms (cache miss)
+396 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fandroid-x64 set size:undefined disposed:false
+397 silly fetch manifest @rollup/rollup-linux-riscv64-gnu@4.62.2
+398 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-riscv64-gnu cache-miss
+399 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-riscv64 359ms (cache miss)
+400 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-riscv64 set size:undefined disposed:false
+401 silly fetch manifest @rollup/rollup-linux-riscv64-musl@4.62.2
+402 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-riscv64-musl cache-miss
+403 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fandroid-arm 409ms (cache miss)
+404 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fandroid-arm set size:undefined disposed:false
+405 silly fetch manifest @rollup/rollup-linux-ppc64-gnu@4.62.2
+406 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-ppc64-gnu cache-miss
+407 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fdarwin-arm64 415ms (cache miss)
+408 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fdarwin-arm64 set size:undefined disposed:false
+409 silly fetch manifest @rollup/rollup-linux-ppc64-musl@4.62.2
+410 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-ppc64-musl cache-miss
+411 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-mips64el 430ms (cache miss)
+412 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-mips64el set size:undefined disposed:false
+413 silly fetch manifest @rollup/rollup-linux-s390x-gnu@4.62.2
+414 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-s390x-gnu cache-miss
+415 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-x64 456ms (cache miss)
+416 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-x64 set size:undefined disposed:false
+417 silly fetch manifest @rollup/rollup-darwin-x64@4.62.2
+418 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-darwin-x64 cache-miss
+419 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fopenbsd-arm64 458ms (cache miss)
+420 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fopenbsd-arm64 set size:undefined disposed:false
+421 silly fetch manifest @rollup/rollup-win32-x64-gnu@4.62.2
+422 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-x64-gnu cache-miss
+423 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/picocolors 471ms (cache miss)
+424 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/picocolors set size:undefined disposed:false
+425 silly fetch manifest @rollup/rollup-win32-x64-msvc@4.62.2
+426 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-x64-msvc cache-miss
+427 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fnetbsd-arm64 479ms (cache miss)
+428 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fnetbsd-arm64 set size:undefined disposed:false
+429 silly fetch manifest @rollup/rollup-freebsd-x64@4.62.2
+430 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-freebsd-x64 cache-miss
+431 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@types%2festree 491ms (cache miss)
+432 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@types%2festree set size:undefined disposed:false
+433 silly fetch manifest @rollup/rollup-linux-x64-gnu@4.62.2
+434 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-x64-gnu cache-miss
+435 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2ffreebsd-x64 496ms (cache miss)
+436 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2ffreebsd-x64 set size:undefined disposed:false
+437 silly fetch manifest @rollup/rollup-linux-x64-musl@4.62.2
+438 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-x64-musl cache-miss
+439 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fsunos-x64 499ms (cache miss)
+440 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fsunos-x64 set size:undefined disposed:false
+441 silly fetch manifest @rollup/rollup-openbsd-x64@4.62.2
+442 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-openbsd-x64 cache-miss
+443 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fnetbsd-x64 504ms (cache miss)
+444 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fnetbsd-x64 set size:undefined disposed:false
+445 silly fetch manifest @rollup/rollup-openharmony-arm64@4.62.2
+446 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-openharmony-arm64 cache-miss
+447 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/source-map-js 504ms (cache miss)
+448 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/source-map-js set size:undefined disposed:false
+449 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm64-musl 445ms (cache miss)
+450 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm64-musl set size:undefined disposed:false
+451 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-freebsd-arm64 483ms (cache miss)
+452 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-freebsd-arm64 set size:undefined disposed:false
+453 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fopenharmony-arm64 638ms (cache miss)
+454 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fopenharmony-arm64 set size:undefined disposed:false
+455 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/nanoid 664ms (cache miss)
+456 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/nanoid set size:undefined disposed:false
+457 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-loong64-gnu 353ms (cache miss)
+458 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-loong64-gnu set size:undefined disposed:false
+459 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm-musleabihf 408ms (cache miss)
+460 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm-musleabihf set size:undefined disposed:false
+461 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-loong64-musl 362ms (cache miss)
+462 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-loong64-musl set size:undefined disposed:false
+463 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-arm64-msvc 581ms (cache miss)
+464 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-arm64-msvc set size:undefined disposed:false
+465 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-darwin-arm64 709ms (cache miss)
+466 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-darwin-arm64 set size:undefined disposed:false
+467 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-ppc64-gnu 316ms (cache miss)
+468 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-ppc64-gnu set size:undefined disposed:false
+469 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fandroid-arm64 730ms (cache miss)
+470 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2fandroid-arm64 set size:undefined disposed:false
+471 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-ppc64-musl 318ms (cache miss)
+472 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-ppc64-musl set size:undefined disposed:false
+473 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-riscv64-gnu 419ms (cache miss)
+474 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-riscv64-gnu set size:undefined disposed:false
+475 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm64-gnu 591ms (cache miss)
+476 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm64-gnu set size:undefined disposed:false
+477 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-android-arm-eabi 558ms (cache miss)
+478 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-android-arm-eabi set size:undefined disposed:false
+479 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-riscv64-musl 395ms (cache miss)
+480 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-riscv64-musl set size:undefined disposed:false
+481 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm-gnueabihf 563ms (cache miss)
+482 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-arm-gnueabihf set size:undefined disposed:false
+483 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-android-arm64 697ms (cache miss)
+484 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-android-arm64 set size:undefined disposed:false
+485 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-x64-gnu 314ms (cache miss)
+486 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-x64-gnu set size:undefined disposed:false
+487 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-openbsd-x64 386ms (cache miss)
+488 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-openbsd-x64 set size:undefined disposed:false
+489 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-freebsd-x64 428ms (cache miss)
+490 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-freebsd-x64 set size:undefined disposed:false
+491 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-x64-msvc 466ms (cache miss)
+492 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-x64-msvc set size:undefined disposed:false
+493 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-s390x-gnu 548ms (cache miss)
+494 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-s390x-gnu set size:undefined disposed:false
+495 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-x64-gnu 522ms (cache miss)
+496 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-x64-gnu set size:undefined disposed:false
+497 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2ffreebsd-arm64 1017ms (cache miss)
+498 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2ffreebsd-arm64 set size:undefined disposed:false
+499 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-darwin-x64 566ms (cache miss)
+500 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-darwin-x64 set size:undefined disposed:false
+501 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-openharmony-arm64 530ms (cache miss)
+502 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-openharmony-arm64 set size:undefined disposed:false
+503 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-loong64 1035ms (cache miss)
+504 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@esbuild%2flinux-loong64 set size:undefined disposed:false
+505 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-ia32-msvc 793ms (cache miss)
+506 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-win32-ia32-msvc set size:undefined disposed:false
+507 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-x64-musl 588ms (cache miss)
+508 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@rollup%2frollup-linux-x64-musl set size:undefined disposed:false
+509 silly placeDep ROOT @esbuild/aix-ppc64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+510 silly placeDep ROOT @esbuild/android-arm@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+511 silly placeDep ROOT @esbuild/android-arm64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+512 silly placeDep ROOT @esbuild/android-x64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+513 silly placeDep ROOT @esbuild/darwin-arm64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+514 silly placeDep ROOT @esbuild/darwin-x64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+515 silly placeDep ROOT @esbuild/freebsd-arm64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+516 silly placeDep ROOT @esbuild/freebsd-x64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+517 silly placeDep ROOT @esbuild/linux-arm@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+518 silly placeDep ROOT @esbuild/linux-arm64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+519 silly placeDep ROOT @esbuild/linux-ia32@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+520 silly placeDep ROOT @esbuild/linux-loong64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+521 silly placeDep ROOT @esbuild/linux-mips64el@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+522 silly placeDep ROOT @esbuild/linux-ppc64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+523 silly placeDep ROOT @esbuild/linux-riscv64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+524 silly placeDep ROOT @esbuild/linux-s390x@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+525 silly placeDep ROOT @esbuild/linux-x64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+526 silly placeDep ROOT @esbuild/netbsd-arm64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+527 silly placeDep ROOT @esbuild/netbsd-x64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+528 silly placeDep ROOT @esbuild/openbsd-arm64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+529 silly placeDep ROOT @esbuild/openbsd-x64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+530 silly placeDep ROOT @esbuild/openharmony-arm64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+531 silly placeDep ROOT @esbuild/sunos-x64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+532 silly placeDep ROOT @esbuild/win32-arm64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+533 silly placeDep ROOT @esbuild/win32-ia32@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+534 silly placeDep ROOT @esbuild/win32-x64@0.25.12 OK for: esbuild@0.25.12 want: 0.25.12
+535 silly placeDep ROOT nanoid@3.3.15 OK for: postcss@8.5.16 want: ^3.3.12
+536 silly placeDep ROOT picocolors@1.1.1 OK for: postcss@8.5.16 want: ^1.1.1
+537 silly placeDep ROOT source-map-js@1.2.1 OK for: postcss@8.5.16 want: ^1.2.1
+538 silly placeDep ROOT @rollup/rollup-android-arm-eabi@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+539 silly placeDep ROOT @rollup/rollup-android-arm64@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+540 silly placeDep ROOT @rollup/rollup-darwin-arm64@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+541 silly placeDep ROOT @rollup/rollup-darwin-x64@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+542 silly placeDep ROOT @rollup/rollup-freebsd-arm64@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+543 silly placeDep ROOT @rollup/rollup-freebsd-x64@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+544 silly placeDep ROOT @rollup/rollup-linux-arm-gnueabihf@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+545 silly placeDep ROOT @rollup/rollup-linux-arm-musleabihf@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+546 silly placeDep ROOT @rollup/rollup-linux-arm64-gnu@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+547 silly placeDep ROOT @rollup/rollup-linux-arm64-musl@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+548 silly placeDep ROOT @rollup/rollup-linux-loong64-gnu@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+549 silly placeDep ROOT @rollup/rollup-linux-loong64-musl@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+550 silly placeDep ROOT @rollup/rollup-linux-ppc64-gnu@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+551 silly placeDep ROOT @rollup/rollup-linux-ppc64-musl@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+552 silly placeDep ROOT @rollup/rollup-linux-riscv64-gnu@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+553 silly placeDep ROOT @rollup/rollup-linux-riscv64-musl@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+554 silly placeDep ROOT @rollup/rollup-linux-s390x-gnu@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+555 silly placeDep ROOT @rollup/rollup-linux-x64-gnu@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+556 silly placeDep ROOT @rollup/rollup-linux-x64-musl@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+557 silly placeDep ROOT @rollup/rollup-openbsd-x64@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+558 silly placeDep ROOT @rollup/rollup-openharmony-arm64@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+559 silly placeDep ROOT @rollup/rollup-win32-arm64-msvc@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+560 silly placeDep ROOT @rollup/rollup-win32-ia32-msvc@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+561 silly placeDep ROOT @rollup/rollup-win32-x64-gnu@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+562 silly placeDep ROOT @rollup/rollup-win32-x64-msvc@4.62.2 OK for: rollup@4.62.2 want: 4.62.2
+563 silly placeDep ROOT @types/estree@1.0.9 OK for: rollup@4.62.2 want: 1.0.9
+564 silly fetch manifest vue@3.5.39
+565 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/vue cache-miss
+566 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/vue 329ms (cache updated)
+567 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/vue set size:undefined disposed:false
+568 silly placeDep ROOT @vue/compiler-dom@3.5.39 OK for: vue@3.5.39 want: 3.5.39
+569 silly placeDep ROOT @vue/compiler-sfc@3.5.39 OK for: vue@3.5.39 want: 3.5.39
+570 silly placeDep ROOT @vue/runtime-dom@3.5.39 OK for: vue@3.5.39 want: 3.5.39
+571 silly placeDep ROOT @vue/server-renderer@3.5.39 OK for: vue@3.5.39 want: 3.5.39
+572 silly placeDep ROOT @vue/shared@3.5.39 OK for: vue@3.5.39 want: 3.5.39
+573 silly fetch manifest @vue/compiler-core@3.5.39
+574 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-core cache-miss
+575 silly fetch manifest @babel/parser@^7.29.7
+576 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@babel%2fparser cache-miss
+577 silly fetch manifest estree-walker@^2.0.2
+578 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/estree-walker cache-miss
+579 silly fetch manifest magic-string@^0.30.21
+580 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/magic-string cache-miss
+581 silly fetch manifest @vue/compiler-core@3.5.39
+582 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-core cache-miss
+583 silly fetch manifest @vue/compiler-ssr@3.5.39
+584 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-ssr cache-miss
+585 silly fetch manifest csstype@^3.2.3
+586 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/csstype cache-miss
+587 silly fetch manifest @vue/reactivity@3.5.39
+588 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2freactivity cache-miss
+589 silly fetch manifest @vue/runtime-core@3.5.39
+590 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fruntime-core cache-miss
+591 silly fetch manifest @vue/compiler-ssr@3.5.39
+592 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-ssr cache-miss
+593 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/estree-walker 93ms (cache miss)
+594 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/estree-walker set size:undefined disposed:false
+595 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/csstype 228ms (cache miss)
+596 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/csstype set size:undefined disposed:false
+597 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/magic-string 236ms (cache miss)
+598 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/magic-string set size:undefined disposed:false
+599 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-core 289ms (cache miss)
+600 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-core set size:undefined disposed:false
+601 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-ssr 322ms (cache miss)
+602 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-ssr set size:undefined disposed:false
+603 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fruntime-core 508ms (cache miss)
+604 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fruntime-core set size:undefined disposed:false
+605 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-core 512ms (cache miss)
+606 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-core set size:undefined disposed:false
+607 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2freactivity 534ms (cache miss)
+608 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2freactivity set size:undefined disposed:false
+609 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@babel%2fparser 578ms (cache miss)
+610 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@babel%2fparser set size:undefined disposed:false
+611 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-ssr 589ms (cache miss)
+612 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@vue%2fcompiler-ssr set size:undefined disposed:false
+613 silly placeDep ROOT @vue/compiler-core@3.5.39 OK for: @vue/compiler-dom@3.5.39 want: 3.5.39
+614 silly fetch manifest entities@^7.0.1
+615 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/entities cache-miss
+616 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/entities 59ms (cache miss)
+617 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/entities set size:undefined disposed:false
+618 silly placeDep ROOT @babel/parser@7.29.7 OK for: @vue/compiler-core@3.5.39 want: ^7.29.7
+619 silly placeDep ROOT entities@7.0.1 OK for: @vue/compiler-core@3.5.39 want: ^7.0.1
+620 silly placeDep ROOT estree-walker@2.0.2 OK for: @vue/compiler-core@3.5.39 want: ^2.0.2
+621 silly fetch manifest @babel/types@^7.29.7
+622 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@babel%2ftypes cache-miss
+623 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@babel%2ftypes 149ms (cache miss)
+624 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@babel%2ftypes set size:undefined disposed:false
+625 silly placeDep ROOT @babel/types@7.29.7 OK for: @babel/parser@7.29.7 want: ^7.29.7
+626 silly fetch manifest @babel/helper-string-parser@^7.29.7
+627 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@babel%2fhelper-string-parser cache-miss
+628 silly fetch manifest @babel/helper-validator-identifier@^7.29.7
+629 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@babel%2fhelper-validator-identifier cache-miss
+630 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@babel%2fhelper-string-parser 28ms (cache miss)
+631 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@babel%2fhelper-string-parser set size:undefined disposed:false
+632 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@babel%2fhelper-validator-identifier 51ms (cache miss)
+633 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@babel%2fhelper-validator-identifier set size:undefined disposed:false
+634 silly placeDep ROOT @babel/helper-string-parser@7.29.7 OK for: @babel/types@7.29.7 want: ^7.29.7
+635 silly placeDep ROOT @babel/helper-validator-identifier@7.29.7 OK for: @babel/types@7.29.7 want: ^7.29.7
+636 silly placeDep ROOT @vue/compiler-ssr@3.5.39 OK for: @vue/compiler-sfc@3.5.39 want: 3.5.39
+637 silly placeDep ROOT magic-string@0.30.21 OK for: @vue/compiler-sfc@3.5.39 want: ^0.30.21
+638 silly fetch manifest @jridgewell/sourcemap-codec@^1.5.5
+639 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@jridgewell%2fsourcemap-codec cache-miss
+640 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@jridgewell%2fsourcemap-codec 53ms (cache miss)
+641 silly packumentCache full:https://mirrors.huaweicloud.com/repository/npm/@jridgewell%2fsourcemap-codec set size:undefined disposed:false
+642 silly placeDep ROOT @vue/reactivity@3.5.39 OK for: @vue/runtime-dom@3.5.39 want: 3.5.39
+643 silly placeDep ROOT @vue/runtime-core@3.5.39 OK for: @vue/runtime-dom@3.5.39 want: 3.5.39
+644 silly placeDep ROOT csstype@3.2.3 OK for: @vue/runtime-dom@3.5.39 want: ^3.2.3
+645 silly placeDep ROOT @jridgewell/sourcemap-codec@1.5.5 OK for: magic-string@0.30.21 want: ^1.5.5
+646 silly placeDep ROOT @vue/devtools-api@6.6.4 OK for: vue-router@4.6.4 want: ^6.6.4
+647 silly reify moves {}
+648 silly audit bulk request {
+648 silly audit   '@vitejs/plugin-vue': [ '5.2.4' ],
+648 silly audit   vue: [ '3.5.39' ],
+648 silly audit   vite: [ '6.4.3' ],
+648 silly audit   axios: [ '1.18.1' ],
+648 silly audit   'vue-router': [ '4.6.4' ],
+648 silly audit   'follow-redirects': [ '1.16.0' ],
+648 silly audit   'form-data': [ '4.0.6' ],
+648 silly audit   'https-proxy-agent': [ '5.0.1' ],
+648 silly audit   'proxy-from-env': [ '2.1.0' ],
+648 silly audit   asynckit: [ '0.4.0' ],
+648 silly audit   'combined-stream': [ '1.0.8' ],
+648 silly audit   'es-set-tostringtag': [ '2.1.0' ],
+648 silly audit   hasown: [ '2.0.4' ],
+648 silly audit   'mime-types': [ '2.1.35' ],
+648 silly audit   'delayed-stream': [ '1.0.0' ],
+648 silly audit   'es-errors': [ '1.3.0' ],
+648 silly audit   'get-intrinsic': [ '1.3.0' ],
+648 silly audit   'has-tostringtag': [ '1.0.2' ],
+648 silly audit   'call-bind-apply-helpers': [ '1.0.2' ],
+648 silly audit   'es-define-property': [ '1.0.1' ],
+648 silly audit   'es-object-atoms': [ '1.1.2' ],
+648 silly audit   'function-bind': [ '1.1.2' ],
+648 silly audit   'get-proto': [ '1.0.1' ],
+648 silly audit   gopd: [ '1.2.0' ],
+648 silly audit   'has-symbols': [ '1.1.0' ],
+648 silly audit   'math-intrinsics': [ '1.1.0' ],
+648 silly audit   'dunder-proto': [ '1.0.1' ],
+648 silly audit   'agent-base': [ '6.0.2' ],
+648 silly audit   debug: [ '4.4.3' ],
+648 silly audit   ms: [ '2.1.3' ],
+648 silly audit   'mime-db': [ '1.52.0' ],
+648 silly audit   esbuild: [ '0.25.12' ],
+648 silly audit   fdir: [ '6.5.0' ],
+648 silly audit   fsevents: [ '2.3.3' ],
+648 silly audit   picomatch: [ '4.0.5' ],
+648 silly audit   postcss: [ '8.5.16' ],
+648 silly audit   rollup: [ '4.62.2' ],
+648 silly audit   tinyglobby: [ '0.2.17' ],
+648 silly audit   '@esbuild/aix-ppc64': [ '0.25.12' ],
+648 silly audit   '@esbuild/android-arm': [ '0.25.12' ],
+648 silly audit   '@esbuild/android-arm64': [ '0.25.12' ],
+648 silly audit   '@esbuild/android-x64': [ '0.25.12' ],
+648 silly audit   '@esbuild/darwin-arm64': [ '0.25.12' ],
+648 silly audit   '@esbuild/darwin-x64': [ '0.25.12' ],
+648 silly audit   '@esbuild/freebsd-arm64': [ '0.25.12' ],
+648 silly audit   '@esbuild/freebsd-x64': [ '0.25.12' ],
+648 silly audit   '@esbuild/linux-arm': [ '0.25.12' ],
+648 silly audit   '@esbuild/linux-arm64': [ '0.25.12' ],
+648 silly audit   '@esbuild/linux-ia32': [ '0.25.12' ],
+648 silly audit   '@esbuild/linux-loong64': [ '0.25.12' ],
+648 silly audit   '@esbuild/linux-mips64el': [ '0.25.12' ],
+648 silly audit   '@esbuild/linux-ppc64': [ '0.25.12' ],
+648 silly audit   '@esbuild/linux-riscv64': [ '0.25.12' ],
+648 silly audit   '@esbuild/linux-s390x': [ '0.25.12' ],
+648 silly audit   '@esbuild/linux-x64': [ '0.25.12' ],
+648 silly audit   '@esbuild/netbsd-arm64': [ '0.25.12' ],
+648 silly audit   '@esbuild/netbsd-x64': [ '0.25.12' ],
+648 silly audit   '@esbuild/openbsd-arm64': [ '0.25.12' ],
+648 silly audit   '@esbuild/openbsd-x64': [ '0.25.12' ],
+648 silly audit   '@esbuild/openharmony-arm64': [ '0.25.12' ],
+648 silly audit   '@esbuild/sunos-x64': [ '0.25.12' ],
+648 silly audit   '@esbuild/win32-arm64': [ '0.25.12' ],
+648 silly audit   '@esbuild/win32-ia32': [ '0.25.12' ],
+648 silly audit   '@esbuild/win32-x64': [ '0.25.12' ],
+648 silly audit   nanoid: [ '3.3.15' ],
+648 silly audit   picocolors: [ '1.1.1' ],
+648 silly audit   'source-map-js': [ '1.2.1' ],
+648 silly audit   '@rollup/rollup-android-arm-eabi': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-android-arm64': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-darwin-arm64': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-darwin-x64': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-freebsd-arm64': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-freebsd-x64': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-arm-gnueabihf': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-arm-musleabihf': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-arm64-gnu': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-arm64-musl': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-loong64-gnu': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-loong64-musl': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-ppc64-gnu': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-ppc64-musl': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-riscv64-gnu': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-riscv64-musl': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-s390x-gnu': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-x64-gnu': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-linux-x64-musl': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-openbsd-x64': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-openharmony-arm64': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-win32-arm64-msvc': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-win32-ia32-msvc': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-win32-x64-gnu': [ '4.62.2' ],
+648 silly audit   '@rollup/rollup-win32-x64-msvc': [ '4.62.2' ],
+648 silly audit   '@types/estree': [ '1.0.9' ],
+648 silly audit   '@vue/compiler-dom': [ '3.5.39' ],
+648 silly audit   '@vue/compiler-sfc': [ '3.5.39' ],
+648 silly audit   '@vue/runtime-dom': [ '3.5.39' ],
+648 silly audit   '@vue/server-renderer': [ '3.5.39' ],
+648 silly audit   '@vue/shared': [ '3.5.39' ],
+648 silly audit   '@vue/compiler-core': [ '3.5.39' ],
+648 silly audit   '@babel/parser': [ '7.29.7' ],
+648 silly audit   entities: [ '7.0.1' ],
+648 silly audit   'estree-walker': [ '2.0.2' ],
+648 silly audit   '@babel/types': [ '7.29.7' ],
+648 silly audit   '@babel/helper-string-parser': [ '7.29.7' ],
+648 silly audit   '@babel/helper-validator-identifier': [ '7.29.7' ],
+648 silly audit   '@vue/compiler-ssr': [ '3.5.39' ],
+648 silly audit   'magic-string': [ '0.30.21' ],
+648 silly audit   '@vue/reactivity': [ '3.5.39' ],
+648 silly audit   '@vue/runtime-core': [ '3.5.39' ],
+648 silly audit   csstype: [ '3.2.3' ],
+648 silly audit   '@jridgewell/sourcemap-codec': [ '1.5.5' ],
+648 silly audit   '@vue/devtools-api': [ '6.6.4' ]
+648 silly audit }
+649 http cache @vue/devtools-api@https://mirrors.huaweicloud.com/repository/npm/@vue/devtools-api/-/devtools-api-6.6.4.tgz 1ms (cache hit)
+650 http cache csstype@https://mirrors.huaweicloud.com/repository/npm/csstype/-/csstype-3.2.3.tgz 0ms (cache hit)
+651 http cache magic-string@https://mirrors.huaweicloud.com/repository/npm/magic-string/-/magic-string-0.30.21.tgz 0ms (cache hit)
+652 http cache @vue/reactivity@https://mirrors.huaweicloud.com/repository/npm/@vue/reactivity/-/reactivity-3.5.39.tgz 0ms (cache hit)
+653 http cache @vue/compiler-ssr@https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-ssr/-/compiler-ssr-3.5.39.tgz 0ms (cache hit)
+654 http cache @vue/runtime-core@https://mirrors.huaweicloud.com/repository/npm/@vue/runtime-core/-/runtime-core-3.5.39.tgz 0ms (cache hit)
+655 http cache entities@https://mirrors.huaweicloud.com/repository/npm/entities/-/entities-7.0.1.tgz 0ms (cache hit)
+656 http cache @jridgewell/sourcemap-codec@https://mirrors.huaweicloud.com/repository/npm/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.5.tgz 0ms (cache hit)
+657 http cache @babel/parser@https://mirrors.huaweicloud.com/repository/npm/@babel/parser/-/parser-7.29.7.tgz 0ms (cache hit)
+658 http cache @babel/helper-string-parser@https://mirrors.huaweicloud.com/repository/npm/@babel/helper-string-parser/-/helper-string-parser-7.29.7.tgz 0ms (cache hit)
+659 http cache @babel/helper-validator-identifier@https://mirrors.huaweicloud.com/repository/npm/@babel/helper-validator-identifier/-/helper-validator-identifier-7.29.7.tgz 0ms (cache hit)
+660 http cache @vue/compiler-core@https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-core/-/compiler-core-3.5.39.tgz 0ms (cache hit)
+661 http cache @babel/types@https://mirrors.huaweicloud.com/repository/npm/@babel/types/-/types-7.29.7.tgz 0ms (cache hit)
+662 http cache estree-walker@https://mirrors.huaweicloud.com/repository/npm/estree-walker/-/estree-walker-2.0.2.tgz 0ms (cache hit)
+663 http cache @vue/runtime-dom@https://mirrors.huaweicloud.com/repository/npm/@vue/runtime-dom/-/runtime-dom-3.5.39.tgz 0ms (cache hit)
+664 http cache @vue/server-renderer@https://mirrors.huaweicloud.com/repository/npm/@vue/server-renderer/-/server-renderer-3.5.39.tgz 0ms (cache hit)
+665 http cache @vue/compiler-dom@https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-dom/-/compiler-dom-3.5.39.tgz 0ms (cache hit)
+666 http cache @vue/compiler-sfc@https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-sfc/-/compiler-sfc-3.5.39.tgz 0ms (cache hit)
+667 http cache @vue/shared@https://mirrors.huaweicloud.com/repository/npm/@vue/shared/-/shared-3.5.39.tgz 0ms (cache hit)
+668 http cache @types/estree@https://mirrors.huaweicloud.com/repository/npm/@types/estree/-/estree-1.0.9.tgz 0ms (cache hit)
+669 http cache @rollup/rollup-win32-x64-msvc@https://mirrors.huaweicloud.com/repository/npm/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.62.2.tgz 0ms (cache hit)
+670 http cache picocolors@https://mirrors.huaweicloud.com/repository/npm/picocolors/-/picocolors-1.1.1.tgz 0ms (cache hit)
+671 http cache nanoid@https://mirrors.huaweicloud.com/repository/npm/nanoid/-/nanoid-3.3.15.tgz 0ms (cache hit)
+672 http cache tinyglobby@https://mirrors.huaweicloud.com/repository/npm/tinyglobby/-/tinyglobby-0.2.17.tgz 0ms (cache hit)
+673 http cache rollup@https://mirrors.huaweicloud.com/repository/npm/rollup/-/rollup-4.62.2.tgz 0ms (cache hit)
+674 http cache source-map-js@https://mirrors.huaweicloud.com/repository/npm/source-map-js/-/source-map-js-1.2.1.tgz 0ms (cache hit)
+675 http cache @rollup/rollup-win32-x64-gnu@https://mirrors.huaweicloud.com/repository/npm/@rollup/rollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.62.2.tgz 0ms (cache hit)
+676 http cache picomatch@https://mirrors.huaweicloud.com/repository/npm/picomatch/-/picomatch-4.0.5.tgz 0ms (cache hit)
+677 http cache postcss@https://mirrors.huaweicloud.com/repository/npm/postcss/-/postcss-8.5.16.tgz 0ms (cache hit)
+678 http cache fdir@https://mirrors.huaweicloud.com/repository/npm/fdir/-/fdir-6.5.0.tgz 0ms (cache hit)
+679 http cache esbuild@https://mirrors.huaweicloud.com/repository/npm/esbuild/-/esbuild-0.25.12.tgz 0ms (cache hit)
+680 http cache mime-db@https://mirrors.huaweicloud.com/repository/npm/mime-db/-/mime-db-1.52.0.tgz 0ms (cache hit)
+681 http cache @esbuild/win32-x64@https://mirrors.huaweicloud.com/repository/npm/@esbuild/win32-x64/-/win32-x64-0.25.12.tgz 0ms (cache hit)
+682 http cache ms@https://mirrors.huaweicloud.com/repository/npm/ms/-/ms-2.1.3.tgz 0ms (cache hit)
+683 http cache agent-base@https://mirrors.huaweicloud.com/repository/npm/agent-base/-/agent-base-6.0.2.tgz 0ms (cache hit)
+684 http cache math-intrinsics@https://mirrors.huaweicloud.com/repository/npm/math-intrinsics/-/math-intrinsics-1.1.0.tgz 0ms (cache hit)
+685 http cache debug@https://mirrors.huaweicloud.com/repository/npm/debug/-/debug-4.4.3.tgz 0ms (cache hit)
+686 http cache dunder-proto@https://mirrors.huaweicloud.com/repository/npm/dunder-proto/-/dunder-proto-1.0.1.tgz 0ms (cache hit)
+687 http cache has-symbols@https://mirrors.huaweicloud.com/repository/npm/has-symbols/-/has-symbols-1.1.0.tgz 0ms (cache hit)
+688 http cache gopd@https://mirrors.huaweicloud.com/repository/npm/gopd/-/gopd-1.2.0.tgz 0ms (cache hit)
+689 http cache es-object-atoms@https://mirrors.huaweicloud.com/repository/npm/es-object-atoms/-/es-object-atoms-1.1.2.tgz 0ms (cache hit)
+690 http cache function-bind@https://mirrors.huaweicloud.com/repository/npm/function-bind/-/function-bind-1.1.2.tgz 0ms (cache hit)
+691 http cache es-define-property@https://mirrors.huaweicloud.com/repository/npm/es-define-property/-/es-define-property-1.0.1.tgz 0ms (cache hit)
+692 http cache get-proto@https://mirrors.huaweicloud.com/repository/npm/get-proto/-/get-proto-1.0.1.tgz 0ms (cache hit)
+693 http cache has-tostringtag@https://mirrors.huaweicloud.com/repository/npm/has-tostringtag/-/has-tostringtag-1.0.2.tgz 0ms (cache hit)
+694 http cache get-intrinsic@https://mirrors.huaweicloud.com/repository/npm/get-intrinsic/-/get-intrinsic-1.3.0.tgz 0ms (cache hit)
+695 http cache es-errors@https://mirrors.huaweicloud.com/repository/npm/es-errors/-/es-errors-1.3.0.tgz 0ms (cache hit)
+696 http cache call-bind-apply-helpers@https://mirrors.huaweicloud.com/repository/npm/call-bind-apply-helpers/-/call-bind-apply-helpers-1.0.2.tgz 0ms (cache hit)
+697 http cache delayed-stream@https://mirrors.huaweicloud.com/repository/npm/delayed-stream/-/delayed-stream-1.0.0.tgz 0ms (cache hit)
+698 http cache hasown@https://mirrors.huaweicloud.com/repository/npm/hasown/-/hasown-2.0.4.tgz 0ms (cache hit)
+699 http cache combined-stream@https://mirrors.huaweicloud.com/repository/npm/combined-stream/-/combined-stream-1.0.8.tgz 0ms (cache hit)
+700 http cache mime-types@https://mirrors.huaweicloud.com/repository/npm/mime-types/-/mime-types-2.1.35.tgz 0ms (cache hit)
+701 http cache asynckit@https://mirrors.huaweicloud.com/repository/npm/asynckit/-/asynckit-0.4.0.tgz 0ms (cache hit)
+702 http cache https-proxy-agent@https://mirrors.huaweicloud.com/repository/npm/https-proxy-agent/-/https-proxy-agent-5.0.1.tgz 0ms (cache hit)
+703 http cache es-set-tostringtag@https://mirrors.huaweicloud.com/repository/npm/es-set-tostringtag/-/es-set-tostringtag-2.1.0.tgz 0ms (cache hit)
+704 http cache proxy-from-env@https://mirrors.huaweicloud.com/repository/npm/proxy-from-env/-/proxy-from-env-2.1.0.tgz 0ms (cache hit)
+705 http cache form-data@https://mirrors.huaweicloud.com/repository/npm/form-data/-/form-data-4.0.6.tgz 0ms (cache hit)
+706 http cache vue-router@https://mirrors.huaweicloud.com/repository/npm/vue-router/-/vue-router-4.6.4.tgz 0ms (cache hit)
+707 http cache axios@https://mirrors.huaweicloud.com/repository/npm/axios/-/axios-1.18.1.tgz 0ms (cache hit)
+708 http cache follow-redirects@https://mirrors.huaweicloud.com/repository/npm/follow-redirects/-/follow-redirects-1.16.0.tgz 0ms (cache hit)
+709 http cache vite@https://mirrors.huaweicloud.com/repository/npm/vite/-/vite-6.4.3.tgz 0ms (cache hit)
+710 http cache vue@https://mirrors.huaweicloud.com/repository/npm/vue/-/vue-3.5.39.tgz 0ms (cache hit)
+711 http cache @vitejs/plugin-vue@https://mirrors.huaweicloud.com/repository/npm/@vitejs/plugin-vue/-/plugin-vue-5.2.4.tgz 0ms (cache hit)
+712 silly tarball no local data for @vue/devtools-api@https://mirrors.huaweicloud.com/repository/npm/@vue/devtools-api/-/devtools-api-6.6.4.tgz. Extracting by manifest.
+713 silly tarball no local data for csstype@https://mirrors.huaweicloud.com/repository/npm/csstype/-/csstype-3.2.3.tgz. Extracting by manifest.
+714 silly tarball no local data for magic-string@https://mirrors.huaweicloud.com/repository/npm/magic-string/-/magic-string-0.30.21.tgz. Extracting by manifest.
+715 silly tarball no local data for @vue/reactivity@https://mirrors.huaweicloud.com/repository/npm/@vue/reactivity/-/reactivity-3.5.39.tgz. Extracting by manifest.
+716 silly tarball no local data for @vue/compiler-ssr@https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-ssr/-/compiler-ssr-3.5.39.tgz. Extracting by manifest.
+717 silly tarball no local data for @vue/runtime-core@https://mirrors.huaweicloud.com/repository/npm/@vue/runtime-core/-/runtime-core-3.5.39.tgz. Extracting by manifest.
+718 silly tarball no local data for entities@https://mirrors.huaweicloud.com/repository/npm/entities/-/entities-7.0.1.tgz. Extracting by manifest.
+719 silly tarball no local data for @jridgewell/sourcemap-codec@https://mirrors.huaweicloud.com/repository/npm/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.5.tgz. Extracting by manifest.
+720 silly tarball no local data for @babel/parser@https://mirrors.huaweicloud.com/repository/npm/@babel/parser/-/parser-7.29.7.tgz. Extracting by manifest.
+721 silly tarball no local data for @babel/helper-string-parser@https://mirrors.huaweicloud.com/repository/npm/@babel/helper-string-parser/-/helper-string-parser-7.29.7.tgz. Extracting by manifest.
+722 silly tarball no local data for @babel/helper-validator-identifier@https://mirrors.huaweicloud.com/repository/npm/@babel/helper-validator-identifier/-/helper-validator-identifier-7.29.7.tgz. Extracting by manifest.
+723 silly tarball no local data for @vue/compiler-core@https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-core/-/compiler-core-3.5.39.tgz. Extracting by manifest.
+724 silly tarball no local data for @babel/types@https://mirrors.huaweicloud.com/repository/npm/@babel/types/-/types-7.29.7.tgz. Extracting by manifest.
+725 silly tarball no local data for estree-walker@https://mirrors.huaweicloud.com/repository/npm/estree-walker/-/estree-walker-2.0.2.tgz. Extracting by manifest.
+726 silly tarball no local data for @vue/runtime-dom@https://mirrors.huaweicloud.com/repository/npm/@vue/runtime-dom/-/runtime-dom-3.5.39.tgz. Extracting by manifest.
+727 silly tarball no local data for @vue/server-renderer@https://mirrors.huaweicloud.com/repository/npm/@vue/server-renderer/-/server-renderer-3.5.39.tgz. Extracting by manifest.
+728 silly tarball no local data for @vue/compiler-dom@https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-dom/-/compiler-dom-3.5.39.tgz. Extracting by manifest.
+729 silly tarball no local data for @vue/compiler-sfc@https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-sfc/-/compiler-sfc-3.5.39.tgz. Extracting by manifest.
+730 silly tarball no local data for @vue/shared@https://mirrors.huaweicloud.com/repository/npm/@vue/shared/-/shared-3.5.39.tgz. Extracting by manifest.
+731 silly tarball no local data for @types/estree@https://mirrors.huaweicloud.com/repository/npm/@types/estree/-/estree-1.0.9.tgz. Extracting by manifest.
+732 silly tarball no local data for @rollup/rollup-win32-x64-msvc@https://mirrors.huaweicloud.com/repository/npm/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.62.2.tgz. Extracting by manifest.
+733 silly tarball no local data for picocolors@https://mirrors.huaweicloud.com/repository/npm/picocolors/-/picocolors-1.1.1.tgz. Extracting by manifest.
+734 silly tarball no local data for nanoid@https://mirrors.huaweicloud.com/repository/npm/nanoid/-/nanoid-3.3.15.tgz. Extracting by manifest.
+735 silly tarball no local data for tinyglobby@https://mirrors.huaweicloud.com/repository/npm/tinyglobby/-/tinyglobby-0.2.17.tgz. Extracting by manifest.
+736 silly tarball no local data for rollup@https://mirrors.huaweicloud.com/repository/npm/rollup/-/rollup-4.62.2.tgz. Extracting by manifest.
+737 silly tarball no local data for source-map-js@https://mirrors.huaweicloud.com/repository/npm/source-map-js/-/source-map-js-1.2.1.tgz. Extracting by manifest.
+738 silly tarball no local data for @rollup/rollup-win32-x64-gnu@https://mirrors.huaweicloud.com/repository/npm/@rollup/rollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.62.2.tgz. Extracting by manifest.
+739 silly tarball no local data for picomatch@https://mirrors.huaweicloud.com/repository/npm/picomatch/-/picomatch-4.0.5.tgz. Extracting by manifest.
+740 silly tarball no local data for postcss@https://mirrors.huaweicloud.com/repository/npm/postcss/-/postcss-8.5.16.tgz. Extracting by manifest.
+741 silly tarball no local data for fdir@https://mirrors.huaweicloud.com/repository/npm/fdir/-/fdir-6.5.0.tgz. Extracting by manifest.
+742 silly tarball no local data for esbuild@https://mirrors.huaweicloud.com/repository/npm/esbuild/-/esbuild-0.25.12.tgz. Extracting by manifest.
+743 silly tarball no local data for mime-db@https://mirrors.huaweicloud.com/repository/npm/mime-db/-/mime-db-1.52.0.tgz. Extracting by manifest.
+744 silly tarball no local data for @esbuild/win32-x64@https://mirrors.huaweicloud.com/repository/npm/@esbuild/win32-x64/-/win32-x64-0.25.12.tgz. Extracting by manifest.
+745 silly tarball no local data for ms@https://mirrors.huaweicloud.com/repository/npm/ms/-/ms-2.1.3.tgz. Extracting by manifest.
+746 silly tarball no local data for agent-base@https://mirrors.huaweicloud.com/repository/npm/agent-base/-/agent-base-6.0.2.tgz. Extracting by manifest.
+747 silly tarball no local data for math-intrinsics@https://mirrors.huaweicloud.com/repository/npm/math-intrinsics/-/math-intrinsics-1.1.0.tgz. Extracting by manifest.
+748 silly tarball no local data for debug@https://mirrors.huaweicloud.com/repository/npm/debug/-/debug-4.4.3.tgz. Extracting by manifest.
+749 silly tarball no local data for dunder-proto@https://mirrors.huaweicloud.com/repository/npm/dunder-proto/-/dunder-proto-1.0.1.tgz. Extracting by manifest.
+750 silly tarball no local data for has-symbols@https://mirrors.huaweicloud.com/repository/npm/has-symbols/-/has-symbols-1.1.0.tgz. Extracting by manifest.
+751 silly tarball no local data for gopd@https://mirrors.huaweicloud.com/repository/npm/gopd/-/gopd-1.2.0.tgz. Extracting by manifest.
+752 silly tarball no local data for es-object-atoms@https://mirrors.huaweicloud.com/repository/npm/es-object-atoms/-/es-object-atoms-1.1.2.tgz. Extracting by manifest.
+753 silly tarball no local data for function-bind@https://mirrors.huaweicloud.com/repository/npm/function-bind/-/function-bind-1.1.2.tgz. Extracting by manifest.
+754 silly tarball no local data for es-define-property@https://mirrors.huaweicloud.com/repository/npm/es-define-property/-/es-define-property-1.0.1.tgz. Extracting by manifest.
+755 silly tarball no local data for get-proto@https://mirrors.huaweicloud.com/repository/npm/get-proto/-/get-proto-1.0.1.tgz. Extracting by manifest.
+756 silly tarball no local data for has-tostringtag@https://mirrors.huaweicloud.com/repository/npm/has-tostringtag/-/has-tostringtag-1.0.2.tgz. Extracting by manifest.
+757 silly tarball no local data for get-intrinsic@https://mirrors.huaweicloud.com/repository/npm/get-intrinsic/-/get-intrinsic-1.3.0.tgz. Extracting by manifest.
+758 silly tarball no local data for es-errors@https://mirrors.huaweicloud.com/repository/npm/es-errors/-/es-errors-1.3.0.tgz. Extracting by manifest.
+759 silly tarball no local data for call-bind-apply-helpers@https://mirrors.huaweicloud.com/repository/npm/call-bind-apply-helpers/-/call-bind-apply-helpers-1.0.2.tgz. Extracting by manifest.
+760 silly tarball no local data for delayed-stream@https://mirrors.huaweicloud.com/repository/npm/delayed-stream/-/delayed-stream-1.0.0.tgz. Extracting by manifest.
+761 silly tarball no local data for hasown@https://mirrors.huaweicloud.com/repository/npm/hasown/-/hasown-2.0.4.tgz. Extracting by manifest.
+762 silly tarball no local data for combined-stream@https://mirrors.huaweicloud.com/repository/npm/combined-stream/-/combined-stream-1.0.8.tgz. Extracting by manifest.
+763 silly tarball no local data for mime-types@https://mirrors.huaweicloud.com/repository/npm/mime-types/-/mime-types-2.1.35.tgz. Extracting by manifest.
+764 silly tarball no local data for asynckit@https://mirrors.huaweicloud.com/repository/npm/asynckit/-/asynckit-0.4.0.tgz. Extracting by manifest.
+765 silly tarball no local data for https-proxy-agent@https://mirrors.huaweicloud.com/repository/npm/https-proxy-agent/-/https-proxy-agent-5.0.1.tgz. Extracting by manifest.
+766 silly tarball no local data for es-set-tostringtag@https://mirrors.huaweicloud.com/repository/npm/es-set-tostringtag/-/es-set-tostringtag-2.1.0.tgz. Extracting by manifest.
+767 silly tarball no local data for proxy-from-env@https://mirrors.huaweicloud.com/repository/npm/proxy-from-env/-/proxy-from-env-2.1.0.tgz. Extracting by manifest.
+768 silly tarball no local data for form-data@https://mirrors.huaweicloud.com/repository/npm/form-data/-/form-data-4.0.6.tgz. Extracting by manifest.
+769 silly tarball no local data for vue-router@https://mirrors.huaweicloud.com/repository/npm/vue-router/-/vue-router-4.6.4.tgz. Extracting by manifest.
+770 silly tarball no local data for axios@https://mirrors.huaweicloud.com/repository/npm/axios/-/axios-1.18.1.tgz. Extracting by manifest.
+771 silly tarball no local data for follow-redirects@https://mirrors.huaweicloud.com/repository/npm/follow-redirects/-/follow-redirects-1.16.0.tgz. Extracting by manifest.
+772 silly tarball no local data for vite@https://mirrors.huaweicloud.com/repository/npm/vite/-/vite-6.4.3.tgz. Extracting by manifest.
+773 silly tarball no local data for vue@https://mirrors.huaweicloud.com/repository/npm/vue/-/vue-3.5.39.tgz. Extracting by manifest.
+774 silly tarball no local data for @vitejs/plugin-vue@https://mirrors.huaweicloud.com/repository/npm/@vitejs/plugin-vue/-/plugin-vue-5.2.4.tgz. Extracting by manifest.
+775 http fetch POST 405 https://mirrors.huaweicloud.com/repository/npm/-/npm/v1/security/advisories/bulk 47ms
+776 verbose audit error HttpErrorGeneral: 405 Method Not Allowed - POST https://mirrors.huaweicloud.com/repository/npm/-/npm/v1/security/advisories/bulk
+776 verbose audit error     at D:\Node\node_modules\npm\node_modules\npm-registry-fetch\lib\check-response.js:103:15
+776 verbose audit error     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+776 verbose audit error     at async #getReport (D:\Node\node_modules\npm\node_modules\@npmcli\arborist\lib\audit-report.js:275:19)
+776 verbose audit error     at async AuditReport.run (D:\Node\node_modules\npm\node_modules\@npmcli\arborist\lib\audit-report.js:100:19) {
+776 verbose audit error   headers: [Object: null prototype] {
+776 verbose audit error     date: [ 'Tue, 07 Jul 2026 11:47:57 GMT' ],
+776 verbose audit error     'content-type': [ 'application/json;charset=UTF-8' ],
+776 verbose audit error     'transfer-encoding': [ 'chunked' ],
+776 verbose audit error     connection: [ 'keep-alive' ],
+776 verbose audit error     'set-cookie': [
+776 verbose audit error       'HWWAFSESTIME=1783424875064; path=/',
+776 verbose audit error       'HWWAFSESID=c6e5e58c0b0e713fc1a; path=/'
+776 verbose audit error     ],
+776 verbose audit error     'lubanops-gtrace-id': [ 'v-648621-1783424877747-79639568' ],
+776 verbose audit error     'lubanops-nenv-id': [ '269996' ],
+776 verbose audit error     server: [ 'elb' ],
+776 verbose audit error     'x-fetch-attempts': [ '1' ]
+776 verbose audit error   },
+776 verbose audit error   statusCode: 405,
+776 verbose audit error   code: 'E405',
+776 verbose audit error   method: 'POST',
+776 verbose audit error   uri: 'https://mirrors.huaweicloud.com/repository/npm/-/npm/v1/security/advisories/bulk',
+776 verbose audit error   body: { errors: [ [Object] ] },
+776 verbose audit error   pkgid: 'bulk'
+776 verbose audit error }
+777 silly audit error [object Object]
+778 silly audit report null
+779 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@babel/helper-string-parser/-/helper-string-parser-7.29.7.tgz 70ms (cache miss)
+780 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue/devtools-api/-/devtools-api-6.6.4.tgz 77ms (cache miss)
+781 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/estree-walker/-/estree-walker-2.0.2.tgz 73ms (cache miss)
+782 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-ssr/-/compiler-ssr-3.5.39.tgz 83ms (cache miss)
+783 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@types/estree/-/estree-1.0.9.tgz 103ms (cache miss)
+784 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/picocolors/-/picocolors-1.1.1.tgz 107ms (cache miss)
+785 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/nanoid/-/nanoid-3.3.15.tgz 107ms (cache miss)
+786 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@babel/helper-validator-identifier/-/helper-validator-identifier-7.29.7.tgz 122ms (cache miss)
+787 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/tinyglobby/-/tinyglobby-0.2.17.tgz 128ms (cache miss)
+788 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue/shared/-/shared-3.5.39.tgz 150ms (cache miss)
+789 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue/reactivity/-/reactivity-3.5.39.tgz 162ms (cache miss)
+790 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-core/-/compiler-core-3.5.39.tgz 166ms (cache miss)
+791 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/magic-string/-/magic-string-0.30.21.tgz 170ms (cache miss)
+792 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue/server-renderer/-/server-renderer-3.5.39.tgz 169ms (cache miss)
+793 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/fdir/-/fdir-6.5.0.tgz 165ms (cache miss)
+794 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/csstype/-/csstype-3.2.3.tgz 185ms (cache miss)
+795 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/picomatch/-/picomatch-4.0.5.tgz 179ms (cache miss)
+796 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue/runtime-core/-/runtime-core-3.5.39.tgz 190ms (cache miss)
+797 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/ms/-/ms-2.1.3.tgz 183ms (cache miss)
+798 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/esbuild/-/esbuild-0.25.12.tgz 188ms (cache miss)
+799 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/mime-db/-/mime-db-1.52.0.tgz 189ms (cache miss)
+800 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/agent-base/-/agent-base-6.0.2.tgz 207ms (cache miss)
+801 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/dunder-proto/-/dunder-proto-1.0.1.tgz 211ms (cache miss)
+802 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/math-intrinsics/-/math-intrinsics-1.1.0.tgz 214ms (cache miss)
+803 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/source-map-js/-/source-map-js-1.2.1.tgz 218ms (cache miss)
+804 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.5.tgz 224ms (cache miss)
+805 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/has-symbols/-/has-symbols-1.1.0.tgz 219ms (cache miss)
+806 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/gopd/-/gopd-1.2.0.tgz 222ms (cache miss)
+807 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/debug/-/debug-4.4.3.tgz 225ms (cache miss)
+808 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue/runtime-dom/-/runtime-dom-3.5.39.tgz 234ms (cache miss)
+809 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/es-object-atoms/-/es-object-atoms-1.1.2.tgz 245ms (cache miss)
+810 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/function-bind/-/function-bind-1.1.2.tgz 246ms (cache miss)
+811 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/es-define-property/-/es-define-property-1.0.1.tgz 246ms (cache miss)
+812 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-dom/-/compiler-dom-3.5.39.tgz 254ms (cache miss)
+813 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/get-proto/-/get-proto-1.0.1.tgz 251ms (cache miss)
+814 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/has-tostringtag/-/has-tostringtag-1.0.2.tgz 278ms (cache miss)
+815 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/get-intrinsic/-/get-intrinsic-1.3.0.tgz 284ms (cache miss)
+816 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.62.2.tgz 292ms (cache miss)
+817 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/es-errors/-/es-errors-1.3.0.tgz 285ms (cache miss)
+818 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/delayed-stream/-/delayed-stream-1.0.0.tgz 297ms (cache miss)
+819 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/call-bind-apply-helpers/-/call-bind-apply-helpers-1.0.2.tgz 300ms (cache miss)
+820 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/hasown/-/hasown-2.0.4.tgz 300ms (cache miss)
+821 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/combined-stream/-/combined-stream-1.0.8.tgz 301ms (cache miss)
+822 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/mime-types/-/mime-types-2.1.35.tgz 309ms (cache miss)
+823 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/asynckit/-/asynckit-0.4.0.tgz 313ms (cache miss)
+824 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/rollup/-/rollup-4.62.2.tgz 324ms (cache miss)
+825 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/postcss/-/postcss-8.5.16.tgz 323ms (cache miss)
+826 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/https-proxy-agent/-/https-proxy-agent-5.0.1.tgz 317ms (cache miss)
+827 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/es-set-tostringtag/-/es-set-tostringtag-2.1.0.tgz 317ms (cache miss)
+828 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@babel/parser/-/parser-7.29.7.tgz 333ms (cache miss)
+829 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/follow-redirects/-/follow-redirects-1.16.0.tgz 329ms (cache miss)
+830 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/proxy-from-env/-/proxy-from-env-2.1.0.tgz 331ms (cache miss)
+831 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/form-data/-/form-data-4.0.6.tgz 335ms (cache miss)
+832 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vue/compiler-sfc/-/compiler-sfc-3.5.39.tgz 356ms (cache miss)
+833 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@vitejs/plugin-vue/-/plugin-vue-5.2.4.tgz 351ms (cache miss)
+834 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/entities/-/entities-7.0.1.tgz 413ms (cache miss)
+835 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/vue-router/-/vue-router-4.6.4.tgz 446ms (cache miss)
+836 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/vue/-/vue-3.5.39.tgz 454ms (cache miss)
+837 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@rollup/rollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.62.2.tgz 486ms (cache miss)
+838 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@babel/types/-/types-7.29.7.tgz 491ms (cache miss)
+839 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/vite/-/vite-6.4.3.tgz 515ms (cache miss)
+840 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/axios/-/axios-1.18.1.tgz 545ms (cache miss)
+841 http fetch GET 200 https://mirrors.huaweicloud.com/repository/npm/@esbuild/win32-x64/-/win32-x64-0.25.12.tgz 647ms (cache miss)
+842 info run esbuild@0.25.12 postinstall node_modules/esbuild node install.js
+843 info run esbuild@0.25.12 postinstall { code: 0, signal: null }
+844 silly ADD node_modules/@vue/devtools-api
+845 silly ADD node_modules/@jridgewell/sourcemap-codec
+846 silly ADD node_modules/csstype
+847 silly ADD node_modules/@vue/runtime-core
+848 silly ADD node_modules/@vue/reactivity
+849 silly ADD node_modules/magic-string
+850 silly ADD node_modules/@vue/compiler-ssr
+851 silly ADD node_modules/@babel/helper-validator-identifier
+852 silly ADD node_modules/@babel/helper-string-parser
+853 silly ADD node_modules/@babel/types
+854 silly ADD node_modules/estree-walker
+855 silly ADD node_modules/entities
+856 silly ADD node_modules/@babel/parser
+857 silly ADD node_modules/@vue/compiler-core
+858 silly ADD node_modules/@vue/shared
+859 silly ADD node_modules/@vue/server-renderer
+860 silly ADD node_modules/@vue/runtime-dom
+861 silly ADD node_modules/@vue/compiler-sfc
+862 silly ADD node_modules/@vue/compiler-dom
+863 silly ADD node_modules/@types/estree
+864 silly ADD node_modules/@rollup/rollup-win32-x64-msvc
+865 silly ADD node_modules/@rollup/rollup-win32-x64-gnu
+866 silly ADD node_modules/source-map-js
+867 silly ADD node_modules/picocolors
+868 silly ADD node_modules/nanoid
+869 silly ADD node_modules/@esbuild/win32-x64
+870 silly ADD node_modules/tinyglobby
+871 silly ADD node_modules/rollup
+872 silly ADD node_modules/postcss
+873 silly ADD node_modules/picomatch
+874 silly ADD node_modules/fdir
+875 silly ADD node_modules/esbuild
+876 silly ADD node_modules/mime-db
+877 silly ADD node_modules/ms
+878 silly ADD node_modules/debug
+879 silly ADD node_modules/agent-base
+880 silly ADD node_modules/dunder-proto
+881 silly ADD node_modules/math-intrinsics
+882 silly ADD node_modules/has-symbols
+883 silly ADD node_modules/gopd
+884 silly ADD node_modules/get-proto
+885 silly ADD node_modules/function-bind
+886 silly ADD node_modules/es-object-atoms
+887 silly ADD node_modules/es-define-property
+888 silly ADD node_modules/call-bind-apply-helpers
+889 silly ADD node_modules/has-tostringtag
+890 silly ADD node_modules/get-intrinsic
+891 silly ADD node_modules/es-errors
+892 silly ADD node_modules/delayed-stream
+893 silly ADD node_modules/mime-types
+894 silly ADD node_modules/hasown
+895 silly ADD node_modules/es-set-tostringtag
+896 silly ADD node_modules/combined-stream
+897 silly ADD node_modules/asynckit
+898 silly ADD node_modules/proxy-from-env
+899 silly ADD node_modules/https-proxy-agent
+900 silly ADD node_modules/form-data
+901 silly ADD node_modules/follow-redirects
+902 silly ADD node_modules/vue-router
+903 silly ADD node_modules/axios
+904 silly ADD node_modules/vite
+905 silly ADD node_modules/vue
+906 silly ADD node_modules/@vitejs/plugin-vue
+907 warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+907 warn allow-scripts   esbuild@0.25.12 (postinstall: node install.js)
+907 warn allow-scripts
+907 warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+908 verbose cwd D:\文档\工作\小学期2\BusMind-main\frontend
+909 verbose os Windows_NT 10.0.22621
+910 verbose node v24.18.0
+911 verbose npm  v11.16.0
+912 notice
+912 notice New minor version of npm available! 11.16.0 -> 11.18.0
+912 notice Changelog: https://github.com/npm/cli/releases/tag/v11.18.0
+912 notice To update run: npm install -g npm@11.18.0
+912 notice  { force: true, Symbol(proc-log.meta): true }
+913 verbose exit 0
+914 info ok
