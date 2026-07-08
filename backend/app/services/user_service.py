@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
 from datetime import timedelta
-from app.models.user import User
-from app.schemas.user_schema import UserRegisterRequest, UserLoginRequest, UserDTO, LoginResponse, UserUpdateRequest, UserMeResponse
-from app.dependencies.auth import verify_password, get_password_hash, create_access_token
-from app.core.config import settings
+from backend.app.models.user import User
+from backend.app.schemas.user_schema import UserRegisterRequest, UserLoginRequest, UserDTO, LoginResponse, UserUpdateRequest, UserMeResponse
+from backend.app.dependencies.auth import verify_password, get_password_hash, create_access_token
+from backend.app.core.config import settings
 
 def register_user(db: Session, request: UserRegisterRequest) -> UserDTO:
     existing_user = db.query(User).filter(User.username == request.username).first()

@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
-from app.dependencies.auth import get_db, get_current_user
-from app.services.user_service import register_user, login_user, get_current_user as get_current_user_service, update_user
-from app.schemas.user_schema import (
+from backend.app.dependencies.auth import get_db, get_current_user
+from backend.app.services.user_service import register_user, login_user, get_current_user as get_current_user_service, update_user
+from backend.app.schemas.user_schema import (
     UserRegisterRequest,
     UserLoginRequest,
     UserUpdateRequest,
@@ -12,7 +12,7 @@ from app.schemas.user_schema import (
     LoginResponse,
     ApiResponse
 )
-from app.models.user import User
+from backend.app.models.user import User
 
 router = APIRouter(prefix="/users", tags=["用户"])
 
