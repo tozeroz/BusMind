@@ -1,68 +1,124 @@
 <template>
-  <section class="page-grid">
-    <div class="navigation-page">
-      <div class="map-stage">
+  <section class="home-map-layout">
+    <aside class="destination-panel">
+      <div class="side-scroll">
+        <template v-if="panelMode === 'search'">
+          <p class="eyebrow">乘客端</p>
+          <h1>首页</h1>
+
+          <form class="destination-search" @submit.prevent="searchRoutes">
+            <p class="eyebrow">目的地检索</p>
+            <h2>你要去哪里？</h2>
+            <div class="location-line">
+              <span>当前位置</span>
+              <strong>定位获取</strong>
+            </div>
+            <label>
+              目的地
+              <input v-model="query.end" placeholder="如：教学楼" />
+            </label>
+            <button class="primary-button" type="submit">开始检索</button>
+            <p v-if="notice" class="form-tip">{{ notice }}</p>
+          </form>
+
+          <div class="home-side-stats">
+            <article v-for="item in stats" :key="item.label" class="stat-card">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
+            </article>
+          </div>
+        </template>
+
+        <template v-else-if="panelMode === 'station'">
+          <button class="ghost-button back-side-button" type="button" @click="resetPanel">返回检索</button>
+          <p class="eyebrow">站点信息</p>
+          <h1>{{ selectedInfo.name }}</h1>
+          <div class="info-list">
+            <p><span>经过线路</span><strong>校园 1 号线 / 校园 2 号线</strong></p>
+            <p><span>下一班车</span><strong>约 5 分钟</strong></p>
+            <p><span>当前客流</span><strong>{{ selectedInfo.crowd }}</strong></p>
+            <p><span>站点热度</span><strong>较高</strong></p>
+          </div>
+        </template>
+
+        <template v-else>
+          <button class="ghost-button back-side-button" type="button" @click="resetPanel">返回检索</button>
+          <p class="eyebrow">路段客流</p>
+          <h1>{{ selectedInfo.name }}</h1>
+          <div class="info-list">
+            <p><span>拥挤指数</span><strong>{{ selectedInfo.crowd }}</strong></p>
+            <p><span>平均速度</span><strong>18 km/h</strong></p>
+            <p><span>预计延误</span><strong>3 分钟</strong></p>
+            <p><span>建议</span><strong>可正常通行</strong></p>
+          </div>
+        </template>
+      </div>
+    </aside>
+
+    <section
+      class="home-map-panel"
+      @wheel.prevent="zoomMap"
+      @mousedown="startMapDrag"
+    >
+      <div
+        class="map-stage"
+        :style="{ transform: `translate(${mapTransform.x}px, ${mapTransform.y}px) scale(${mapTransform.scale})` }"
+      >
         <div class="map-toolbar">
           <strong>地图预留区</strong>
-          <span>后续接入地图 API 后展示可移动地图、站点、线路和车辆位置</span>
+          <span>滚轮缩放，按住拖动；点击站点或路段查看信息</span>
         </div>
-        <div class="map-road horizontal"></div>
-        <div class="map-road vertical"></div>
-        <div class="map-pin start">起</div>
-        <div class="map-pin end">终</div>
+        <button class="map-road horizontal clickable-road" type="button" @click.stop="selectRoad('教学楼主干路', '适中')"></button>
+        <button class="map-road vertical clickable-road" type="button" @click.stop="selectRoad('图书馆交叉路段', '拥挤')"></button>
+        <button class="map-pin start" type="button" @click.stop="selectStation('当前位置', '适中')">起</button>
+        <button class="map-pin end" type="button" @click.stop="selectStation('教学楼站', '拥挤')">终</button>
       </div>
 
-      <form class="route-search-panel" @submit.prevent="searchRoutes">
-        <p class="eyebrow">路线规划</p>
-        <h2>你要去哪里？</h2>
-        <label>
-          出发地
-          <input v-model="query.start" placeholder="如：宿舍区" />
-        </label>
-        <label>
-          目的地
-          <input v-model="query.end" placeholder="如：教学楼" />
-        </label>
-        <button class="primary-button" type="submit">询问 AI 出行助手</button>
-        <p v-if="notice" class="form-tip">{{ notice }}</p>
-      </form>
-    </div>
-
-    <div class="stats-row">
-      <article v-for="item in stats" :key="item.label" class="stat-card">
-        <span>{{ item.label }}</span>
-        <strong>{{ item.value }}</strong>
+      <article v-if="panelMode !== 'search'" class="map-chart-card">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">{{ panelMode === 'station' ? '站点图表' : '路段图表' }}</p>
+            <h3>{{ selectedInfo.name }}</h3>
+          </div>
+          <button class="ghost-button" type="button" @click="resetPanel">关闭</button>
+        </div>
+        <div class="mini-chart">
+          <span style="height: 42%"></span>
+          <span style="height: 70%"></span>
+          <span style="height: 56%"></span>
+          <span style="height: 88%"></span>
+          <span style="height: 64%"></span>
+        </div>
+        <p class="muted">后续接入客流数据后，这里展示真实统计图表。</p>
       </article>
-    </div>
+    </section>
 
-    <div class="panel">
-      <div class="section-title">
-        <h3>功能入口</h3>
-        <p>乘客端保留地图首页和 AI 出行助手，路线、车辆、客流数据归入管理员端。</p>
-      </div>
-      <div class="feature-grid">
-        <RouterLink v-for="item in features" :key="item.path" class="feature-card" :to="item.path">
-          <strong>{{ item.title }}</strong>
-          <span>{{ item.desc }}</span>
-        </RouterLink>
-      </div>
-    </div>
+    <button
+      class="ai-floating-button"
+      type="button"
+      :style="{ left: `${floatPosition.x}px`, top: `${floatPosition.y}px` }"
+      @mousedown.stop="startFloatDrag"
+      @click="openAi"
+      title="AI 出行助手"
+    >
+      AI
+    </button>
   </section>
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ref } from 'vue'
 
 const router = useRouter()
-const query = reactive({ start: '宿舍区', end: '教学楼' })
+const query = reactive({ end: '教学楼' })
 const notice = ref('')
-
-const searchRoutes = () => {
-  notice.value = `已带入：${query.start} → ${query.end}`
-  router.push('/ai')
-}
+const panelMode = ref('search')
+const selectedInfo = reactive({ name: '', crowd: '' })
+const mapTransform = reactive({ x: 0, y: 0, scale: 1 })
+const mapDrag = reactive({ dragging: false, startX: 0, startY: 0, originX: 0, originY: 0 })
+const floatPosition = reactive({ x: window.innerWidth - 112, y: window.innerHeight - 120 })
+const dragState = reactive({ dragging: false, moved: false, offsetX: 0, offsetY: 0 })
 
 const stats = [
   { label: '运行线路', value: '3 条' },
@@ -71,8 +127,79 @@ const stats = [
   { label: '当前客流', value: '适中' }
 ]
 
-const features = [
-  { title: 'AI 出行助手', desc: '用自然语言获取出行建议', path: '/ai' },
-  { title: '地图预览', desc: '后续展示可移动地图和实时位置', path: '/home' }
-]
+const searchRoutes = () => {
+  notice.value = `已检索目的地：${query.end}`
+}
+
+const resetPanel = () => {
+  panelMode.value = 'search'
+  selectedInfo.name = ''
+  selectedInfo.crowd = ''
+}
+
+const selectStation = (name, crowd) => {
+  panelMode.value = 'station'
+  selectedInfo.name = name
+  selectedInfo.crowd = crowd
+}
+
+const selectRoad = (name, crowd) => {
+  panelMode.value = 'road'
+  selectedInfo.name = name
+  selectedInfo.crowd = crowd
+}
+
+const zoomMap = (event) => {
+  const nextScale = mapTransform.scale + (event.deltaY > 0 ? -0.08 : 0.08)
+  mapTransform.scale = Math.min(1.8, Math.max(0.7, Number(nextScale.toFixed(2))))
+}
+
+const startMapDrag = (event) => {
+  mapDrag.dragging = true
+  mapDrag.startX = event.clientX
+  mapDrag.startY = event.clientY
+  mapDrag.originX = mapTransform.x
+  mapDrag.originY = mapTransform.y
+  window.addEventListener('mousemove', onMapDrag)
+  window.addEventListener('mouseup', stopMapDrag)
+}
+
+const onMapDrag = (event) => {
+  if (!mapDrag.dragging) return
+  mapTransform.x = mapDrag.originX + event.clientX - mapDrag.startX
+  mapTransform.y = mapDrag.originY + event.clientY - mapDrag.startY
+}
+
+const stopMapDrag = () => {
+  mapDrag.dragging = false
+  window.removeEventListener('mousemove', onMapDrag)
+  window.removeEventListener('mouseup', stopMapDrag)
+}
+
+const startFloatDrag = (event) => {
+  dragState.dragging = true
+  dragState.moved = false
+  dragState.offsetX = event.clientX - floatPosition.x
+  dragState.offsetY = event.clientY - floatPosition.y
+  window.addEventListener('mousemove', onFloatDrag)
+  window.addEventListener('mouseup', stopFloatDrag)
+}
+
+const onFloatDrag = (event) => {
+  if (!dragState.dragging) return
+  dragState.moved = true
+  floatPosition.x = Math.min(Math.max(16, event.clientX - dragState.offsetX), window.innerWidth - 72)
+  floatPosition.y = Math.min(Math.max(76, event.clientY - dragState.offsetY), window.innerHeight - 72)
+}
+
+const stopFloatDrag = () => {
+  dragState.dragging = false
+  window.removeEventListener('mousemove', onFloatDrag)
+  window.removeEventListener('mouseup', stopFloatDrag)
+}
+
+const openAi = () => {
+  if (dragState.moved) return
+  router.push('/ai')
+}
 </script>

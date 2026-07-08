@@ -20,6 +20,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  overflow: hidden;
   color: var(--text);
   background:
     radial-gradient(rgba(0, 0, 0, 0.04) 0, rgba(0, 0, 0, 0.44) 100%),
@@ -55,7 +56,8 @@ button {
 }
 
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: block;
 }
 
@@ -69,7 +71,8 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 10px 18px;
+  height: 64px;
+  padding: 8px 18px;
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(24px);
@@ -161,7 +164,9 @@ button {
 }
 
 .main-panel {
-  padding: 86px 28px 28px;
+  height: 100vh;
+  overflow: hidden;
+  padding: 78px 16px 16px;
 }
 
 .topbar {
@@ -722,6 +727,186 @@ label {
   background: var(--panel-soft);
 }
 
+.home-map-layout {
+  position: relative;
+  height: calc(100vh - 94px);
+  display: grid;
+  grid-template-columns: 23% 1fr;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.destination-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow);
+}
+
+.side-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: 22px;
+}
+
+.destination-panel h1 {
+  font-size: 34px;
+}
+
+.destination-search {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 22px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.location-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  padding: 12px 14px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.location-line strong {
+  color: #fff;
+}
+
+.home-side-stats {
+  display: grid;
+  gap: 12px;
+  align-content: end;
+  margin-top: 22px;
+}
+
+.home-map-panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+  cursor: grab;
+}
+
+.home-map-panel:active {
+  cursor: grabbing;
+}
+
+.home-map-panel .map-stage {
+  width: 100%;
+  height: 100%;
+  transform-origin: center;
+  transition: transform 0.08s linear;
+}
+
+.clickable-road {
+  border: 0;
+  cursor: pointer;
+}
+
+.map-pin {
+  border: 0;
+  cursor: pointer;
+}
+
+.map-chart-card {
+  position: absolute;
+  right: 22px;
+  top: 78px;
+  z-index: 8;
+  width: min(360px, calc(100% - 44px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(24px);
+  box-shadow: var(--shadow);
+}
+
+.mini-chart {
+  height: 150px;
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin: 12px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mini-chart span {
+  flex: 1;
+  border-radius: 999px 999px 0 0;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.ai-floating-button {
+  position: fixed;
+  z-index: 30;
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  color: var(--ink);
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(16px);
+  user-select: none;
+}
+
+.back-side-button {
+  width: max-content;
+  margin-bottom: 18px;
+}
+
+.info-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.info-list p {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.info-list span {
+  color: var(--muted);
+}
+
+.ai-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .form-tip {
   color: rgba(255, 255, 255, 0.76);
   font-size: 13px;
@@ -1032,6 +1217,15 @@ label {
   .admin-form-row,
   .admin-table-like {
     grid-template-columns: 1fr;
+  }
+
+  .home-map-layout {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .home-map-panel {
+    min-height: 520px;
   }
 
   .ai-chat-shell {

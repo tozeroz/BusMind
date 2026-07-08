@@ -29,7 +29,10 @@
           <p class="eyebrow">AI 出行助手</p>
           <h2>公交自然语言问答</h2>
         </div>
-        <span class="status-dot">演示模式</span>
+        <div class="ai-header-actions">
+          <RouterLink class="ghost-button" to="/home">返回主页</RouterLink>
+          <span class="status-dot">演示模式</span>
+        </div>
       </header>
 
       <div class="ai-message-list">
