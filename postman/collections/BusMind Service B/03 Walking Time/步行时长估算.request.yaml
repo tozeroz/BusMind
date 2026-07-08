@@ -1,0 +1,24 @@
+$kind: http-request
+url: "{{base_url}}/walking-time-estimation"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "origin_longitude": 116.3974,
+      "origin_latitude": 39.9093,
+      "target_station_id": 3,
+      "walking_speed_mps": 1.2,
+      "route_mode": "straight_line"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 422, 503]); });
+      pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });
+      pm.test('Business request succeeded', function () { const j = pm.response.json(); pm.expect(j.code).to.eql(0); pm.expect(j.message).to.eql('success'); });
+      pm.test('Walking result non-negative', function () { const d=pm.response.json().data; pm.expect(d.walk_distance_meters).to.be.at.least(0); pm.expect(d.walk_time_minutes).to.be.at.least(0); });
+    language: text/javascript
+order: 1000

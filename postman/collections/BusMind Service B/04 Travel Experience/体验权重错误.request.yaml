@@ -1,0 +1,26 @@
+$kind: http-request
+url: "{{base_url}}/travel-experience/evaluate"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "predicted_load_level": "seats_available",
+      "transfer_count": 0,
+      "walk_time_minutes": 5,
+      "weights": {
+        "w_load": 0.5,
+        "w_walk": 0.5,
+        "w_transfer": 0.5
+      }
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 422, 503]); });
+      pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });
+      pm.test('Returns 40002', function () { pm.expect(pm.response.code).to.eql(400); pm.expect(pm.response.json().code).to.eql(40002); });
+    language: text/javascript
+order: 2000
