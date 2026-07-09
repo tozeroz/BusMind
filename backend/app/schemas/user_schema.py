@@ -100,6 +100,6 @@ class QueryHistoryResponse(BaseModel):
 class ApiResponse(BaseModel):
     code: int
     message: str
-    data: Optional[dict] = None
+    data: Optional[dict | list] = None
     trace_id: str
     timestamp: str

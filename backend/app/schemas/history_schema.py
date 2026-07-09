@@ -7,7 +7,7 @@ class PassengerFlowTrendDTO(BaseModel):
     target_type: str
     target_id: int
     bus_stop_code: Optional[str]
-    record_time: datetime
+    record_time: Optional[datetime]
     day_type: Optional[str]
     tap_in_volume: int
     tap_out_volume: int
@@ -43,7 +43,7 @@ class EtaPredictionDTO(BaseModel):
     vehicle_id: int
     line_id: int
     target_station_id: int
-    prediction_time: datetime
+    prediction_time: Optional[datetime]
     predicted_eta_minutes: float
     arrival_time: Optional[datetime]
     vehicle_to_stop_distance_m: Optional[float]
@@ -57,7 +57,7 @@ class LoadPredictionDTO(BaseModel):
     vehicle_id: int
     line_id: int
     station_id: Optional[int]
-    prediction_time: datetime
+    prediction_time: Optional[datetime]
     predicted_load_level: str
     load_score: Optional[float]
     predicted_load_rate: Optional[float]

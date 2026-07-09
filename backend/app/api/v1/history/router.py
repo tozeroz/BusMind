@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
@@ -96,6 +96,27 @@ async def get_passenger_flow_prediction_api(
     return build_response(0, "success", [r.model_dump() for r in result])
 
 @router.get(
+    "/eta/line/{line_id}",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get ETA Predictions by Line",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def get_eta_by_line(
+    line_id: int,
+    target_station_id: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db)
+):
+    result = get_eta_predictions_by_line(
+        db=db,
+        line_id=line_id,
+        target_station_id=target_station_id
+    )
+    return build_response(0, "success", [r.model_dump() for r in result])
+
+@router.get(
     "/eta/{vehicle_id}/{target_station_id}",
     response_model=ApiResponse,
     status_code=200,
@@ -119,26 +140,29 @@ async def get_eta(
     )
     if result:
         return build_response(0, "success", result.model_dump())
-    return build_response(404, "ETA prediction not found")
+    raise HTTPException(
+        status_code=404,
+        detail=build_response(404, "ETA prediction not found").model_dump()
+    )
 
 @router.get(
-    "/eta/line/{line_id}",
+    "/load/line/{line_id}",
     response_model=ApiResponse,
     status_code=200,
-    summary="Get ETA Predictions by Line",
+    summary="Get Load Predictions by Line",
     responses={
         200: {"description": "Get success"}
     }
 )
-async def get_eta_by_line(
+async def get_load_by_line(
     line_id: int,
-    target_station_id: Optional[int] = Query(None, ge=1),
+    station_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db)
 ):
-    result = get_eta_predictions_by_line(
+    result = get_load_predictions_by_line(
         db=db,
         line_id=line_id,
-        target_station_id=target_station_id
+        station_id=station_id
     )
     return build_response(0, "success", [r.model_dump() for r in result])
 
@@ -166,25 +190,7 @@ async def get_load(
     )
     if result:
         return build_response(0, "success", result.model_dump())
-    return build_response(404, "Load prediction not found")
-
-@router.get(
-    "/load/line/{line_id}",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Get Load Predictions by Line",
-    responses={
-        200: {"description": "Get success"}
-    }
-)
-async def get_load_by_line(
-    line_id: int,
-    station_id: Optional[int] = Query(None, ge=1),
-    db: Session = Depends(get_db)
-):
-    result = get_load_predictions_by_line(
-        db=db,
-        line_id=line_id,
-        station_id=station_id
+    raise HTTPException(
+        status_code=404,
+        detail=build_response(404, "Load prediction not found").model_dump()
     )
-    return build_response(0, "success", [r.model_dump() for r in result])

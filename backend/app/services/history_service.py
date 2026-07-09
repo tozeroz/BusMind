@@ -11,6 +11,15 @@ from app.schemas.history_schema import (
     LoadPredictionDTO
 )
 
+def _build_record_time(year_month: str, hour: int) -> datetime:
+    if year_month:
+        try:
+            date_part = datetime.strptime(year_month, "%Y-%m")
+            return datetime(date_part.year, date_part.month, 1, hour or 0, 0, 0)
+        except:
+            pass
+    return None
+
 def get_passenger_flow_trend(
     db: Session,
     line_id: Optional[int] = None,
@@ -22,15 +31,9 @@ def get_passenger_flow_trend(
     query = db.query(PassengerFlowTrend)
     
     if station_id:
-        query = query.filter(PassengerFlowTrend.target_id == station_id, PassengerFlowTrend.target_type == "station")
+        query = query.filter(PassengerFlowTrend.target_id == station_id)
     
-    if start_date:
-        query = query.filter(PassengerFlowTrend.record_time >= start_date)
-    
-    if end_date:
-        query = query.filter(PassengerFlowTrend.record_time <= end_date)
-    
-    records = query.order_by(PassengerFlowTrend.record_time).all()
+    records = query.order_by(PassengerFlowTrend.year_month, PassengerFlowTrend.hour).all()
     
     items = []
     total_tap_in = 0
@@ -41,12 +44,14 @@ def get_passenger_flow_trend(
     flow_levels = {}
     
     for record in records:
+        record_time = _build_record_time(record.year_month, record.hour)
+        
         items.append(PassengerFlowTrendDTO(
             flow_record_id=record.flow_record_id,
             target_type=record.target_type,
             target_id=record.target_id,
             bus_stop_code=record.bus_stop_code,
-            record_time=record.record_time,
+            record_time=record_time,
             day_type=record.day_type,
             tap_in_volume=record.tap_in_volume,
             tap_out_volume=record.tap_out_volume,
@@ -59,7 +64,7 @@ def get_passenger_flow_trend(
         total_flow += record.total_flow
         if record.total_flow > peak_flow:
             peak_flow = record.total_flow
-            peak_hour = record.record_time.hour if record.record_time else None
+            peak_hour = record.hour
         if record.flow_level:
             flow_levels[record.flow_level] = flow_levels.get(record.flow_level, 0) + 1
     
