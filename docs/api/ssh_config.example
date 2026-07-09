@@ -1,0 +1,12 @@
+# Copy the relevant block to:
+# C:/Users/<your-windows-user>/.ssh/config
+# Do not put the real private key inside the BusMind project.
+
+Host busmind-server
+    HostName <SSH_SERVER_IP_OR_DOMAIN>
+    User <SSH_USERNAME>
+    Port 22
+    IdentityFile C:/Users/<your-windows-user>/.ssh/busmind_server.pem
+    IdentitiesOnly yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 3

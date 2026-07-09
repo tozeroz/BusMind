@@ -31,7 +31,7 @@ class SimulationStateStore:
 
     def __init__(self) -> None:
         self._eta: dict[tuple[int, int, int | None], PredictionOverride] = {}
-        self._load: dict[tuple[int, int, int | None], PredictionOverride] = {}
+        self._load: dict[tuple[int, int | None, int | None], PredictionOverride] = {}
         self._lock = RLock()
 
     def clear(self) -> None:
@@ -82,7 +82,7 @@ class SimulationStateStore:
         self,
         *,
         line_id: int,
-        station_id: int,
+        station_id: int | None,
         vehicle_id: int | None,
         payload: dict[str, Any],
         source: str,
@@ -99,12 +99,14 @@ class SimulationStateStore:
         self,
         *,
         line_id: int,
-        station_id: int,
+        station_id: int | None,
         vehicle_id: int | None,
     ) -> PredictionOverride | None:
         keys = [
             (line_id, station_id, vehicle_id),
             (line_id, station_id, None),
+            (line_id, None, vehicle_id),
+            (line_id, None, None),
         ]
         with self._lock:
             for key in keys:

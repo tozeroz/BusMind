@@ -83,6 +83,7 @@ class SimulationService:
         payload: dict[str, Any]
         if request.prediction_type == PredictionType.ETA:
             assert request.vehicle_id is not None
+            assert request.line_id is not None
             assert request.target_station_id is not None
             eta_minutes = self._resolve_eta_minutes(
                 request.predicted_eta_minutes,
@@ -91,7 +92,9 @@ class SimulationService:
             arrival_time = request.arrival_time
             if arrival_time is not None:
                 arrival_time = ensure_local_datetime(arrival_time)
+            prediction_time = ensure_local_datetime(request.prediction_time)
             payload = {
+                "prediction_time": prediction_time,
                 "predicted_eta_minutes": eta_minutes,
                 "arrival_time": arrival_time,
                 "confidence": request.confidence,
@@ -108,11 +111,11 @@ class SimulationService:
             )
             storage_key = (
                 f"eta:{request.vehicle_id}:{request.target_station_id}:"
-                f"{request.line_id if request.line_id is not None else '*'}"
+                f"{request.line_id}"
             )
         else:
+            assert request.vehicle_id is not None
             assert request.line_id is not None
-            assert request.station_id is not None
             level = request.predicted_load_level
             rate = request.predicted_load_rate
             if level is None and rate is not None:
@@ -120,15 +123,22 @@ class SimulationService:
             if rate is None and level is not None:
                 rate = _default_rate_for_level(level)
             assert level is not None and rate is not None
+            prediction_time = ensure_local_datetime(request.prediction_time)
             capacity = request.capacity
             count = request.predicted_onboard_count
             if count is None and capacity is not None:
                 count = int(round(capacity * rate))
+            load_score = request.load_score
+            if load_score is None:
+                load_score = _load_score_from_rate(rate)
             payload = {
-                "predicted_load_rate": round(rate, 2),
+                "prediction_time": prediction_time,
+                "predicted_load_rate": round(rate, 4),
                 "predicted_load_level": level.value,
                 "predicted_onboard_count": count,
+                "onboard_count": count,
                 "capacity": capacity,
+                "load_score": load_score,
                 "confidence": request.confidence,
                 "model_version": request.model_version,
                 "metadata": request.metadata,
@@ -142,8 +152,9 @@ class SimulationService:
                 expires_in_seconds=request.expires_in_seconds,
             )
             storage_key = (
-                f"passenger_load:{request.line_id}:{request.station_id}:"
-                f"{request.vehicle_id if request.vehicle_id is not None else '*'}"
+                f"passenger_load:{request.line_id}:"
+                f"{request.station_id if request.station_id is not None else '*'}:"
+                f"{request.vehicle_id}"
             )
 
         return PredictionResultUpdateResult(
@@ -302,7 +313,9 @@ def _level_from_rate(rate: float) -> LoadLevel:
         return LoadLevel.SEATS_AVAILABLE
     if rate <= 0.85:
         return LoadLevel.STANDING_AVAILABLE
-    return LoadLevel.LIMITED_STANDING
+    if rate <= 1.0:
+        return LoadLevel.LIMITED_STANDING
+    return LoadLevel.OVERCROWDED
 
 
 def _default_rate_for_level(level: LoadLevel) -> float:
@@ -310,7 +323,12 @@ def _default_rate_for_level(level: LoadLevel) -> float:
         LoadLevel.SEATS_AVAILABLE: 0.45,
         LoadLevel.STANDING_AVAILABLE: 0.72,
         LoadLevel.LIMITED_STANDING: 0.92,
+        LoadLevel.OVERCROWDED: 1.10,
     }[level]
+
+
+def _load_score_from_rate(rate: float) -> float:
+    return float(round(max(0.0, min(100.0, 100.0 - min(rate, 2.0) * 55.0))))
 
 
 def _json_safe_payload(payload: dict[str, Any]) -> dict[str, Any]:
