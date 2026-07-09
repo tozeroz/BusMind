@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from backend.app.schemas.common import GeoPoint, StationSummary, StrictModel
+from app.schemas.common import GeoPoint, StationSummary, StrictModel
 
 
 class WalkingRouteMode(StrEnum):

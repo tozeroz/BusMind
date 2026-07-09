@@ -4,8 +4,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.app.api.v1.intelligence_router import router
-from backend.app.core.exception_handlers import register_intelligence_exception_handlers
+from app.api.v1.intelligence_router import router
+from app.core.exception_handlers import register_intelligence_exception_handlers
 
 
 @pytest.fixture()

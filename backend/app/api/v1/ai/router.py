@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from backend.app.api.v1.dependencies import get_ai_service
-from backend.app.core.api_response import ApiResponse, success_response
-from backend.app.schemas.ai_travel import AiTravelRequest
-from backend.app.services.ai_service import AiTravelService
+from app.api.v1.dependencies import get_ai_service
+from app.core.api_response import ApiResponse, success_response
+from app.schemas.ai_travel import AiTravelRequest
+from app.services.ai_service import AiTravelService
 
 router = APIRouter(tags=["AI Travel Assistant"])
 

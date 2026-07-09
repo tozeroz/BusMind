@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from math import asin, cos, radians, sin, sqrt
 
-from backend.app.core.intelligence_settings import settings
-from backend.app.schemas.common import GeoPoint, StationSummary
-from backend.app.schemas.walking import WalkingRouteMode, WalkingTimeRequest, WalkingTimeResult
-from backend.app.services.intelligence_gateway import IntelligenceDataGateway
+from app.core.intelligence_settings import settings
+from app.schemas.common import GeoPoint, StationSummary
+from app.schemas.walking import WalkingRouteMode, WalkingTimeRequest, WalkingTimeResult
+from app.services.intelligence_gateway import IntelligenceDataGateway
 
 
 class WalkingTimeService:

@@ -1,34 +1,34 @@
-from __future__ import annotations
-
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-
-from backend.app.core.api_response import error_response
-from backend.app.core.intelligence_exceptions import BusinessError
-
-
-async def business_error_handler(_: Request, exc: BusinessError) -> JSONResponse:
-    body = error_response(exc.code, exc.message).model_dump(mode="json")
-    return JSONResponse(status_code=exc.http_status, content=body)
-
-
-async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
-    errors = exc.errors()
-    first = errors[0] if errors else {}
-    location = ".".join(str(item) for item in first.get("loc", []) if item != "body")
-    detail = first.get("msg", "请求参数不合法")
-    message = f"参数校验失败：{location} {detail}".strip()
-    body = error_response(42200, message).model_dump(mode="json")
-    return JSONResponse(status_code=422, content=body)
-
-
-def register_intelligence_exception_handlers(app: FastAPI) -> None:
-    """Register handlers needed by engineer-B routers.
-
-    Team A can call this once in the shared FastAPI application. Existing global
-    handlers can be retained instead if they already produce the same envelope.
-    """
-
-    app.add_exception_handler(BusinessError, business_error_handler)
-    app.add_exception_handler(RequestValidationError, validation_error_handler)
+from __future__ import annotations
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+from app.core.api_response import error_response
+from app.core.intelligence_exceptions import BusinessError
+
+
+async def business_error_handler(_: Request, exc: BusinessError) -> JSONResponse:
+    body = error_response(exc.code, exc.message).model_dump(mode="json")
+    return JSONResponse(status_code=exc.http_status, content=body)
+
+
+async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    errors = exc.errors()
+    first = errors[0] if errors else {}
+    location = ".".join(str(item) for item in first.get("loc", []) if item != "body")
+    detail = first.get("msg", "e¯·æ±åæaåæ³?)
+    message = f"åææ éªå¤±e´¥ï¼{location} {detail}".strip()
+    body = error_response(42200, message).model_dump(mode="json")
+    return JSONResponse(status_code=422, content=body)
+
+
+def register_intelligence_exception_handlers(app: FastAPI) -> None:
+    """Register handlers needed by engineer-B routers.
+
+    Team A can call this once in the shared FastAPI application. Existing global
+    handlers can be retained instead if they already produce the same envelope.
+    """
+
+    app.add_exception_handler(BusinessError, business_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)

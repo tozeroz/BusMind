@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from backend.app.core.intelligence_settings import settings
+from app.core.intelligence_settings import settings
 
 
 def now_local() -> datetime:

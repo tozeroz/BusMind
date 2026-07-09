@@ -1,23 +1,23 @@
-from backend.app.schemas.ai_travel import AiMode, AiTravelRequest, AiTravelResult
-from backend.app.schemas.eta import EtaResult
-from backend.app.schemas.passenger_load import (
+from app.schemas.ai_travel import AiMode, AiTravelRequest, AiTravelResult
+from app.schemas.eta import EtaResult
+from app.schemas.passenger_load import (
     LoadLevel,
     PassengerLoadPredictionRequest,
     PassengerLoadPredictionResult,
 )
-from backend.app.schemas.recommendation import (
+from app.schemas.recommendation import (
     Preference,
     RecommendRoutesRequest,
     RecommendRoutesResult,
     RecommendType,
     RouteRecommendation,
 )
-from backend.app.schemas.travel_experience import (
+from app.schemas.travel_experience import (
     ExperienceWeights,
     TravelExperienceRequest,
     TravelExperienceResult,
 )
-from backend.app.schemas.walking import WalkingTimeRequest, WalkingTimeResult
+from app.schemas.walking import WalkingTimeRequest, WalkingTimeResult
 
 __all__ = [
     "AiMode",

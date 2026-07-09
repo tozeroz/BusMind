@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from backend.app.services.ai_service import AiTravelService
-from backend.app.services.eta_service import EtaService
-from backend.app.services.intelligence_gateway import get_intelligence_gateway
-from backend.app.services.load_service import PassengerLoadService
-from backend.app.services.recommend_service import (
+from app.services.ai_service import AiTravelService
+from app.services.eta_service import EtaService
+from app.services.intelligence_gateway import get_intelligence_gateway
+from app.services.load_service import PassengerLoadService
+from app.services.recommend_service import (
     RecommendationService,
     TravelExperienceService,
     WalkingTimeService,

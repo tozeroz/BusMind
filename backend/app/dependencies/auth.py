@@ -5,15 +5,15 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from backend.app.models.user import User
-from backend.app.core.config import settings
+from app.models.user import User
+from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/users/login")
 
 def get_db():
-    from backend.app.db.session import SessionLocal
+    from app.db.session import SessionLocal
     db = SessionLocal()
     try:
         yield db
