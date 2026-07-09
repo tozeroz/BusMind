@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d1d6f6e6-7fc5-4e77-bf09-busmindserviceb",
     "name": "BusMind Service B",
-    "description": "ETA、客载量预计、步行时长、出行体验推荐和 DeepSeek AI 助手。",
+    "description": "服务端工程师 B：ETA、客载状态预测、步行时长、出行体验推荐、DeepSeek AI 助手，以及车辆状态/预测结果/LTA Bus Arrival 更新接口。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -152,7 +152,7 @@
                   "pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 422, 503]); });",
                   "pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });",
                   "pm.test('Business request succeeded', function () { const j = pm.response.json(); pm.expect(j.code).to.eql(0); pm.expect(j.message).to.eql('success'); });",
-                  "pm.test('Load result enum and range', function () { const d=pm.response.json().data; pm.expect(['seats_available','standing_available','limited_standing']).to.include(d.predicted_load_level); pm.expect(d.predicted_load_rate).to.be.within(0,1); pm.expect(d.load_score).to.be.within(0,100); });"
+                  "pm.test('Load result enum and range', function () { const d=pm.response.json().data; pm.expect(['seats_available','standing_available','limited_standing','overcrowded']).to.include(d.predicted_load_level); pm.expect(d.predicted_load_rate).to.be.within(0,2); pm.expect(d.load_score).to.be.within(0,100); });"
                 ]
               }
             }
@@ -492,6 +492,193 @@
                   "pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });",
                   "pm.test('Business request succeeded', function () { const j = pm.response.json(); pm.expect(j.code).to.eql(0); pm.expect(j.message).to.eql('success'); });",
                   "pm.test('Explain answer present', function () { const d=pm.response.json().data; pm.expect(d.answer).to.be.a('string').and.not.empty; pm.expect(d.related_routes).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 Simulation Updates",
+      "item": [
+        {
+          "name": "01 更新车辆状态",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/simulation/vehicle-status/{{vehicle_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "simulation",
+                "vehicle-status",
+                "{{vehicle_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"longitude\": 116.4001,\n  \"latitude\": 39.9101,\n  \"current_station_id\": 1,\n  \"next_station_id\": 3,\n  \"speed_kph\": 18.5,\n  \"onboard_count\": 50,\n  \"capacity\": 60,\n  \"status\": \"delayed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 422, 503]); });",
+                  "pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });",
+                  "pm.test('Vehicle update succeeded', function () { const j=pm.response.json(); pm.expect(j.code).to.eql(0); pm.expect(j.data.vehicle_id).to.eql(Number(pm.environment.get('vehicle_id'))); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 写入 ETA 结果",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/simulation/prediction-results",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "simulation",
+                "prediction-results"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prediction_type\": \"eta\",\n  \"vehicle_id\": 101,\n  \"line_id\": 1,\n  \"target_station_id\": 3,\n  \"predicted_eta_minutes\": 2.5,\n  \"confidence\": 0.97,\n  \"model_version\": \"eta_model_20260709\",\n  \"source\": \"data_engineer_model\",\n  \"expires_in_seconds\": 300\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 422, 503]); });",
+                  "pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });",
+                  "pm.test('ETA result stored', function () { const j=pm.response.json(); pm.expect(j.code).to.eql(0); pm.expect(j.data.prediction_type).to.eql('eta'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 写入客载结果",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/simulation/prediction-results",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "simulation",
+                "prediction-results"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prediction_type\": \"passenger_load\",\n  \"vehicle_id\": 101,\n  \"line_id\": 1,\n  \"station_id\": 3,\n  \"predicted_load_level\": \"limited_standing\",\n  \"predicted_load_rate\": 0.93,\n  \"predicted_onboard_count\": 56,\n  \"capacity\": 60,\n  \"confidence\": 0.96,\n  \"model_version\": \"load_model_20260709\",\n  \"source\": \"data_engineer_model\",\n  \"expires_in_seconds\": 300\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 422, 503]); });",
+                  "pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });",
+                  "pm.test('Load result stored', function () { const j=pm.response.json(); pm.expect(j.code).to.eql(0); pm.expect(j.data.prediction_type).to.eql('passenger_load'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 LTA Bus Arrival 刷新",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/simulation/lta-bus-arrival/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "simulation",
+                "lta-bus-arrival",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bus_stop_code\": \"{{lta_bus_stop_code}}\",\n  \"service_no\": \"{{lta_service_no}}\",\n  \"vehicle_id\": 101,\n  \"line_id\": 1,\n  \"station_id\": 3,\n  \"capacity\": 60,\n  \"expires_in_seconds\": 60\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 422, 503]); });",
+                  "pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });",
+                  "pm.test('LTA refresh response', function () { const j=pm.response.json(); if (pm.response.code === 200) { pm.expect(j.code).to.eql(0); pm.expect(j.data.source).to.eql('lta_bus_arrival'); } else { pm.expect(j.code).to.be.oneOf([40410,50320,50321]); } });"
                 ]
               }
             }

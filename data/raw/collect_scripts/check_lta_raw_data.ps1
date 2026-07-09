@@ -48,3 +48,14 @@ foreach ($file in $arrivalFiles | Select-Object -First 5) {
 if (-not $arrivalFiles) {
     Write-Host "MISSING bus arrival sample jsonl files"
 }
+
+Write-Host ""
+
+$trafficFiles = Get-ChildItem -Recurse -File -Path (Join-Path $raw "traffic_speed_bands") -Include "*.json", "*.jsonl" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
+foreach ($file in $trafficFiles | Select-Object -First 5) {
+    Write-Host "OK $($file.FullName) bytes=$($file.Length)"
+}
+
+if (-not $trafficFiles) {
+    Write-Host "MISSING traffic speed bands snapshots"
+}

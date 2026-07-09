@@ -53,7 +53,7 @@ class RecommendRoutesRequest(StrictModel):
 
 
 class PredictedLoadSummary(StrictModel):
-    predicted_load_rate: float | None = Field(default=None, ge=0, le=1)
+    predicted_load_rate: float | None = Field(default=None, ge=0, le=2)
     predicted_load_level: LoadLevel
     predicted_onboard_count: int | None = Field(default=None, ge=0)
     capacity: int | None = Field(default=None, gt=0)

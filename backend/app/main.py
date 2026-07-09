@@ -1,18 +1,23 @@
 from fastapi import FastAPI
+
 from backend.app.api import router as api_router
-from backend.app.models.user import Base
+from backend.app.core.exception_handlers import register_intelligence_exception_handlers
 from backend.app.db.session import engine
+from backend.app.models.user import Base
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="BusMind API",
     description="公交智能调度系统 API",
-    version="1.0.0"
+    version="1.1.0",
 )
 
+# Service-B errors use the same code/message/data/trace_id/timestamp envelope.
+register_intelligence_exception_handlers(app)
 app.include_router(api_router)
 
+
 @app.get("/", tags=["健康检查"])
-async def health_check():
+async def health_check() -> dict[str, str]:
     return {"status": "ok", "message": "BusMind API is running"}
