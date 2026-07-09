@@ -83,3 +83,5 @@ algorithm/model_files/*
 *.crt
 credentials.json
 token.json
+
+/service-b.env

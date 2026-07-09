@@ -16,8 +16,7 @@ const routes = [
     component: MainLayout,
     children: [
       { path: 'home', component: HomeView, meta: { title: '首页' } },
-      { path: 'ai', component: AiAssistantView, meta: { title: 'AI 出行助手' } },
-      { path: '/demo/map', name: 'MapDemo', component: () => import('@/views/demo/MapDemoView.vue') }
+      { path: 'ai', component: AiAssistantView, meta: { title: 'AI 出行助手' } }
     ]
   }
 ]

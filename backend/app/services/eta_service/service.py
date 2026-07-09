@@ -9,6 +9,10 @@ from backend.app.core.time_utils import ensure_local_datetime
 from backend.app.schemas.eta import EtaResult
 from backend.app.services.intelligence_gateway import IntelligenceDataGateway
 from backend.app.services.model_adapter import OptionalPredictor
+from backend.app.services.simulation_service.store import (
+    SimulationStateStore,
+    simulation_state_store,
+)
 
 
 class EtaService:
@@ -16,9 +20,11 @@ class EtaService:
         self,
         gateway: IntelligenceDataGateway,
         predictor: OptionalPredictor | None = None,
+        state_store: SimulationStateStore | None = None,
     ) -> None:
         self.gateway = gateway
         self.predictor = predictor or OptionalPredictor(settings.eta_predictor_path)
+        self.state_store = state_store or simulation_state_store
 
     async def calculate_eta(
         self,
@@ -39,6 +45,35 @@ class EtaService:
             )
         if vehicle.status == "offline":
             raise BusinessError(50301, f"车辆 {vehicle_id} 当前离线，无法计算 ETA", 503)
+
+        override = self.state_store.get_eta(
+            vehicle_id=vehicle_id,
+            target_station_id=target_station_id,
+            line_id=line_id or vehicle.line_id,
+        )
+        if override is not None:
+            eta_minutes = round(
+                max(0.0, min(float(override.payload["predicted_eta_minutes"]), 240.0)),
+                1,
+            )
+            arrival_time = override.payload.get("arrival_time")
+            if not isinstance(arrival_time, datetime):
+                arrival_time = moment + timedelta(minutes=eta_minutes)
+            return EtaResult(
+                vehicle_id=vehicle_id,
+                target_station_id=target_station_id,
+                predicted_eta_minutes=eta_minutes,
+                arrival_time=arrival_time,
+                factors={
+                    "source": override.source,
+                    "confidence": override.payload.get("confidence"),
+                    "metadata": override.payload.get("metadata", {}),
+                    "expires_at": override.expires_at.isoformat(),
+                },
+                model_version=str(
+                    override.payload.get("model_version", "simulation_eta_override")
+                ),
+            )
 
         distance_meters = await self.gateway.get_distance_to_station_meters(
             vehicle_id, target_station_id

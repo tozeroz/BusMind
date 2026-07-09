@@ -52,6 +52,7 @@ export const mockBusRouteGeoJSON = {
   features: [
     {
       type: 'Feature',
+      id: 'L001',
       properties: {
         line_id: 'L001',
         line_name: 'Demo Bus Line',

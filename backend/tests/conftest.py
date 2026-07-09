@@ -4,8 +4,32 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from backend.app.api.v1.dependencies import get_ai_service, get_recommendation_service
 from backend.app.api.v1.intelligence_router import router
 from backend.app.core.exception_handlers import register_intelligence_exception_handlers
+from backend.app.services.ai_service import AiTravelService
+from backend.app.services.intelligence_gateway import (
+    DemoIntelligenceGateway,
+    configure_intelligence_gateway,
+)
+from backend.app.services.simulation_service import simulation_state_store
+
+
+class AiTravelServiceWithoutApiKey(AiTravelService):
+    """Test-only service that behaves as if no DeepSeek key were configured."""
+
+    @staticmethod
+    def _build_default_client():
+        return None
+
+
+@pytest.fixture(autouse=True)
+def reset_service_b_state():
+    simulation_state_store.clear()
+    configure_intelligence_gateway(DemoIntelligenceGateway())
+    yield
+    simulation_state_store.clear()
+    configure_intelligence_gateway(DemoIntelligenceGateway())
 
 
 @pytest.fixture()
@@ -19,3 +43,15 @@ def app() -> FastAPI:
 @pytest.fixture()
 def client(app: FastAPI) -> TestClient:
     return TestClient(app)
+
+
+@pytest.fixture()
+def client_without_deepseek(app: FastAPI):
+    """Return a client whose AI dependency never reads the real .env API key."""
+
+    app.dependency_overrides[get_ai_service] = lambda: AiTravelServiceWithoutApiKey(
+        get_recommendation_service()
+    )
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.pop(get_ai_service, None)

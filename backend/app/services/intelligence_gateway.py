@@ -7,7 +7,7 @@ replace the demo gateway with an adapter backed by its repositories.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import asin, cos, radians, sin, sqrt
 from typing import Protocol
 
@@ -217,6 +217,27 @@ class DemoIntelligenceGateway:
                 station.latitude,
             ),
         )
+
+    async def update_vehicle_status(
+        self,
+        vehicle_id: int,
+        **changes: object,
+    ) -> VehicleData:
+        current = await self.get_vehicle(vehicle_id)
+        allowed = {
+            "longitude",
+            "latitude",
+            "current_station_id",
+            "next_station_id",
+            "speed_kph",
+            "onboard_count",
+            "capacity",
+            "status",
+        }
+        safe_changes = {key: value for key, value in changes.items() if key in allowed}
+        updated = replace(current, **safe_changes)
+        self._vehicles[vehicle_id] = updated
+        return updated
 
 
 def _haversine_meters(

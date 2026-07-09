@@ -13,6 +13,10 @@ from backend.app.schemas.passenger_load import (
 )
 from backend.app.services.intelligence_gateway import IntelligenceDataGateway
 from backend.app.services.model_adapter import OptionalPredictor
+from backend.app.services.simulation_service.store import (
+    SimulationStateStore,
+    simulation_state_store,
+)
 
 
 LOAD_LEVEL_SCORE: dict[LoadLevel, float] = {
@@ -27,9 +31,11 @@ class PassengerLoadService:
         self,
         gateway: IntelligenceDataGateway,
         predictor: OptionalPredictor | None = None,
+        state_store: SimulationStateStore | None = None,
     ) -> None:
         self.gateway = gateway
         self.predictor = predictor or OptionalPredictor(settings.load_predictor_path)
+        self.state_store = state_store or simulation_state_store
 
     async def predict(
         self, request: PassengerLoadPredictionRequest
@@ -55,6 +61,62 @@ class PassengerLoadService:
             if request.current_onboard_count is not None
             else (vehicle.onboard_count if vehicle else round(capacity * 0.45))
         )
+
+        override = self.state_store.get_load(
+            line_id=request.line_id,
+            station_id=request.station_id,
+            vehicle_id=request.vehicle_id,
+        )
+        if override is not None:
+            raw_level = str(override.payload.get("predicted_load_level", ""))
+            try:
+                load_level = LoadLevel(raw_level)
+            except ValueError:
+                load_level = self._level_from_rate(
+                    float(override.payload.get("predicted_load_rate", 0.72))
+                )
+            load_rate_raw = override.payload.get("predicted_load_rate")
+            load_rate = (
+                round(float(load_rate_raw), 2)
+                if isinstance(load_rate_raw, (int, float))
+                else None
+            )
+            override_capacity = override.payload.get("capacity")
+            if isinstance(override_capacity, int) and override_capacity > 0:
+                capacity = override_capacity
+            predicted_count = override.payload.get("predicted_onboard_count")
+            if not isinstance(predicted_count, int):
+                predicted_count = (
+                    int(round(capacity * load_rate))
+                    if load_rate is not None
+                    else None
+                )
+            confidence_raw = override.payload.get("confidence", 0.9)
+            confidence = (
+                round(max(0.0, min(float(confidence_raw), 1.0)), 2)
+                if isinstance(confidence_raw, (int, float))
+                else 0.9
+            )
+            return PassengerLoadPredictionResult(
+                line_id=request.line_id,
+                station_id=request.station_id,
+                vehicle_id=request.vehicle_id,
+                predicted_onboard_count=predicted_count,
+                capacity=capacity,
+                predicted_load_rate=load_rate,
+                predicted_load_level=load_level,
+                load_score=self.calculate_load_score(load_rate, load_level),
+                confidence=confidence,
+                predict_time=moment,
+                feature_summary={
+                    "source": override.source,
+                    "metadata": override.payload.get("metadata", {}),
+                    "expires_at": override.expires_at.isoformat(),
+                },
+                model_version=str(
+                    override.payload.get("model_version", "simulation_load_override")
+                ),
+            )
 
         is_peak = moment.hour in {7, 8, 9, 17, 18, 19}
         flow_level = await self.gateway.get_station_flow_level(request.station_id, moment.hour)

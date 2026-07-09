@@ -1,5 +1,5 @@
-def test_ai_suggest_falls_back_without_api_key(client):
-    response = client.post(
+def test_ai_suggest_falls_back_without_api_key(client_without_deepseek):
+    response = client_without_deepseek.post(
         "/api/v1/ai/travel",
         json={
             "mode": "suggest",
