@@ -1,21 +1,40 @@
 <template>
-  <section class="home-map-layout">
-    <aside class="destination-panel">
-      <div class="side-scroll">
-        <template v-if="panelMode === 'search'">
-          <p class="eyebrow">乘客端</p>
-          <h1>首页</h1>
+  <section class="home-map-layout fullscreen-map-layout">
+    <section class="home-map-panel real-map-panel fullscreen-map-panel">
+      <BusMap ref="busMapRef" @select-stop="selectMapStop" @select-route="selectMapRoute" />
 
-          <form class="destination-search" @submit.prevent="searchRoutes">
+      <button
+        v-if="!isInfoPanelOpen"
+        class="map-mini-toggle"
+        type="button"
+        @click="isInfoPanelOpen = true"
+      >
+        <strong>{{ selectedInfo.name || '目的地检索' }}</strong>
+        <span>{{ panelSubtitle }}</span>
+      </button>
+
+      <aside v-else class="map-info-dock">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">{{ panelLabel }}</p>
+            <h1>{{ panelTitle }}</h1>
+          </div>
+          <button class="ghost-button compact-ghost" type="button" @click="isInfoPanelOpen = false">
+            收起
+          </button>
+        </div>
+
+        <template v-if="panelMode === 'search'">
+          <form class="destination-search floating-search" @submit.prevent="searchRoutes">
             <p class="eyebrow">目的地检索</p>
             <h2>你要去哪里？</h2>
             <div class="location-line">
               <span>当前位置</span>
-              <strong>定位获取</strong>
+              <strong>乌节站附近</strong>
             </div>
             <label>
               目的地
-              <input v-model="query.end" placeholder="如：教学楼" />
+              <input v-model="query.end" placeholder="如：滨海湾 / 市政厅 / 莱佛士坊" />
             </label>
             <button class="primary-button" type="submit">开始检索</button>
             <p v-if="notice" class="form-tip">{{ notice }}</p>
@@ -30,6 +49,9 @@
               <span>体验分 {{ recommendation.score }}</span>
               <span>{{ recommendation.load }}</span>
             </div>
+            <button class="primary-button" type="button" @click="applyRecommendedRoute(recommendation)">
+              查看推荐路线
+            </button>
           </article>
 
           <div class="home-side-stats">
@@ -42,50 +64,70 @@
 
         <template v-else-if="panelMode === 'station'">
           <button class="ghost-button back-side-button" type="button" @click="resetPanel">返回检索</button>
-          <p class="eyebrow">站点信息</p>
-          <h1>{{ selectedInfo.name }}</h1>
           <div class="info-list">
-            <p><span>经过线路</span><strong>校园 1 号线 / 校园 2 号线</strong></p>
-            <p><span>下一班车</span><strong>约 5 分钟</strong></p>
+            <p><span>经过线路</span><strong>{{ selectedInfo.routes }}</strong></p>
+            <p><span>下一班车</span><strong>{{ selectedInfo.eta }}</strong></p>
             <p><span>当前客流</span><strong>{{ selectedInfo.crowd }}</strong></p>
-            <p><span>站点热度</span><strong>较高</strong></p>
+            <p><span>站点热度</span><strong>{{ selectedInfo.status }}</strong></p>
           </div>
         </template>
 
         <template v-else>
           <button class="ghost-button back-side-button" type="button" @click="resetPanel">返回检索</button>
-          <p class="eyebrow">线路信息</p>
-          <h1>{{ selectedInfo.name }}</h1>
           <div class="info-list">
-            <p><span>线路编号</span><strong>{{ selectedInfo.id }}</strong></p>
+            <p><span>路线编号</span><strong>{{ selectedInfo.id }}</strong></p>
             <p><span>当前客流</span><strong>{{ selectedInfo.crowd }}</strong></p>
+            <p><span>预计到达</span><strong>{{ selectedInfo.eta }}</strong></p>
             <p><span>运行状态</span><strong>{{ selectedInfo.status }}</strong></p>
-            <p><span>预计延误</span><strong>3 分钟</strong></p>
           </div>
         </template>
-      </div>
-    </aside>
-
-    <section class="home-map-panel real-map-panel">
-      <BusMap @select-stop="selectMapStop" @select-route="selectMapRoute" />
+      </aside>
 
       <article v-if="panelMode !== 'search'" class="map-chart-card">
         <div class="section-title">
           <div>
-            <p class="eyebrow">{{ panelMode === 'station' ? '站点图表' : '线路图表' }}</p>
+            <p class="eyebrow">{{ panelMode === 'station' ? '站点图表' : '路线图表' }}</p>
             <h3>{{ selectedInfo.name }}</h3>
           </div>
-          <button class="ghost-button" type="button" @click="resetPanel">关闭</button>
+          <button class="ghost-button compact-ghost" type="button" @click="resetPanel">关闭</button>
         </div>
         <div class="mini-chart">
-          <span style="height: 42%"></span>
-          <span style="height: 70%"></span>
-          <span style="height: 56%"></span>
-          <span style="height: 88%"></span>
-          <span style="height: 64%"></span>
+          <span v-for="(item, index) in selectedInfo.chart" :key="`${item}-${index}`" :style="{ height: `${item}%` }"></span>
         </div>
-        <p class="muted">后续接入客流数据后，这里展示真实统计图表。</p>
+        <p class="muted">当前为本地模拟数据，后续可接入后端展示实时客流统计。</p>
       </article>
+
+      <section v-if="isAiChatOpen" class="map-ai-card">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">AI 出行助手</p>
+            <h3>路线建议</h3>
+          </div>
+          <button class="ghost-button compact-ghost" type="button" @click="isAiChatOpen = false">
+            关闭
+          </button>
+        </div>
+
+        <div class="map-ai-messages">
+          <article v-for="message in aiMessages" :key="message.id" :class="['mini-message', message.role]">
+            <p>{{ message.content }}</p>
+          </article>
+        </div>
+
+        <div v-if="aiRecommendation" class="ai-route-result">
+          <p class="eyebrow">推荐路线</p>
+          <h4>{{ aiRecommendation.title }}</h4>
+          <p>{{ aiRecommendation.reason }}</p>
+          <button class="primary-button" type="button" @click="applyRecommendedRoute(aiRecommendation)">
+            在地图中查看
+          </button>
+        </div>
+
+        <form class="map-ai-input" @submit.prevent="sendAiMessage">
+          <input v-model="aiInput" placeholder="例如：去滨海湾，想少走路" />
+          <button class="primary-button" type="submit">发送</button>
+        </form>
+      </section>
     </section>
 
     <button
@@ -93,7 +135,7 @@
       type="button"
       :style="{ left: `${floatPosition.x}px`, top: `${floatPosition.y}px` }"
       @mousedown.stop="startFloatDrag"
-      @click="openAi"
+      @click="toggleAiChat"
       title="AI 出行助手"
     >
       AI
@@ -102,37 +144,79 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { recommendRoutes } from '@/api/bus'
+import { computed, reactive, ref } from 'vue'
 import BusMap from '@/components/map/BusMap.vue'
+import { mockRoutes } from '@/map/mock-bus-data'
 
-const router = useRouter()
-const query = reactive({ end: '教学楼' })
+const busMapRef = ref(null)
+const query = reactive({ end: '滨海湾' })
 const notice = ref('')
 const recommendation = ref(null)
 const panelMode = ref('search')
-const selectedInfo = reactive({ id: '', name: '', crowd: '', status: '' })
+const isInfoPanelOpen = ref(false)
+const isAiChatOpen = ref(false)
+const aiInput = ref('去滨海湾，想坐最舒适的路线')
+const aiRecommendation = ref(null)
+const selectedInfo = reactive({
+  id: '',
+  name: '',
+  crowd: '',
+  status: '',
+  eta: '',
+  routes: '',
+  chart: [42, 70, 56, 88, 64]
+})
 const floatPosition = reactive({ x: window.innerWidth - 112, y: window.innerHeight - 120 })
 const dragState = reactive({ dragging: false, moved: false, offsetX: 0, offsetY: 0 })
 
 const stats = [
-  { label: '运行线路', value: '3 条' },
+  { label: '运行路线', value: '4 条' },
   { label: '在线车辆', value: '12 辆' },
   { label: '平均等待', value: '7 分钟' },
   { label: '当前客流', value: '适中' }
 ]
 
-const stationIdByKeyword = (keyword) => {
-  if (keyword.includes('图书')) return 2
-  if (keyword.includes('教学')) return 3
-  if (keyword.includes('南门')) return 4
-  if (keyword.includes('西门')) return 5
-  if (keyword.includes('创新')) return 12
-  return 3
-}
+const routeReasons = [
+  '途经乌节、索美塞、多美歌和市政厅，适合作为市中心通勤的综合推荐。',
+  '沿乌节路和滨海方向行驶，当前客流压力较低，适合去滨海湾一带。',
+  '覆盖莱佛士坊到市政厅方向，晚高峰客流较高，适合急需到达时选择。',
+  '经索美塞、多美歌到克拉码头，步行距离短，乘坐舒适度更好。'
+]
 
-const loadLevelText = (level) => {
+const mockRouteOptions = mockRoutes.map((route, index) => ({
+  id: route.line_id,
+  title: route.line_name,
+  reason: routeReasons[index],
+  eta: route.eta_minutes,
+  score: [86, 91, 72, 89][index],
+  load: loadLevelText(route.crowd_level),
+  status: route.status,
+  chart: route.chart
+}))
+
+const aiMessages = ref([
+  {
+    id: 1,
+    role: 'assistant',
+    content: '你好，我可以根据目的地、舒适度和等待时间给出路线建议。'
+  }
+])
+
+const panelLabel = computed(() => {
+  if (panelMode.value === 'station') return '站点信息'
+  if (panelMode.value === 'road') return '路线详情'
+  return '乘客端'
+})
+
+const panelTitle = computed(() => selectedInfo.name || '首页')
+
+const panelSubtitle = computed(() => {
+  if (panelMode.value === 'station') return '查看站点客流'
+  if (panelMode.value === 'road') return '查看路线详情'
+  return '点击展开搜索'
+})
+
+function loadLevelText(level) {
   const map = {
     seats_available: '预计有座',
     standing_available: '可站立',
@@ -144,68 +228,106 @@ const loadLevelText = (level) => {
   return map[level] || level || '未知客流'
 }
 
-const searchRoutes = async () => {
-  notice.value = '正在请求推荐路线...'
-  const endStationId = stationIdByKeyword(query.end)
-  try {
-    const response = await recommendRoutes({
-      start_station_id: 1,
-      end_station_id: endStationId,
-      preference: 'balanced'
-    })
-    const route = response.data?.items?.[0]
-    if (!route) throw new Error('empty recommendation')
-    const lineNames = route.segments.map((segment) => segment.line_name).join(' → ')
-    recommendation.value = {
-      title: lineNames || route.route_id,
-      reason: route.reason,
-      eta: route.predicted_eta_minutes,
-      score: route.experience_score,
-      load: loadLevelText(route.predicted_load?.predicted_load_level)
-    }
-    notice.value = `已检索目的地：${query.end}`
-  } catch (error) {
-    recommendation.value = {
-      title: '校园 2 号线',
-      reason: '后端暂未连接成功，当前显示本地演示推荐结果。',
-      eta: 8,
-      score: 86,
-      load: '预计有座'
-    }
-    notice.value = '后端接口暂不可用，已显示演示数据'
+const normalizeChart = (chart) => {
+  if (Array.isArray(chart)) return chart
+  if (typeof chart === 'string') {
+    return chart.split(',').map((item) => Number(item)).filter(Boolean)
   }
+  return [44, 62, 78, 66, 58]
+}
+
+const findRouteForDestination = (text) => {
+  if (text.includes('滨海') || text.includes('莱佛士')) return mockRouteOptions[1]
+  if (text.includes('市政厅') || text.includes('高峰')) return mockRouteOptions[2]
+  if (text.includes('克拉') || text.includes('舒适') || text.includes('少走路')) return mockRouteOptions[3]
+  return mockRouteOptions[0]
+}
+
+const searchRoutes = () => {
+  busMapRef.value?.clearSelection()
+  const matchedRoute = findRouteForDestination(query.end)
+
+  recommendation.value = {
+    ...matchedRoute,
+    title: query.end ? `乌节站 → ${query.end}` : matchedRoute.title,
+    reason: `已根据“${query.end || '目的地'}”生成本地演示路线，后续可替换为后端推荐接口。`
+  }
+  notice.value = `已检索目的地：${query.end || '未填写'}`
 }
 
 const resetPanel = () => {
+  busMapRef.value?.clearSelection()
   panelMode.value = 'search'
+  isInfoPanelOpen.value = true
   selectedInfo.id = ''
   selectedInfo.name = ''
   selectedInfo.crowd = ''
   selectedInfo.status = ''
+  selectedInfo.eta = ''
+  selectedInfo.routes = ''
+  selectedInfo.chart = [42, 70, 56, 88, 64]
 }
 
-const selectStation = (name, crowd) => {
+const selectStation = (stop) => {
   panelMode.value = 'station'
-  selectedInfo.id = ''
-  selectedInfo.name = name
-  selectedInfo.crowd = crowd
-  selectedInfo.status = '正常停靠'
+  isInfoPanelOpen.value = true
+  selectedInfo.id = stop.stop_id
+  selectedInfo.name = stop.stop_name
+  selectedInfo.crowd = loadLevelText(stop.crowd_level)
+  selectedInfo.status = stop.crowd_level === 'high' ? '较高' : '正常'
+  selectedInfo.eta = `约 ${stop.eta_minutes} 分钟`
+  selectedInfo.routes = stop.passing_routes?.join(' / ') || '市中心环线'
+  selectedInfo.chart = stop.crowd_level === 'high' ? [68, 74, 82, 90, 76] : [34, 48, 56, 52, 44]
 }
 
 const selectMapStop = (stop) => {
-  selectStation(stop.stop_name, loadLevelText(stop.crowd_level))
+  selectStation(stop)
 }
 
-const selectRoad = (id, name, crowd) => {
+const selectRoad = (route) => {
   panelMode.value = 'road'
-  selectedInfo.id = id
-  selectedInfo.name = name
-  selectedInfo.crowd = crowd
-  selectedInfo.status = crowd === '拥挤' ? '建议关注' : '运行正常'
+  isInfoPanelOpen.value = true
+  selectedInfo.id = route.line_id || route.id
+  selectedInfo.name = route.line_name || route.title
+  selectedInfo.crowd = route.load || loadLevelText(route.crowd_level)
+  selectedInfo.status = route.status || (selectedInfo.crowd === '拥挤' ? '建议关注' : '运行正常')
+  selectedInfo.eta = route.eta || route.eta_minutes ? `约 ${route.eta || route.eta_minutes} 分钟` : '约 8 分钟'
+  selectedInfo.routes = ''
+  selectedInfo.chart = normalizeChart(route.chart)
 }
 
 const selectMapRoute = (route) => {
-  selectRoad(route.line_id, route.line_name, loadLevelText(route.crowd_level))
+  selectRoad(route)
+}
+
+const applyRecommendedRoute = (route) => {
+  const focusedRoute = busMapRef.value?.focusRouteById(route.id || route.line_id)
+  selectRoad({
+    ...route,
+    ...(focusedRoute || {}),
+    id: route.id || focusedRoute?.line_id,
+    line_name: route.title || focusedRoute?.line_name
+  })
+}
+
+const sendAiMessage = () => {
+  const text = aiInput.value.trim()
+  if (!text) return
+
+  aiMessages.value.push({ id: Date.now(), role: 'user', content: text })
+  const matchedRoute = findRouteForDestination(text)
+
+  aiRecommendation.value = {
+    ...matchedRoute,
+    title: text.includes('舒适') ? `舒适优先：${matchedRoute.title}` : `综合推荐：${matchedRoute.title}`,
+    reason: '根据你的自然语言需求，模拟推荐一条可在地图中高亮查看的公交路线。'
+  }
+  aiMessages.value.push({
+    id: Date.now() + 1,
+    role: 'assistant',
+    content: '已生成一条可查看的推荐路线，点击下方按钮可在地图中高亮。'
+  })
+  aiInput.value = ''
 }
 
 const startFloatDrag = (event) => {
@@ -230,8 +352,8 @@ const stopFloatDrag = () => {
   window.removeEventListener('mouseup', stopFloatDrag)
 }
 
-const openAi = () => {
+const toggleAiChat = () => {
   if (dragState.moved) return
-  router.push('/ai')
+  isAiChatOpen.value = !isAiChatOpen.value
 }
 </script>
