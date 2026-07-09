@@ -1,0 +1,18 @@
+name: BusMind Local
+values:
+  - key: base_url
+    value: 'http://127.0.0.1:8000/api/v1'
+  - key: line_id
+    value: '1'
+  - key: station_id
+    value: '3'
+  - key: vehicle_id
+    value: '101'
+  - key: longitude
+    value: '116.3974'
+  - key: latitude
+    value: '39.9093'
+  - key: best_route_id
+    value: route_001
+  - key: recommend_context
+    value: '{"items":[]}'
