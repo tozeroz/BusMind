@@ -65,6 +65,8 @@ data/raw/*
 !data/raw/collect_scripts/**
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/process_scripts/
+!data/processed/process_scripts/**
 database/backup/*
 algorithm/model_files/*
 *.pkl
