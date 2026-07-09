@@ -562,8 +562,16 @@ def flatten_bus_arrival(
         "vehicle_to_stop_distance_m",
         "speed_kph",
     ]
-    df = df[columns].sort_values(["query_time", "station_id", "service_no", "visit_order"])
-    write_csv(df, processed_dir / "lta_bus_arrival.csv")
+    output = df[columns].sort_values(["query_time", "station_id", "service_no", "visit_order"])
+    output = output.rename(
+        columns={
+            "predicted_eta_minutes": "eta_minutes",
+            "predicted_load": "load_code",
+            "predicted_load_level": "load_level",
+            "predicted_load_rate": "load_rate",
+        }
+    )
+    write_csv(output, processed_dir / "lta_bus_arrival.csv")
     return df
 
 
@@ -586,7 +594,7 @@ def build_bus_vehicle(arrival: pd.DataFrame, stations: pd.DataFrame, processed_d
                 "speed_kph",
                 "onboard_count",
                 "capacity",
-                "predicted_load_level",
+                "load_level",
                 "load_code",
                 "load_score",
                 "operation_status",
@@ -618,6 +626,7 @@ def build_bus_vehicle(arrival: pd.DataFrame, stations: pd.DataFrame, processed_d
             "vehicle_longitude": "longitude",
             "vehicle_latitude": "latitude",
             "predicted_load": "load_code",
+            "predicted_load_level": "load_level",
             "query_time": "last_reported_at",
         }
     )
@@ -638,7 +647,7 @@ def build_bus_vehicle(arrival: pd.DataFrame, stations: pd.DataFrame, processed_d
         "speed_kph",
         "onboard_count",
         "capacity",
-        "predicted_load_level",
+        "load_level",
         "load_code",
         "load_score",
         "operation_status",
@@ -650,7 +659,7 @@ def build_bus_vehicle(arrival: pd.DataFrame, stations: pd.DataFrame, processed_d
     return vehicle
 
 
-def build_direct_prediction_tables(arrival: pd.DataFrame, processed_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+def build_direct_status_tables(arrival: pd.DataFrame, processed_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     base = arrival.copy()
     base["vehicle_id"] = base["vehicle_id"].astype(int)
     base["line_id"] = base["line_id"].astype(int)
@@ -672,13 +681,13 @@ def build_direct_prediction_tables(arrival: pd.DataFrame, processed_dir: Path) -
         ]
     ].rename(
         columns={
-            "query_time": "prediction_time",
             "station_id": "target_station_id",
+            "predicted_eta_minutes": "eta_minutes",
             "estimated_arrival": "arrival_time",
         }
     )
-    eta["model_version"] = "lta_bus_arrival_direct"
-    write_csv(eta, processed_dir / "eta_prediction.csv")
+    eta["data_source"] = "lta_bus_arrival"
+    write_csv(eta, processed_dir / "bus_eta_status.csv")
 
     load = base[
         [
@@ -687,6 +696,7 @@ def build_direct_prediction_tables(arrival: pd.DataFrame, processed_dir: Path) -
             "line_id",
             "station_id",
             "bus_stop_code",
+            "predicted_load",
             "predicted_load_level",
             "load_score",
             "predicted_load_rate",
@@ -696,24 +706,31 @@ def build_direct_prediction_tables(arrival: pd.DataFrame, processed_dir: Path) -
         ]
     ].copy()
     load["confidence"] = load["monitored"].map(lambda value: 1.0 if int(value) == 1 else 0.8)
-    load["prediction_time"] = load["query_time"]
-    load["model_version"] = "lta_bus_arrival_direct"
+    load["data_source"] = "lta_bus_arrival"
     columns = [
-        "prediction_time",
+        "query_time",
         "vehicle_id",
         "line_id",
         "station_id",
         "bus_stop_code",
+        "predicted_load",
         "predicted_load_level",
         "load_score",
         "predicted_load_rate",
         "onboard_count",
         "capacity",
         "confidence",
-        "model_version",
+        "data_source",
     ]
     load = load[columns]
-    write_csv(load, processed_dir / "load_prediction.csv")
+    load = load.rename(
+        columns={
+            "predicted_load": "load_code",
+            "predicted_load_level": "load_level",
+            "predicted_load_rate": "load_rate",
+        }
+    )
+    write_csv(load, processed_dir / "bus_load_status.csv")
     return eta, load
 
 
@@ -974,7 +991,7 @@ def main() -> None:
     flow_trend = build_passenger_flow_trend(raw_dir, processed_dir, args.month)
     arrival = flatten_bus_arrival(raw_dir, processed_dir, lines, stations)
     vehicles = build_bus_vehicle(arrival, stations, processed_dir)
-    eta, load = build_direct_prediction_tables(arrival, processed_dir)
+    eta, load = build_direct_status_tables(arrival, processed_dir)
     map_station = build_map_station(stations, line_station, processed_dir)
     map_road_segment = build_map_road_segment(line_station, stations, flow_trend, processed_dir)
     traffic_speed_bands = build_traffic_speed_bands(raw_dir, processed_dir)
@@ -986,8 +1003,8 @@ def main() -> None:
             {"dataset": "line_station", "rows": len(line_station)},
             {"dataset": "bus_vehicle", "rows": len(vehicles)},
             {"dataset": "lta_bus_arrival", "rows": len(arrival)},
-            {"dataset": "eta_prediction", "rows": len(eta)},
-            {"dataset": "load_prediction", "rows": len(load)},
+            {"dataset": "bus_eta_status", "rows": len(eta)},
+            {"dataset": "bus_load_status", "rows": len(load)},
             {"dataset": "map_station", "rows": len(map_station)},
             {"dataset": "map_road_segment", "rows": len(map_road_segment)},
             {"dataset": "passenger_flow_trend", "rows": len(flow_trend)},

@@ -31,8 +31,8 @@ data/processed/bus_line.csv
 data/processed/line_station.csv
 data/processed/bus_vehicle.csv
 data/processed/lta_bus_arrival.csv
-data/processed/eta_prediction.csv
-data/processed/load_prediction.csv
+data/processed/bus_eta_status.csv
+data/processed/bus_load_status.csv
 data/processed/map_station.csv
 data/processed/map_road_segment.csv
 data/processed/passenger_flow_trend.csv
@@ -43,8 +43,8 @@ data/processed/processing_summary.csv
 ## 说明
 
 - `station_id` 和 `line_id` 已转为后端接口可直接使用的整数 ID，同时保留 LTA 原始编号 `bus_stop_code`、`service_no`。
-- `eta_prediction.csv` 直接来自 LTA Bus Arrival 的 `EstimatedArrival`。
-- `load_prediction.csv` 直接来自 LTA Bus Arrival 的 `Load`，并映射为后端使用的 `seats_available`、`standing_available`、`limited_standing`。
+- `bus_eta_status.csv` 直接来自 LTA Bus Arrival 的 `EstimatedArrival`，表示实时到站状态，不是模型预测。
+- `bus_load_status.csv` 直接来自 LTA Bus Arrival 的 `Load`，表示实时客载状态，不是模型预测。
 - `bus_vehicle.csv` 由 Bus Arrival 实时车辆坐标和客载状态整理得到，用于车辆列表和智能接口网关。
 - `map_station.csv` 和 `map_road_segment.csv` 用于地图站点、线路路段展示。
 - `passenger_flow_trend.csv` 用于历史客流趋势接口。
