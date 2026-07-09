@@ -1,8 +1,24 @@
 import axios from 'axios'
 
+export const AUTH_TOKEN_KEY = 'busmind_access_token'
+
 const service = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 8000
+})
+
+service.interceptors.request.use((config) => {
+  const token =
+    localStorage.getItem(AUTH_TOKEN_KEY) ||
+    localStorage.getItem('access_token') ||
+    sessionStorage.getItem(AUTH_TOKEN_KEY) ||
+    sessionStorage.getItem('access_token')
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  return config
 })
 
 service.interceptors.response.use(
