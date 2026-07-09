@@ -7,15 +7,15 @@ from algorithm.recommend import (
     transfer_score_from_count,
     walk_score_from_minutes,
 )
-from backend.app.core.intelligence_exceptions import BusinessError
-from backend.app.core.intelligence_settings import settings
-from backend.app.schemas.passenger_load import LoadLevel
-from backend.app.schemas.travel_experience import (
+from app.core.intelligence_exceptions import BusinessError
+from app.core.intelligence_settings import settings
+from app.schemas.passenger_load import LoadLevel
+from app.schemas.travel_experience import (
     ExperienceWeights,
     TravelExperienceRequest,
     TravelExperienceResult,
 )
-from backend.app.services.load_service.service import LOAD_LEVEL_SCORE, PassengerLoadService
+from app.services.load_service.service import LOAD_LEVEL_SCORE, PassengerLoadService
 
 
 class TravelExperienceService:

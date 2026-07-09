@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import Field, model_validator
 
-from backend.app.schemas.common import StrictModel
+from app.schemas.common import StrictModel
 
 
 class LoadLevel(StrEnum):

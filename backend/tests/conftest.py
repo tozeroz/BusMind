@@ -1,18 +1,24 @@
 from __future__ import annotations
 
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.app.api.v1.dependencies import get_ai_service, get_recommendation_service
-from backend.app.api.v1.intelligence_router import router
-from backend.app.core.exception_handlers import register_intelligence_exception_handlers
-from backend.app.services.ai_service import AiTravelService
-from backend.app.services.intelligence_gateway import (
+from app.api.v1.dependencies import get_ai_service, get_recommendation_service
+from app.api.v1.intelligence_router import router
+from app.core.exception_handlers import register_intelligence_exception_handlers
+from app.services.ai_service import AiTravelService
+from app.services.intelligence_gateway import (
     DemoIntelligenceGateway,
     configure_intelligence_gateway,
 )
-from backend.app.services.simulation_service import simulation_state_store
+from app.services.simulation_service import simulation_state_store
 
 
 class AiTravelServiceWithoutApiKey(AiTravelService):

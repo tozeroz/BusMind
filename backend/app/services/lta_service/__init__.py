@@ -1,4 +1,4 @@
-from backend.app.services.lta_service.client import (
+from app.services.lta_service.client import (
     LtaBusArrival,
     LtaDataMallClient,
     LtaDataMallConfig,
