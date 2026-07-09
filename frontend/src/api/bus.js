@@ -5,3 +5,6 @@ export {
   predictPassengerLoad,
   recommendRoutes
 } from './intelligence'
+
+export * from './transit'
+export * from './vehicle'
