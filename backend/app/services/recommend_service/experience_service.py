@@ -73,4 +73,6 @@ class TravelExperienceService:
             return LoadLevel.SEATS_AVAILABLE
         if rate <= 0.85:
             return LoadLevel.STANDING_AVAILABLE
-        return LoadLevel.LIMITED_STANDING
+        if rate <= 1.0:
+            return LoadLevel.LIMITED_STANDING
+        return LoadLevel.OVERCROWDED

@@ -13,6 +13,7 @@ class LoadLevel(StrEnum):
     SEATS_AVAILABLE = "seats_available"
     STANDING_AVAILABLE = "standing_available"
     LIMITED_STANDING = "limited_standing"
+    OVERCROWDED = "overcrowded"
 
 
 class PassengerLoadPredictionRequest(StrictModel):
@@ -41,7 +42,7 @@ class PassengerLoadPredictionResult(StrictModel):
     vehicle_id: int | None
     predicted_onboard_count: int | None
     capacity: int | None
-    predicted_load_rate: float | None = Field(default=None, ge=0, le=1)
+    predicted_load_rate: float | None = Field(default=None, ge=0, le=2)
     predicted_load_level: LoadLevel
     load_score: float = Field(ge=0, le=100)
     confidence: float = Field(ge=0, le=1)

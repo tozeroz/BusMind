@@ -15,7 +15,7 @@ class ExperienceWeights(StrictModel):
 
 
 class TravelExperienceRequest(StrictModel):
-    predicted_load_rate: float | None = Field(default=None, ge=0, le=1)
+    predicted_load_rate: float | None = Field(default=None, ge=0, le=2)
     predicted_load_level: LoadLevel | None = None
     transfer_count: int = Field(ge=0)
     walk_time_minutes: float = Field(ge=0)
