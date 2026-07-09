@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict
 
-from backend.app.core.time_utils import now_local
+from app.core.time_utils import now_local
 
 
 class ApiResponse(BaseModel):

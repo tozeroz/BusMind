@@ -5,8 +5,8 @@ from enum import StrEnum
 
 from pydantic import Field, model_validator
 
-from backend.app.schemas.common import RouteSegment, StationSummary, StrictModel
-from backend.app.schemas.passenger_load import LoadLevel
+from app.schemas.common import RouteSegment, StationSummary, StrictModel
+from app.schemas.passenger_load import LoadLevel
 
 
 class Preference(StrEnum):

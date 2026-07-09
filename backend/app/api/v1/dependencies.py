@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from backend.app.core.intelligence_settings import settings
-from backend.app.services.ai_service import AiTravelService
-from backend.app.services.eta_service import EtaService
-from backend.app.services.intelligence_gateway import get_intelligence_gateway
-from backend.app.services.load_service import PassengerLoadService
-from backend.app.services.lta_service import LtaDataMallClient, LtaDataMallConfig
-from backend.app.services.recommend_service import (
+from app.core.intelligence_settings import settings
+from app.services.ai_service import AiTravelService
+from app.services.eta_service import EtaService
+from app.services.intelligence_gateway import get_intelligence_gateway
+from app.services.load_service import PassengerLoadService
+from app.services.lta_service import LtaDataMallClient, LtaDataMallConfig
+from app.services.recommend_service import (
     RecommendationService,
     TravelExperienceService,
     WalkingTimeService,
 )
-from backend.app.services.simulation_service import (
+from app.services.simulation_service import (
     SimulationService,
     simulation_state_store,
 )

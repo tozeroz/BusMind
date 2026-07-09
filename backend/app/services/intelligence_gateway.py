@@ -1,7 +1,7 @@
 """Narrow data gateway owned by service-side engineer B.
 
-This module does not implement team-A APIs or database repositories.  It defines
-only the data contract required by ETA/load/recommend services.  Team A can
+This module does not implement team-A APIs or database repositories. It defines
+only the data contract required by ETA/load/recommend services. Team A can
 replace the demo gateway with an adapter backed by its repositories.
 """
 
@@ -11,7 +11,7 @@ from dataclasses import dataclass, replace
 from math import asin, cos, radians, sin, sqrt
 from typing import Protocol
 
-from backend.app.core.intelligence_exceptions import ResourceNotFoundError
+from app.core.intelligence_exceptions import ResourceNotFoundError
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,7 +81,9 @@ class IntelligenceDataGateway(Protocol):
         max_transfer_count: int,
     ) -> list[CandidateRouteData]: ...
 
-    async def find_nearest_station(self, longitude: float, latitude: float) -> StationData: ...
+    async def find_nearest_station(
+        self, longitude: float, latitude: float
+    ) -> StationData: ...
 
 
 class DemoIntelligenceGateway:
@@ -89,12 +91,12 @@ class DemoIntelligenceGateway:
 
     def __init__(self) -> None:
         self._stations = {
-            1: StationData(1, "东门站", 116.39740, 39.90930),
-            2: StationData(2, "图书馆站", 116.40120, 39.91060),
-            3: StationData(3, "教学楼站", 116.40510, 39.91220),
-            4: StationData(4, "南门站", 116.40330, 39.90670),
-            5: StationData(5, "西门站", 116.39280, 39.91010),
-            12: StationData(12, "创新中心站", 116.41180, 39.91480),
+            1: StationData(1, "a聹茅聴篓莽芦?", 116.39740, 39.90930),
+            2: StationData(2, "氓聸戮a鹿娄茅娄聠莽芦聶", 116.40120, 39.91060),
+            3: StationData(3, "忙聲聶氓颅娄忙楼录莽芦聶", 116.40510, 39.91220),
+            4: StationData(4, "氓聧聴茅聴篓莽芦?", 116.40330, 39.90670),
+            5: StationData(5, "e楼茅聴篓莽芦?", 116.39280, 39.91010),
+            12: StationData(12, "氓聢聸忙聳a颅氓聝莽芦?", 116.41180, 39.91480),
         }
         self._vehicles = {
             101: VehicleData(101, 1, 116.3906, 39.9088, 5, 1, 24.0, 38, 60),
@@ -105,13 +107,17 @@ class DemoIntelligenceGateway:
     async def get_station(self, station_id: int) -> StationData:
         station = self._stations.get(station_id)
         if station is None:
-            raise ResourceNotFoundError(f"站点不存在：station_id={station_id}")
+            raise ResourceNotFoundError(
+                f"莽芦聶莽聜鹿a聧氓颅聵氓聹篓茂录職station_id={station_id}"
+            )
         return station
 
     async def get_vehicle(self, vehicle_id: int) -> VehicleData:
         vehicle = self._vehicles.get(vehicle_id)
         if vehicle is None:
-            raise ResourceNotFoundError(f"车辆不存在：vehicle_id={vehicle_id}")
+            raise ResourceNotFoundError(
+                f"e陆娄e戮聠a聧氓颅聵氓聹篓茂录職vehicle_id={vehicle_id}"
+            )
         return vehicle
 
     async def get_distance_to_station_meters(
@@ -161,7 +167,12 @@ class DemoIntelligenceGateway:
                 line_ids=(1,),
                 segments=(
                     RouteSegmentData(
-                        1, 1, "校园1号线", start_station_id, end_station_id, 18.0
+                        1,
+                        1,
+                        "忙聽氓聸颅1氓聫路莽潞",
+                        start_station_id,
+                        end_station_id,
+                        18.0,
                     ),
                 ),
                 boarding_station_id=start_station_id,
@@ -176,7 +187,12 @@ class DemoIntelligenceGateway:
                 line_ids=(2,),
                 segments=(
                     RouteSegmentData(
-                        1, 2, "校园2号线", start_station_id, end_station_id, 16.0
+                        1,
+                        2,
+                        "忙聽氓聸颅2氓聫路莽潞",
+                        start_station_id,
+                        end_station_id,
+                        16.0,
                     ),
                 ),
                 boarding_station_id=start_station_id,
@@ -194,9 +210,21 @@ class DemoIntelligenceGateway:
                     line_ids=(3, 1),
                     segments=(
                         RouteSegmentData(
-                            1, 3, "校园快线", start_station_id, 3, 7.0
+                            1,
+                            3,
+                            "忙聽氓聸颅氓芦莽潞",
+                            start_station_id,
+                            3,
+                            7.0,
                         ),
-                        RouteSegmentData(2, 1, "校园1号线", 3, end_station_id, 8.0),
+                        RouteSegmentData(
+                            2,
+                            1,
+                            "忙聽氓聸颅1氓聫路莽潞",
+                            3,
+                            end_station_id,
+                            8.0,
+                        ),
                     ),
                     boarding_station_id=start_station_id,
                     alighting_station_id=end_station_id,
@@ -207,7 +235,9 @@ class DemoIntelligenceGateway:
             )
         return routes
 
-    async def find_nearest_station(self, longitude: float, latitude: float) -> StationData:
+    async def find_nearest_station(
+        self, longitude: float, latitude: float
+    ) -> StationData:
         return min(
             self._stations.values(),
             key=lambda station: _haversine_meters(
@@ -248,11 +278,15 @@ def _haversine_meters(
 ) -> float:
     earth_radius = 6_371_000.0
     lon_1, lat_1, lon_2, lat_2 = map(
-        radians, (longitude_1, latitude_1, longitude_2, latitude_2)
+        radians,
+        (longitude_1, latitude_1, longitude_2, latitude_2),
     )
     delta_lon = lon_2 - lon_1
     delta_lat = lat_2 - lat_1
-    value = sin(delta_lat / 2) ** 2 + cos(lat_1) * cos(lat_2) * sin(delta_lon / 2) ** 2
+    value = (
+        sin(delta_lat / 2) ** 2
+        + cos(lat_1) * cos(lat_2) * sin(delta_lon / 2) ** 2
+    )
     return 2 * earth_radius * asin(sqrt(value))
 
 
@@ -265,6 +299,5 @@ def get_intelligence_gateway() -> IntelligenceDataGateway:
 
 def configure_intelligence_gateway(gateway: IntelligenceDataGateway) -> None:
     """Replace demo data with a team-A repository adapter at application startup."""
-
     global _gateway
     _gateway = gateway

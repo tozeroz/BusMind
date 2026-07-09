@@ -1,0 +1,11 @@
+vehicle_id,line_id,station_id,predicted_load_level,load_score,predicted_load_rate,onboard_count,capacity,confidence,model_version
+101,1,2,standing_available,65.0,0.65,39,60,0.85,lta_bus_arrival_direct
+101,1,6,seats_available,85.0,0.45,27,60,0.82,lta_bus_arrival_direct
+102,1,1,limited_standing,45.0,0.85,51,60,0.78,lta_bus_arrival_direct
+201,2,5,seats_available,88.0,0.40,24,60,0.88,lta_bus_arrival_direct
+202,2,1,standing_available,62.0,0.68,41,60,0.81,lta_bus_arrival_direct
+301,3,6,seats_available,90.0,0.35,18,50,0.90,lta_bus_arrival_direct
+302,3,4,standing_available,68.0,0.62,34,55,0.84,lta_bus_arrival_direct
+401,4,9,standing_available,60.0,0.70,42,60,0.83,lta_bus_arrival_direct
+501,5,2,seats_available,82.0,0.48,27,55,0.86,lta_bus_arrival_direct
+502,5,7,limited_standing,48.0,0.82,49,60,0.79,lta_bus_arrival_direct

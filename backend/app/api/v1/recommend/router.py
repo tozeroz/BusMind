@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from backend.app.api.v1.dependencies import (
+from app.api.v1.dependencies import (
     get_experience_service,
     get_recommendation_service,
     get_walking_service,
 )
-from backend.app.core.api_response import ApiResponse, success_response
-from backend.app.schemas.recommendation import RecommendRoutesRequest
-from backend.app.schemas.travel_experience import TravelExperienceRequest
-from backend.app.schemas.walking import WalkingTimeRequest
-from backend.app.services.recommend_service import (
+from app.core.api_response import ApiResponse, success_response
+from app.schemas.recommendation import RecommendRoutesRequest
+from app.schemas.travel_experience import TravelExperienceRequest
+from app.schemas.walking import WalkingTimeRequest
+from app.services.recommend_service import (
     RecommendationService,
     TravelExperienceService,
     WalkingTimeService,

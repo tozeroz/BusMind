@@ -3,13 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from backend.app.core.intelligence_exceptions import (
+from app.core.intelligence_exceptions import (
     BusinessError,
     ModelUnavailableError,
 )
-from backend.app.core.time_utils import ensure_local_datetime, now_local
-from backend.app.schemas.passenger_load import LoadLevel
-from backend.app.schemas.simulation import (
+from app.core.time_utils import ensure_local_datetime, now_local
+from app.schemas.passenger_load import LoadLevel
+from app.schemas.simulation import (
     LtaBusArrivalRefreshRequest,
     LtaBusArrivalRefreshResult,
     PredictionResultUpdateRequest,
@@ -19,9 +19,9 @@ from backend.app.schemas.simulation import (
     VehicleStatusUpdateRequest,
     VehicleStatusUpdateResult,
 )
-from backend.app.services.intelligence_gateway import IntelligenceDataGateway, VehicleData
-from backend.app.services.lta_service import LtaDataMallClient, LtaDataMallError
-from backend.app.services.simulation_service.store import SimulationStateStore
+from app.services.intelligence_gateway import IntelligenceDataGateway, VehicleData
+from app.services.lta_service import LtaDataMallClient, LtaDataMallError
+from app.services.simulation_service.store import SimulationStateStore
 
 
 _LTA_LOAD_MAP: dict[str, tuple[LoadLevel, float]] = {

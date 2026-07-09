@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from backend.app.api.v1.dependencies import get_load_service
-from backend.app.core.api_response import ApiResponse, success_response
-from backend.app.schemas.passenger_load import PassengerLoadPredictionRequest
-from backend.app.services.load_service import PassengerLoadService
+from app.api.v1.dependencies import get_load_service
+from app.core.api_response import ApiResponse, success_response
+from app.schemas.passenger_load import PassengerLoadPredictionRequest
+from app.services.load_service import PassengerLoadService
 
 router = APIRouter(tags=["Passenger Load"])
 

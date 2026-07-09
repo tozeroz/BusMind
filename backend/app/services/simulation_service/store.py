@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from threading import RLock
 from typing import Any
 
-from backend.app.core.time_utils import now_local
+from app.core.time_utils import now_local
 
 
 @dataclass(frozen=True, slots=True)

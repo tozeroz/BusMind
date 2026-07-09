@@ -3,13 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from backend.app.core.intelligence_exceptions import BusinessError
-from backend.app.core.intelligence_settings import settings
-from backend.app.core.time_utils import ensure_local_datetime
-from backend.app.schemas.eta import EtaResult
-from backend.app.services.intelligence_gateway import IntelligenceDataGateway
-from backend.app.services.model_adapter import OptionalPredictor
-from backend.app.services.simulation_service.store import (
+from app.core.intelligence_exceptions import BusinessError
+from app.core.intelligence_settings import settings
+from app.core.time_utils import ensure_local_datetime
+from app.schemas.eta import EtaResult
+from app.services.intelligence_gateway import IntelligenceDataGateway
+from app.services.model_adapter import OptionalPredictor
+from app.services.simulation_service.store import (
     SimulationStateStore,
     simulation_state_store,
 )

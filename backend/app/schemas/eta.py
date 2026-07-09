@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import Field
 
-from backend.app.schemas.common import StrictModel
+from app.schemas.common import StrictModel
 
 
 class EtaResult(StrictModel):

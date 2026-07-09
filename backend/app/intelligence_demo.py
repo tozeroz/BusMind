@@ -2,8 +2,8 @@
 
 from fastapi import FastAPI
 
-from backend.app.api.v1.intelligence_router import router
-from backend.app.core.exception_handlers import register_intelligence_exception_handlers
+from app.api.v1.intelligence_router import router
+from app.core.exception_handlers import register_intelligence_exception_handlers
 
 app = FastAPI(title="BusMind Service-B Demo", version="1.0.0")
 register_intelligence_exception_handlers(app)
