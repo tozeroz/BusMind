@@ -1,22 +1,23 @@
 from fastapi import FastAPI
-from app.api import router as api_router
-from app.models.user import Base as UserBase
-from app.models.bus_line import Base as BusBase
-from app.models.history import Base as HistoryBase
-from app.db.session import engine
 
-UserBase.metadata.create_all(bind=engine)
-BusBase.metadata.create_all(bind=engine)
-HistoryBase.metadata.create_all(bind=engine)
+from backend.app.api import router as api_router
+from backend.app.core.exception_handlers import register_intelligence_exception_handlers
+from backend.app.db.session import engine
+from backend.app.models.user import Base
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="BusMind API",
-    description="Bus Intelligent Scheduling System API",
-    version="1.0.0"
+    description="公交智能调度系统 API",
+    version="1.1.0",
 )
 
+# Service-B errors use the same code/message/data/trace_id/timestamp envelope.
+register_intelligence_exception_handlers(app)
 app.include_router(api_router)
 
-@app.get("/", tags=["Health Check"])
-async def health_check():
+
+@app.get("/", tags=["健康检查"])
+async def health_check() -> dict[str, str]:
     return {"status": "ok", "message": "BusMind API is running"}

@@ -12,11 +12,12 @@ def test_passenger_load_prediction_success(client):
     )
     assert response.status_code == 200
     data = response.json()["data"]
-    assert 0 <= data["predicted_load_rate"] <= 1
+    assert 0 <= data["predicted_load_rate"] <= 2
     assert data["predicted_load_level"] in {
         "seats_available",
         "standing_available",
         "limited_standing",
+        "overcrowded",
     }
     assert 0 <= data["load_score"] <= 100
 
