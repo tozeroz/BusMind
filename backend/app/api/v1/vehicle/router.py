@@ -166,3 +166,23 @@ async def get_vehicles_for_line(
 ):
     vehicles = get_vehicles_by_line(db, line_id)
     return build_response(0, "success", {"vehicles": vehicles})
+
+@router.get(
+    "/realtime",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Real-time Vehicle Positions",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def get_realtime_vehicles(
+    line_id: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db)
+):
+    if line_id:
+        vehicles = get_vehicles_by_line(db, line_id)
+    else:
+        result = get_vehicle_list(db, page=1, limit=100)
+        vehicles = result.vehicles
+    return build_response(0, "success", {"vehicles": vehicles})

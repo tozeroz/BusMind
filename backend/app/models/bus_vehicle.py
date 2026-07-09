@@ -12,7 +12,9 @@ class BusVehicle(Base):
     line_id = Column(BIGINT, ForeignKey("bus_lines.line_id"), nullable=False, index=True)
     current_latitude = Column(DECIMAL(10, 7))
     current_longitude = Column(DECIMAL(10, 7))
+    current_station_id = Column(BIGINT, ForeignKey("bus_stations.station_id"), index=True)
     next_station_id = Column(BIGINT, ForeignKey("bus_stations.station_id"), index=True)
+    progress = Column(DECIMAL(5, 2))
     status = Column(String(20), nullable=False, default='running')
     speed_kmh = Column(DECIMAL(6, 2))
     direction_deg = Column(DECIMAL(6, 2))
@@ -22,4 +24,5 @@ class BusVehicle(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
 
     line = relationship("BusLine")
-    next_station = relationship("BusStation")
+    current_station = relationship("BusStation", foreign_keys=[current_station_id])
+    next_station = relationship("BusStation", foreign_keys=[next_station_id])

@@ -22,6 +22,10 @@ from app.schemas.history_schema import (
 
 router = APIRouter(prefix="/history", tags=["History"])
 
+# 边界说明：
+# - Passenger Flow（客流）: 站点/线路的历史上下车人数统计（tap_in/tap_out/total_flow）
+# - Passenger Load（负载）: 车辆内乘客数量预测（onboard_count/capacity/load_rate）
+
 def get_trace_id() -> str:
     return f"req_{uuid4().hex[:12]}"
 

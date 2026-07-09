@@ -265,6 +265,64 @@ async def remove_station_from_line(
     return build_response(0, "success", None)
 
 
+bus_lines_router = APIRouter(prefix="/bus-lines", tags=["Lines"])
+
+@bus_lines_router.get(
+    "",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Line List (Alias)",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def list_lines_alias(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    line_name: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    result = get_line_list(db, page, limit, line_name)
+    return build_response(0, "success", result.model_dump())
+
+@bus_lines_router.get(
+    "/{line_id}",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Line Detail (Alias)",
+    responses={
+        200: {"description": "Get success"},
+        404: {"description": "Line not found"}
+    }
+)
+async def get_line_alias(
+    line_id: int,
+    db: Session = Depends(get_db)
+):
+    line = get_line_by_id(db, line_id)
+    if not line:
+        raise HTTPException(
+            status_code=404,
+            detail=build_response(40400, "Line not found").model_dump()
+        )
+    return build_response(0, "success", line.model_dump())
+
+@bus_lines_router.get(
+    "/{line_id}/stations",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Line Stations (Alias)",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def list_line_stations_alias(
+    line_id: int,
+    db: Session = Depends(get_db)
+):
+    stations = get_line_stations(db, line_id)
+    return build_response(0, "success", {"stations": stations})
+
 station_router = APIRouter(prefix="/stations", tags=["Stations"])
 
 @station_router.get(
@@ -435,3 +493,46 @@ async def get_all_station_coordinates(
 ):
     stations = get_stations_with_coordinates(db)
     return build_response(0, "success", {"stations": stations})
+
+
+bus_stations_router = APIRouter(prefix="/bus-stations", tags=["Stations"])
+
+@bus_stations_router.get(
+    "",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Station List (Alias)",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def list_stations_alias(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    station_name: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    result = get_station_list(db, page, limit, station_name)
+    return build_response(0, "success", result.model_dump())
+
+@bus_stations_router.get(
+    "/{station_id}",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Station Detail (Alias)",
+    responses={
+        200: {"description": "Get success"},
+        404: {"description": "Station not found"}
+    }
+)
+async def get_station_alias(
+    station_id: int,
+    db: Session = Depends(get_db)
+):
+    station = get_station_by_id(db, station_id)
+    if not station:
+        raise HTTPException(
+            status_code=404,
+            detail=build_response(40401, "Station not found").model_dump()
+        )
+    return build_response(0, "success", station.model_dump())

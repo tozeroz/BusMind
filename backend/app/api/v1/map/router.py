@@ -19,6 +19,11 @@ from app.schemas.user_schema import ApiResponse
 
 router = APIRouter(prefix="/map", tags=["Map"])
 
+# 地图模块接口说明：
+# - /stations: 获取站点坐标列表，用于地图标记展示
+# - /road-segments: 获取路段信息（站点间连线），包含路径坐标
+# - /lines: 获取完整线路信息，包含整条线路的路径坐标
+
 def get_trace_id() -> str:
     return f"req_{uuid4().hex[:12]}"
 

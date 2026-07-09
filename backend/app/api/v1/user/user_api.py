@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
 from app.dependencies.auth import get_db, get_current_user
-from app.services.user_service import register_user, login_user, get_current_user as get_current_user_service, update_user, get_user_history
+from app.services.user_service import register_user, login_user, get_current_user as get_current_user_service, update_user, get_user_history, get_user_favorites, add_user_favorite, delete_user_favorite
 from app.schemas.user_schema import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -11,7 +11,10 @@ from app.schemas.user_schema import (
     UserDTO,
     LoginResponse,
     ApiResponse,
-    QueryHistoryResponse
+    QueryHistoryResponse,
+    UserFavoriteResponse,
+    UserFavoriteRequest,
+    UserFavoriteDTO
 )
 from app.models.user import User
 
@@ -127,7 +130,7 @@ async def update_me(
         )
 
 @router.get(
-    "/history",
+    "/me/query-history",
     response_model=ApiResponse,
     status_code=200,
     summary="Get User Query History",
@@ -136,7 +139,7 @@ async def update_me(
         401: {"description": "Unauthorized"}
     }
 )
-async def get_history(
+async def get_query_history(
     page: int = 1,
     limit: int = 20,
     current_user: User = Depends(get_current_user),
@@ -144,3 +147,80 @@ async def get_history(
 ):
     history_response = get_user_history(db, current_user.user_id, page, limit)
     return build_response(0, "success", history_response.model_dump())
+
+
+@router.get(
+    "/me/favorites",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get User Favorites",
+    responses={
+        200: {"description": "Get success"},
+        401: {"description": "Unauthorized"}
+    }
+)
+async def get_favorites(
+    page: int = 1,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    favorites_response = get_user_favorites(db, current_user.user_id, page, limit)
+    return build_response(0, "success", favorites_response.model_dump())
+
+
+@router.post(
+    "/me/favorites",
+    response_model=ApiResponse,
+    status_code=201,
+    summary="Add User Favorite",
+    responses={
+        201: {"description": "Add success"},
+        400: {"description": "Bad request"},
+        401: {"description": "Unauthorized"},
+        409: {"description": "Favorite already exists"}
+    }
+)
+async def add_favorite(
+    request: UserFavoriteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        favorite = add_user_favorite(db, current_user.user_id, request)
+        return build_response(0, "success", favorite.model_dump())
+    except ValueError as e:
+        if str(e) == "Favorite already exists":
+            raise HTTPException(
+                status_code=409,
+                detail=build_response(40901, str(e)).model_dump()
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=build_response(40001, str(e)).model_dump()
+        )
+
+
+@router.delete(
+    "/me/favorites/{favorite_id}",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Delete User Favorite",
+    responses={
+        200: {"description": "Delete success"},
+        401: {"description": "Unauthorized"},
+        404: {"description": "Favorite not found"}
+    }
+)
+async def delete_favorite(
+    favorite_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    success = delete_user_favorite(db, current_user.user_id, favorite_id)
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail=build_response(40400, "Favorite not found").model_dump()
+        )
+    return build_response(0, "success", None)

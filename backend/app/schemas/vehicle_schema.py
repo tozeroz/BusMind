@@ -9,15 +9,22 @@ class BusVehicleDTO(BaseModel):
     line_name: Optional[str] = None
     current_latitude: float
     current_longitude: float
+    latitude: float = 0.0
+    longitude: float = 0.0
+    current_station_id: Optional[int] = None
+    current_station_name: Optional[str] = None
     next_station_id: Optional[int] = None
     next_station_name: Optional[str] = None
+    progress: Optional[float] = 0.0
     status: str
     speed_kmh: float
+    speed: float = 0.0
     direction_deg: float
     onboard_count: int
     capacity: int
     load_rate: float
     last_updated_at: datetime
+    update_time: str = ""
     created_at: datetime
 
     class Config:
@@ -35,7 +42,9 @@ class VehicleCreateRequest(BaseModel):
     line_id: int
     current_latitude: float
     current_longitude: float
+    current_station_id: Optional[int] = None
     next_station_id: Optional[int] = None
+    progress: Optional[float] = 0.0
     status: Optional[str] = "running"
     speed_kmh: Optional[float] = 0.0
     direction_deg: Optional[float] = 0.0
@@ -72,7 +81,9 @@ class VehicleCreateRequest(BaseModel):
 class VehicleUpdateRequest(BaseModel):
     current_latitude: Optional[float] = None
     current_longitude: Optional[float] = None
+    current_station_id: Optional[int] = None
     next_station_id: Optional[int] = None
+    progress: Optional[float] = None
     status: Optional[str] = None
     speed_kmh: Optional[float] = None
     direction_deg: Optional[float] = None

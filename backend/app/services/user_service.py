@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import timedelta
-from app.models.user import User, QueryHistory
-from app.schemas.user_schema import UserRegisterRequest, UserLoginRequest, UserDTO, LoginResponse, UserUpdateRequest, UserMeResponse, QueryHistoryDTO, QueryHistoryResponse
+from app.models.user import User, QueryHistory, UserFavorite
+from app.schemas.user_schema import UserRegisterRequest, UserLoginRequest, UserDTO, LoginResponse, UserUpdateRequest, UserMeResponse, QueryHistoryDTO, QueryHistoryResponse, UserFavoriteDTO, UserFavoriteRequest, UserFavoriteResponse
 from app.dependencies.auth import verify_password, get_password_hash, create_access_token
 from app.core.config import settings
 
@@ -62,7 +62,9 @@ def get_current_user(db: Session, user: User) -> UserMeResponse:
         QueryHistory.user_id == user.user_id
     ).scalar() or 0
     
-    favorite_count = 0
+    favorite_count = db.query(func.count(UserFavorite.favorite_id)).filter(
+        UserFavorite.user_id == user.user_id
+    ).scalar() or 0
     
     return UserMeResponse(
         user=UserDTO(
@@ -145,3 +147,76 @@ def add_query_history(db: Session, user_id: int, query_type: str, query_params: 
         result_summary=new_history.result_summary,
         created_at=new_history.created_at
     )
+
+
+def get_user_favorites(db: Session, user_id: int, page: int = 1, limit: int = 20) -> UserFavoriteResponse:
+    offset = (page - 1) * limit
+    
+    favorites = db.query(UserFavorite).filter(
+        UserFavorite.user_id == user_id
+    ).order_by(UserFavorite.created_at.desc()).offset(offset).limit(limit).all()
+    
+    total = db.query(func.count(UserFavorite.favorite_id)).filter(
+        UserFavorite.user_id == user_id
+    ).scalar() or 0
+    
+    favorite_dtos = [
+        UserFavoriteDTO(
+            favorite_id=f.favorite_id,
+            user_id=f.user_id,
+            favorite_type=f.favorite_type,
+            target_id=f.target_id,
+            target_name=f.target_name,
+            created_at=f.created_at
+        ) for f in favorites
+    ]
+    
+    return UserFavoriteResponse(
+        favorites=favorite_dtos,
+        total=total
+    )
+
+
+def add_user_favorite(db: Session, user_id: int, request: UserFavoriteRequest) -> UserFavoriteDTO:
+    existing_favorite = db.query(UserFavorite).filter(
+        UserFavorite.user_id == user_id,
+        UserFavorite.favorite_type == request.favorite_type,
+        UserFavorite.target_id == request.target_id
+    ).first()
+    
+    if existing_favorite:
+        raise ValueError("Favorite already exists")
+    
+    new_favorite = UserFavorite(
+        user_id=user_id,
+        favorite_type=request.favorite_type,
+        target_id=request.target_id,
+        target_name=request.target_name
+    )
+    
+    db.add(new_favorite)
+    db.commit()
+    db.refresh(new_favorite)
+    
+    return UserFavoriteDTO(
+        favorite_id=new_favorite.favorite_id,
+        user_id=new_favorite.user_id,
+        favorite_type=new_favorite.favorite_type,
+        target_id=new_favorite.target_id,
+        target_name=new_favorite.target_name,
+        created_at=new_favorite.created_at
+    )
+
+
+def delete_user_favorite(db: Session, user_id: int, favorite_id: int) -> bool:
+    favorite = db.query(UserFavorite).filter(
+        UserFavorite.favorite_id == favorite_id,
+        UserFavorite.user_id == user_id
+    ).first()
+    
+    if not favorite:
+        return False
+    
+    db.delete(favorite)
+    db.commit()
+    return True
