@@ -119,6 +119,39 @@ class PassengerLoadService:
                 ),
             )
 
+        latest_load = await self.gateway.get_latest_load_status(
+            line_id=request.line_id,
+            station_id=request.station_id,
+            vehicle_id=request.vehicle_id,
+        )
+        if latest_load is not None:
+            load_rate = latest_load.load_rate
+            load_level = self._level_from_source(latest_load.load_level, load_rate)
+            status_capacity = latest_load.capacity or capacity
+            predicted_count = latest_load.onboard_count
+            if predicted_count is None and load_rate is not None:
+                predicted_count = int(round(status_capacity * load_rate))
+            confidence = latest_load.confidence if latest_load.confidence is not None else 0.82
+            return PassengerLoadPredictionResult(
+                line_id=request.line_id,
+                station_id=request.station_id,
+                vehicle_id=request.vehicle_id,
+                predicted_onboard_count=predicted_count,
+                capacity=status_capacity,
+                predicted_load_rate=load_rate,
+                predicted_load_level=load_level,
+                load_score=latest_load.load_score if latest_load.load_score is not None else self.calculate_load_score(load_rate, load_level),
+                confidence=round(max(0.0, min(float(confidence), 1.0)), 2),
+                predict_time=moment,
+                feature_summary={
+                    "source": latest_load.source,
+                    "query_time": latest_load.query_time.isoformat(),
+                    "load_code": latest_load.load_code,
+                },
+                model_version="load_mysql_realtime_v1",
+            )
+
+
         is_peak = moment.hour in {7, 8, 9, 17, 18, 19}
         flow_level = await self.gateway.get_station_flow_level(request.station_id, moment.hour)
         weather = (request.weather or "clear").lower()
@@ -169,6 +202,31 @@ class PassengerLoadService:
             },
             model_version=model_version,
         )
+
+    @staticmethod
+    def _level_from_source(raw_level: str, load_rate: float | None) -> LoadLevel:
+        mapping = {
+            "SEA": LoadLevel.SEATS_AVAILABLE,
+            "SDA": LoadLevel.STANDING_AVAILABLE,
+            "LSD": LoadLevel.LIMITED_STANDING,
+            "seats_available": LoadLevel.SEATS_AVAILABLE,
+            "standing_available": LoadLevel.STANDING_AVAILABLE,
+            "limited_standing": LoadLevel.LIMITED_STANDING,
+            "overcrowded": LoadLevel.OVERCROWDED,
+        }
+        level = mapping.get(str(raw_level))
+        if level is not None:
+            return level
+        if load_rate is None:
+            return LoadLevel.STANDING_AVAILABLE
+        if load_rate <= 0.60:
+            return LoadLevel.SEATS_AVAILABLE
+        if load_rate <= 0.85:
+            return LoadLevel.STANDING_AVAILABLE
+        if load_rate <= 1.0:
+            return LoadLevel.LIMITED_STANDING
+        return LoadLevel.OVERCROWDED
+
 
     @staticmethod
     def calculate_load_score(
