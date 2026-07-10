@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.exception_handlers import register_intelligence_exception_handlers
 from app.db.schema_check import validate_database_schema
 from app.db.session import engine
-from app.models import Base  # ensure all ORM tables share one complete metadata registry
+from app.models import Base
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +23,14 @@ async def lifespan(_: FastAPI):
     if settings.VALIDATE_DB_SCHEMA_ON_STARTUP:
         issues = validate_database_schema(engine)
         if issues:
-            details = "; ".join(f"{item.object_name}: {item.issue}" for item in issues)
-            raise RuntimeError(f"Database schema validation failed: {details}")
+            details = "; ".join(
+                f"{item.object_name}: {item.issue}"
+                for item in issues
+            )
+            raise RuntimeError(
+                f"Database schema validation failed: {details}"
+            )
+
         logger.info("Database schema validation passed")
 
     yield
@@ -43,4 +49,7 @@ app.include_router(api_router)
 
 @app.get("/", tags=["健康检查"])
 async def health_check() -> dict[str, str]:
-    return {"status": "ok", "message": "BusMind API is running"}
+    return {
+        "status": "ok",
+        "message": "BusMind API is running",
+    }
