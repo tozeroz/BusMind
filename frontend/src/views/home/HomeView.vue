@@ -268,9 +268,14 @@ const resetPanel = () => {
   selectedInfo.chart = [42, 70, 56, 88, 64]
 }
 
-const selectStation = (stop) => {
-  panelMode.value = 'station'
+const openChartPanel = (mode) => {
+  panelMode.value = mode
   isInfoPanelOpen.value = true
+  isAiChatOpen.value = false
+}
+
+const selectStation = (stop) => {
+  openChartPanel('station')
   selectedInfo.id = stop.stop_id
   selectedInfo.name = stop.stop_name
   selectedInfo.crowd = loadLevelText(stop.crowd_level)
@@ -285,8 +290,7 @@ const selectMapStop = (stop) => {
 }
 
 const selectRoad = (route) => {
-  panelMode.value = 'road'
-  isInfoPanelOpen.value = true
+  openChartPanel('road')
   selectedInfo.id = route.line_id || route.id
   selectedInfo.name = route.line_name || route.title
   selectedInfo.crowd = route.load || loadLevelText(route.crowd_level)
@@ -354,6 +358,10 @@ const stopFloatDrag = () => {
 
 const toggleAiChat = () => {
   if (dragState.moved) return
-  isAiChatOpen.value = !isAiChatOpen.value
+  const shouldOpen = !isAiChatOpen.value
+  isAiChatOpen.value = shouldOpen
+  if (shouldOpen && panelMode.value !== 'search') {
+    resetPanel()
+  }
 }
 </script>
