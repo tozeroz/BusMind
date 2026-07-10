@@ -8,8 +8,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.app.cache import CacheProvider, memory_cache_provider
-from backend.app.cache.cache_keys import bus_arrival_service
+from app.cache import CacheProvider, memory_cache_provider
+from app.cache.cache_keys import bus_arrival_service
 
 
 LOAD_LEVEL = {
