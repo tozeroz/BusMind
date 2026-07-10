@@ -3,6 +3,15 @@
     <section class="home-map-panel real-map-panel fullscreen-map-panel">
       <BusMap ref="busMapRef" @select-stop="selectMapStop" @select-route="selectMapRoute" />
 
+      <button
+        class="map-current-locate-button"
+        type="button"
+        title="定位到当前位置"
+        @click="focusMapToCurrentLocation"
+      >
+        ▲
+      </button>
+
       <Transition name="dock-pop" mode="out-in">
         <button
           v-if="!isInfoPanelOpen"
@@ -36,12 +45,15 @@
 
           <template v-if="panelMode === 'search'">
             <form class="destination-search floating-search" @submit.prevent="searchRoutes">
-              <div class="search-header-line">
+              <label class="search-header-line current-location-row">
                 <span>当前位置</span>
-                <strong>乌节站附近</strong>
-              </div>
+                <input v-model="query.start" placeholder="输入当前位置" />
+                <button class="locate-current-button" type="button" @click="getCurrentLocation">
+                  定位
+                </button>
+              </label>
               <label class="search-box-row">
-                <span>目的地</span>
+                <span>目标地点</span>
                 <input v-model="query.end" placeholder="搜索地点、公交站、线路" />
                 <button class="search-submit-chip" type="submit">检索</button>
               </label>
@@ -176,7 +188,7 @@ import BusMap from '@/components/map/BusMap.vue'
 import { mockRoutes } from '@/map/mock-bus-data'
 
 const busMapRef = ref(null)
-const query = reactive({ end: '滨海湾' })
+const query = reactive({ start: '乌节站', end: '滨海湾' })
 const notice = ref('')
 const recommendation = ref(null)
 const panelMode = ref('search')
@@ -298,10 +310,25 @@ const searchRoutes = () => {
 
   recommendation.value = {
     ...matchedRoute,
-    title: query.end ? `乌节站 → ${query.end}` : matchedRoute.title,
+    title: query.end ? `${query.start || '当前位置'} → ${query.end}` : matchedRoute.title,
     reason: `已根据“${query.end || '目的地'}”生成本地演示路线，后续可替换为后端推荐接口。`
   }
   notice.value = `已检索目的地：${query.end || '未填写'}`
+}
+
+const getCurrentLocation = () => {
+  query.start = '乌节站'
+  notice.value = '已获取当前位置：乌节站'
+}
+
+const focusMapToCurrentLocation = () => {
+  const focusedStop = busMapRef.value?.focusStopByName(query.start)
+  if (!focusedStop) {
+    notice.value = `请输入明确站点名称：${query.start || '未填写'}`
+    return
+  }
+
+  notice.value = `地图已定位到：${focusedStop.stop_name}`
 }
 
 const resetPanel = () => {

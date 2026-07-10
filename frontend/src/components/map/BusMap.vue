@@ -454,6 +454,20 @@ function focusRouteById(routeId) {
   }
 }
 
+function focusStopByName(name) {
+  const text = (name || '').trim()
+  if (!text || !map || !map.getSource('stops-highlight-selected')) return null
+
+  const stop = mockBusStops.find((item) => item.stop_name === text)
+
+  if (!stop) return null
+
+  highlightStop(stop.stop_id)
+  scheduleFocusOnCoordinates([[stop.lng, stop.lat]], 15.6)
+
+  return stop
+}
+
 onMounted(() => {
   registerPmtilesProtocol()
 
@@ -464,7 +478,7 @@ onMounted(() => {
     zoom: 11
   })
 
-  map.addControl(new maplibregl.NavigationControl(), 'top-right')
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 
   map.on('load', () => {
     addRouteSources()
@@ -495,7 +509,8 @@ onBeforeUnmount(() => {
 
 defineExpose({
   clearSelection,
-  focusRouteById
+  focusRouteById,
+  focusStopByName
 })
 </script>
 
