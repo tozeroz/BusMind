@@ -1954,19 +1954,95 @@
 
 
 
-## 4\.12 仿真与预测更新
+## 4\.12 后台 LTA 采集刷新
 
-供联调/仿真程序更新车辆状态、预测结果和 LTA 到站数据。
+提供第一阶段后台手动触发入口，用于调用真实 LTA DataMall API，写入统一缓存，并按需同步到 MySQL。该模块不引入 APScheduler、Celery 或独立 worker。
 
-### 4\.12\.1 POST /api/v1/simulation/lta\-bus\-arrival/refresh
+### 4\.12\.1 POST /api/v1/admin/lta/bus\-arrival/refresh
 
 |**项目**|**内容**|
 |---|---|
-|**接口名称**|刷新   LTA 公交到站数据|
+|**接口名称**|手动刷新 LTA 公交到站并可同步入库|
+|**模块**|后台 LTA 采集刷新|
+|**当前鉴权**|无需鉴权（按当前代码）|
+|**前端方法**|后端管理/无直接调用|
+|**数据来源/实现**|LtaCollectorService.refresh\_bus\_arrival\(\)；CacheSyncService.sync\_bus\_arrival\(\)。|
+
+
+
+**请求参数**
+
+|**字段**|**位置**|**类型**|**必填**|**说明**|
+|---|---|---|---|---|
+|bus\_stop\_code|Body|string|是|LTA 公交站编码。格式 ^\\d\{5\}$。|
+|service\_no|Body|string（可空）|否|LTA 公交服务号/线路号。提供时只刷新指定线路；不提供时刷新该站点返回的全部线路。|
+|sync\_to\_db|Body|bool|否|是否同步缓存到数据库。默认 true。|
+
+
+
+**响应结构**
+
+|**响应项**|**类型/结构**|**说明**|
+|---|---|---|
+|**HTTP 状态**|200   / 422 / 503|业务成功 code=0；未配置 LTA\_ACCOUNT\_KEY 时返回 503。|
+|**统一外壳**|ApiResponse|code、message、data、trace\_id、timestamp。|
+|**data**|LtaRefreshAdminResult|字段明细见“核心数据模型”。|
+
+
+
+|**说明：**该接口是真实 LTA 采集入口，适合后台手动刷新；旧 /api/v1/simulation/lta\-bus\-arrival/refresh 仅作为兼容入口保留。|
+|---|
+
+
+
+### 4\.12\.2 POST /api/v1/admin/lta/traffic\-speed\-bands/refresh
+
+|**项目**|**内容**|
+|---|---|
+|**接口名称**|手动刷新 LTA 路况速度带并可同步入库|
+|**模块**|后台 LTA 采集刷新|
+|**当前鉴权**|无需鉴权（按当前代码）|
+|**前端方法**|后端管理/无直接调用|
+|**数据来源/实现**|LtaCollectorService.refresh\_traffic\_speed\_bands\(\)；CacheSyncService.sync\_traffic\_speed\_bands\(\)。|
+
+
+
+**请求参数**
+
+|**字段**|**位置**|**类型**|**必填**|**说明**|
+|---|---|---|---|---|
+|sync\_to\_db|Body|bool|否|是否同步缓存到 traffic\_speed\_bands 表。默认 true。|
+
+
+
+**响应结构**
+
+|**响应项**|**类型/结构**|**说明**|
+|---|---|---|
+|**HTTP 状态**|200   / 422 / 503|业务成功 code=0；未配置 LTA\_ACCOUNT\_KEY 时返回 503。|
+|**统一外壳**|ApiResponse|code、message、data、trace\_id、timestamp。|
+|**data**|LtaRefreshAdminResult|字段明细见“核心数据模型”。|
+
+
+
+|**说明：**接口会刷新 traffic\_speed\_bands:latest 缓存，并为每个 link\_id 写入 traffic\_speed\_bands:\{link\_id\} 缓存；sync\_to\_db=true 时同步到 traffic\_speed\_bands 表。|
+|---|
+
+
+
+## 4\.13 仿真与预测更新
+
+供联调/仿真程序更新车辆状态、预测结果和 LTA 到站数据。
+
+### 4\.13\.1 POST /api/v1/simulation/lta\-bus\-arrival/refresh
+
+|**项目**|**内容**|
+|---|---|
+|**接口名称**|刷新   LTA 公交到站数据（兼容旧入口，已废弃）|
 |**模块**|仿真与预测更新|
 |**当前鉴权**|无需鉴权（按当前代码）|
 |**前端方法**|refreshLtaBusArrival\(data\)|
-|**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新。|
+|**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新；实际转调 SimulationService.refresh\_bus\_arrival\_status\_from\_lta\(\)。|
 
 
 
@@ -1994,12 +2070,12 @@
 
 
 
-|**说明：**用于仿真、数据刷新和模型结果写入，不等同于普通查询接口。|
+|**说明：**该接口已在 OpenAPI 中标记 deprecated；真实 LTA 采集建议使用 /api/v1/admin/lta/bus\-arrival/refresh。|
 |---|
 
 
 
-### 4\.12\.2 POST /api/v1/simulation/prediction\-results
+### 4\.13\.2 POST /api/v1/simulation/prediction\-results
 
 |**项目**|**内容**|
 |---|---|
@@ -2051,7 +2127,7 @@
 
 
 
-### 4\.12\.3 PATCH /api/v1/simulation/vehicle\-status/\{vehicle\_id\}
+### 4\.13\.3 PATCH /api/v1/simulation/vehicle\-status/\{vehicle\_id\}
 
 |**项目**|**内容**|
 |---|---|
@@ -2834,6 +2910,21 @@ AI 出行助手响应。
 
 
 
+### LtaRefreshAdminResult
+
+后台 LTA 采集刷新结果。
+
+|**字段**|**中文含义**|**类型**|**必有**|**说明**|
+|---|---|---|---|---|
+|dataset|数据集|string|是|刷新对象，例如 lta\_bus\_arrival 或 traffic\_speed\_bands。|
+|collected|采集条数|int|是|本次从 LTA API 采集并写入缓存的记录数。|
+|synced|同步条数|int|是|本次同步到数据库的记录数；sync\_to\_db=false 时通常为 0。|
+|skipped|跳过条数|int|是|缓存缺失、字段不完整或无法匹配数据库记录时跳过的数量。|
+|cache\_keys|缓存键|string\[\]|是|本次刷新涉及的主要缓存键。|
+|refreshed\_at|刷新时间|datetime|是|后端完成刷新响应的时间。|
+
+
+
 ### LtaBusArrivalRefreshResult
 
 LTA 到站数据刷新结果。
@@ -2881,6 +2972,7 @@ LTA 到站数据刷新结果。
 |40903|409|车辆编码冲突。|
 |42200|422|Pydantic/FastAPI   参数校验失败。|
 |50301|503|ETA/车辆状态服务不可用或车辆离线。|
+|50320|503|未配置 LTA\_ACCOUNT\_KEY，无法调用 LTA DataMall。|
 
 
 
@@ -2897,6 +2989,10 @@ LTA 到站数据刷新结果。
 - 车辆 CRUD status 与仿真 status 的枚举不同；不要互相直接复用。
 
 - 历史 passenger\-flow 是站点/线路客流；passenger\-load\-prediction 和 history/load 是车辆客载。
+
+- LTA 后台刷新接口需要本地环境变量或 .env 中配置 LTA\_ACCOUNT\_KEY；该密钥不应提交到仓库。
+
+- LTA 后台刷新接口的 sync\_to\_db=true 会在采集后同步 MySQL；sync\_to\_db=false 只刷新内存缓存。
 
 - 当前写接口未做 admin 鉴权，属于演示联调状态；部署前建议补权限控制。
 
@@ -2928,6 +3024,20 @@ LTA 到站数据刷新结果。
 ## A\.4 更新仿真车辆状态
 
 |PATCH /api/v1/simulation/vehicle\-status/1<br>Content\-Type: application/json<br>\{<br>    "longitude": 116\.397,<br>    "latitude": 39\.908,<br>    "speed\_kph": 28,<br>    "onboard\_count": 24,<br>    "capacity": 60,<br>    "status": "normal"<br>\}|
+|---|
+
+
+
+## A\.5 手动刷新 LTA 公交到站
+
+|POST /api/v1/admin/lta/bus\-arrival/refresh<br>Content\-Type: application/json<br>\{<br>    "bus\_stop\_code": "83139",<br>    "service\_no": "15",<br>    "sync\_to\_db": true<br>\}|
+|---|
+
+
+
+## A\.6 手动刷新 LTA 路况速度带
+
+|POST /api/v1/admin/lta/traffic\-speed\-bands/refresh<br>Content\-Type: application/json<br>\{<br>    "sync\_to\_db": true<br>\}|
 |---|
 
 
