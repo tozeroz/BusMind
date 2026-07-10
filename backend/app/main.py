@@ -4,6 +4,7 @@ from app.api import router as api_router
 from app.core.exception_handlers import register_intelligence_exception_handlers
 from app.db.session import engine
 from app.models.user import Base
+from app.models import transit  # noqa: F401 - register transit ORM models
 
 Base.metadata.create_all(bind=engine)
 
