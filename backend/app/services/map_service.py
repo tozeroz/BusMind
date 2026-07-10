@@ -7,7 +7,9 @@ from app.schemas.map_schema import (
     RoadSegmentDTO,
     RoadSegmentResponse,
     MapLineDTO,
-    MapLineResponse
+    MapLineResponse,
+    LineMapBoundsDTO,
+    LineMapDataDTO
 )
 import math
 
@@ -178,3 +180,60 @@ def get_map_stations_by_line(db: Session, line_id: int) -> MapStationResponse:
             ))
     
     return MapStationResponse(stations=station_dtos, total=len(station_dtos))
+
+
+def get_line_map_data(db: Session, line_id: int, direction: Optional[str] = None) -> Optional[LineMapDataDTO]:
+    line = db.query(BusLine).filter(BusLine.line_id == line_id).first()
+    if not line:
+        return None
+    
+    line_stations = db.query(LineStation).filter(
+        LineStation.line_id == line_id
+    ).order_by(LineStation.order_index).all()
+    
+    station_map = _station_map_by_ids(db, [ls.station_id for ls in line_stations])
+    
+    polyline = []
+    station_dtos = []
+    
+    for ls in line_stations:
+        station = station_map.get(ls.station_id)
+        if station:
+            polyline.append([station.longitude, station.latitude])
+            station_dtos.append(MapStationDTO(
+                station_id=station.station_id,
+                station_name=station.station_name,
+                station_code=station.station_code,
+                latitude=station.latitude,
+                longitude=station.longitude,
+                address=station.address,
+                zone=station.zone,
+                line_ids=[line_id],
+                line_names=[line.line_name]
+            ))
+    
+    if polyline:
+        latitudes = [coord[1] for coord in polyline]
+        longitudes = [coord[0] for coord in polyline]
+        bounds = LineMapBoundsDTO(
+            min_latitude=min(latitudes),
+            max_latitude=max(latitudes),
+            min_longitude=min(longitudes),
+            max_longitude=max(longitudes)
+        )
+    else:
+        bounds = LineMapBoundsDTO(
+            min_latitude=0.0,
+            max_latitude=0.0,
+            min_longitude=0.0,
+            max_longitude=0.0
+        )
+    
+    return LineMapDataDTO(
+        line_id=line.line_id,
+        line_name=line.line_name,
+        line_code=line.line_code,
+        polyline=polyline,
+        stations=station_dtos,
+        bounds=bounds
+    )
