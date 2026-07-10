@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Column, DateTime, DECIMAL, ForeignKey, Integer, String, Time, UniqueConstraint, text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from sqlalchemy.sql import func
 
 from app.db.base import BIGINT_COMPAT, Base, runtime_bigint_id, runtime_string_id
@@ -186,6 +186,7 @@ class LineStation(Base):
 
     line = relationship("BusLine", back_populates="line_stations")
     station = relationship("BusStation")
+    stop_sequence = synonym("order_index")
 
     def __init__(self, **kwargs):
         # Legacy tests and callers may pass an integer id; the final schema uses VARCHAR(50).
