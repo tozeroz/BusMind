@@ -3,12 +3,14 @@ from __future__ import annotations
 from collections.abc import Generator
 
 from fastapi import Depends
+from fastapi.params import Depends as DependsMarker
 from sqlalchemy.orm import Session
 
 from app.core.intelligence_settings import settings
 from app.db.session import SessionLocal
 from app.services.ai_service import AiTravelService
 from app.services.eta_service import EtaService
+from app.services.intelligence_gateway import get_intelligence_gateway
 from app.services.intelligence_gateway_mysql import MySQLTransitGateway
 from app.services.load_service import PassengerLoadService
 from app.services.lta_service import LtaDataMallClient, LtaDataMallConfig
@@ -60,6 +62,8 @@ def get_walking_service(
 def get_recommendation_service(
     gateway: MySQLTransitGateway = Depends(get_transit_gateway),
 ) -> RecommendationService:
+    if isinstance(gateway, DependsMarker):
+        gateway = get_intelligence_gateway()
     return RecommendationService(
         gateway=gateway,
         eta_service=EtaService(gateway),
@@ -71,6 +75,8 @@ def get_recommendation_service(
 def get_ai_service(
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ) -> AiTravelService:
+    if isinstance(recommendation_service, DependsMarker):
+        recommendation_service = get_recommendation_service()
     return AiTravelService(recommendation_service)
 
 
