@@ -67,3 +67,19 @@ class MapLineDTO(BaseModel):
 class MapLineResponse(BaseModel):
     lines: List[MapLineDTO]
     total: int
+
+
+class LineMapBoundsDTO(BaseModel):
+    min_latitude: float
+    max_latitude: float
+    min_longitude: float
+    max_longitude: float
+
+
+class LineMapDataDTO(BaseModel):
+    line_id: int
+    line_name: str
+    line_code: str
+    polyline: List[List[float]] = Field(default_factory=list)
+    stations: List[MapStationDTO] = Field(default_factory=list)
+    bounds: LineMapBoundsDTO

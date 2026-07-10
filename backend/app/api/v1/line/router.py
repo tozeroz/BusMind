@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
@@ -398,6 +399,26 @@ async def search_nearby_stations(
 ):
     result = get_nearby_stations(db, latitude, longitude, radius_km)
     return build_response(0, "success", result.model_dump())
+
+
+@station_router.get(
+    "/nearby",
+    response_model=ApiResponse,
+    status_code=405,
+    summary="Nearby Stations via GET Is Not Supported",
+    responses={
+        405: {"description": "Use POST /api/v1/stations/nearby or GET /api/v1/bus-stations/nearby"}
+    }
+)
+async def search_nearby_stations_get_not_supported():
+    return JSONResponse(
+        status_code=405,
+        content=build_response(
+            40500,
+            "Use POST /api/v1/stations/nearby or GET /api/v1/bus-stations/nearby",
+            None,
+        ).model_dump(mode="json"),
+    )
 
 @station_router.get(
     "/coordinates/all",

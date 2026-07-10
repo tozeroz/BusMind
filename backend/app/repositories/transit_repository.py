@@ -7,18 +7,16 @@ from math import asin, cos, radians, sin, sqrt
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from app.models.transit import (
-    BusEtaStatus,
+from app.models.bus_line import (
     BusLine,
-    BusLoadStatus,
     BusStation,
-    BusVehicle,
     LineStation,
-    LtaBusArrival,
-    MapRoadSegment,
-    PassengerFlowTrend,
-    TrafficSpeedBand,
 )
+from app.models.bus_vehicle import BusVehicle
+from app.models.history import EtaPrediction as BusEtaStatus
+from app.models.history import LoadPrediction as BusLoadStatus
+from app.models.history import PassengerFlowTrend
+from app.models.transit_extra import LtaBusArrival, MapRoadSegment, TrafficSpeedBand
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,7 +264,7 @@ class TransitRepository:
             current = self._line_station_for_station(vehicle.line_id, int(vehicle.next_station_id))
         if current is None:
             return 1
-        return max(1, int(target.stop_sequence) - int(current.stop_sequence))
+        return max(1, int(target.order_index) - int(current.order_index))
 
     def _direct_routes(self, start_station_id: int, end_station_id: int, limit: int) -> list[CandidateRouteRecord]:
         rows = (
@@ -274,7 +272,7 @@ class TransitRepository:
             .join(BusLine, BusLine.line_id == LineStation.line_id)
             .filter(LineStation.station_id == start_station_id)
             .filter(BusLine.status == "running")
-            .order_by(LineStation.line_id, LineStation.stop_sequence)
+            .order_by(LineStation.line_id, LineStation.order_index)
             .all()
         )
         routes: list[CandidateRouteRecord] = []
@@ -283,8 +281,8 @@ class TransitRepository:
                 self.db.query(LineStation)
                 .filter(LineStation.line_id == start.line_id)
                 .filter(LineStation.station_id == end_station_id)
-                .filter(LineStation.stop_sequence > start.stop_sequence)
-                .order_by(LineStation.stop_sequence)
+                .filter(LineStation.order_index > start.order_index)
+                .order_by(LineStation.order_index)
                 .first()
             )
             if end is None:
@@ -331,7 +329,7 @@ class TransitRepository:
             .join(BusLine, BusLine.line_id == LineStation.line_id)
             .filter(LineStation.station_id == start_station_id)
             .filter(BusLine.status == "running")
-            .order_by(LineStation.line_id, LineStation.stop_sequence)
+            .order_by(LineStation.line_id, LineStation.order_index)
             .all()
         )
         end_rows = (
@@ -339,7 +337,7 @@ class TransitRepository:
             .join(BusLine, BusLine.line_id == LineStation.line_id)
             .filter(LineStation.station_id == end_station_id)
             .filter(BusLine.status == "running")
-            .order_by(LineStation.line_id, LineStation.stop_sequence)
+            .order_by(LineStation.line_id, LineStation.order_index)
             .all()
         )
         routes: list[CandidateRouteRecord] = []
@@ -355,8 +353,8 @@ class TransitRepository:
                 transfer_station_id = self._find_transfer_station(start, end)
                 if transfer_station_id is None:
                     continue
-                first_end = self._line_station_after(int(start.line_id), transfer_station_id, int(start.stop_sequence))
-                second_start = self._line_station_before(int(end.line_id), transfer_station_id, int(end.stop_sequence))
+                first_end = self._line_station_after(int(start.line_id), transfer_station_id, int(start.order_index))
+                second_start = self._line_station_before(int(end.line_id), transfer_station_id, int(end.order_index))
                 if first_end is None or second_start is None:
                     continue
                 first_ride = self._ride_time_minutes(start, first_end, first_line)
@@ -388,15 +386,15 @@ class TransitRepository:
         row = (
             self.db.query(LineStation.station_id)
             .filter(LineStation.line_id == start.line_id)
-            .filter(LineStation.stop_sequence > start.stop_sequence)
+            .filter(LineStation.order_index > start.order_index)
             .filter(
                 LineStation.station_id.in_(
                     self.db.query(LineStation.station_id)
                     .filter(LineStation.line_id == end.line_id)
-                    .filter(LineStation.stop_sequence < end.stop_sequence)
+                    .filter(LineStation.order_index < end.order_index)
                 )
             )
-            .order_by(LineStation.stop_sequence)
+            .order_by(LineStation.order_index)
             .first()
         )
         return int(row[0]) if row else None
@@ -405,8 +403,8 @@ class TransitRepository:
         return (
             self.db.query(BusVehicle)
             .filter(BusVehicle.line_id == line_id)
-            .filter(BusVehicle.operation_status != "offline")
-            .order_by(desc(BusVehicle.last_reported_at), desc(BusVehicle.updated_at))
+            .filter(BusVehicle.status != "offline")
+            .order_by(desc(BusVehicle.last_updated_at), desc(BusVehicle.updated_at))
             .first()
         )
 
@@ -415,7 +413,7 @@ class TransitRepository:
             self.db.query(LineStation)
             .filter(LineStation.line_id == line_id)
             .filter(LineStation.station_id == station_id)
-            .order_by(LineStation.stop_sequence)
+            .order_by(LineStation.order_index)
             .first()
         )
 
@@ -424,8 +422,8 @@ class TransitRepository:
             self.db.query(LineStation)
             .filter(LineStation.line_id == line_id)
             .filter(LineStation.station_id == station_id)
-            .filter(LineStation.stop_sequence > after_sequence)
-            .order_by(LineStation.stop_sequence)
+            .filter(LineStation.order_index > after_sequence)
+            .order_by(LineStation.order_index)
             .first()
         )
 
@@ -434,8 +432,8 @@ class TransitRepository:
             self.db.query(LineStation)
             .filter(LineStation.line_id == line_id)
             .filter(LineStation.station_id == station_id)
-            .filter(LineStation.stop_sequence < before_sequence)
-            .order_by(desc(LineStation.stop_sequence))
+            .filter(LineStation.order_index < before_sequence)
+            .order_by(desc(LineStation.order_index))
             .first()
         )
 
@@ -445,7 +443,7 @@ class TransitRepository:
             distance = max(0.0, float(end.route_distance_km) - float(start.route_distance_km))
             if distance > 0:
                 return round(max(3.0, distance / 22.0 * 60.0), 1)
-        stop_count = max(1, int(end.stop_sequence) - int(start.stop_sequence))
+        stop_count = max(1, int(end.order_index) - int(start.order_index))
         base_per_stop = 2.0
         if line.avg_service_frequency is not None:
             base_per_stop = 1.6 if float(line.avg_service_frequency) <= 8 else 2.1
