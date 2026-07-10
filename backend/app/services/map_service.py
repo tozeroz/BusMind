@@ -11,6 +11,20 @@ from app.schemas.map_schema import (
 )
 import math
 
+
+def _station_map_by_ids(db: Session, station_ids: list[int]) -> dict[int, BusStation]:
+    if not station_ids:
+        return {}
+    stations = db.query(BusStation).filter(BusStation.station_id.in_(station_ids)).all()
+    return {station.station_id: station for station in stations}
+
+
+def _line_map_by_ids(db: Session, line_ids: list[int]) -> dict[int, BusLine]:
+    if not line_ids:
+        return {}
+    lines = db.query(BusLine).filter(BusLine.line_id.in_(line_ids)).all()
+    return {line.line_id: line for line in lines}
+
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
     lat1_rad = math.radians(lat1)
@@ -28,17 +42,18 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 
 def get_map_stations(db: Session) -> MapStationResponse:
     stations = db.query(BusStation).all()
+    line_stations = db.query(LineStation).order_by(LineStation.line_id, LineStation.order_index).all()
+    line_map = _line_map_by_ids(db, list({ls.line_id for ls in line_stations}))
+
+    station_line_map: dict[int, list[LineStation]] = {}
+    for ls in line_stations:
+        station_line_map.setdefault(ls.station_id, []).append(ls)
     
     station_dtos = []
     for station in stations:
-        line_stations = db.query(LineStation).filter(LineStation.station_id == station.station_id).all()
-        line_ids = [ls.line_id for ls in line_stations]
-        line_names = []
-        
-        for ls in line_stations:
-            line = db.query(BusLine).filter(BusLine.line_id == ls.line_id).first()
-            if line:
-                line_names.append(line.line_name)
+        station_lines = station_line_map.get(station.station_id, [])
+        line_ids = [ls.line_id for ls in station_lines]
+        line_names = [line_map[ls.line_id].line_name for ls in station_lines if ls.line_id in line_map]
         
         station_dtos.append(MapStationDTO(
             station_id=station.station_id,
@@ -57,22 +72,22 @@ def get_map_stations(db: Session) -> MapStationResponse:
 def get_road_segments(db: Session) -> RoadSegmentResponse:
     segments = []
     lines = db.query(BusLine).all()
+    line_stations = db.query(LineStation).order_by(LineStation.line_id, LineStation.order_index).all()
+    station_map = _station_map_by_ids(db, list({ls.station_id for ls in line_stations}))
+
+    line_station_map: dict[int, list[LineStation]] = {}
+    for ls in line_stations:
+        line_station_map.setdefault(ls.line_id, []).append(ls)
     
     for line in lines:
-        line_stations = db.query(LineStation).filter(
-            LineStation.line_id == line.line_id
-        ).order_by(LineStation.order_index).all()
+        current_line_stations = line_station_map.get(line.line_id, [])
         
-        for i in range(len(line_stations) - 1):
-            start_ls = line_stations[i]
-            end_ls = line_stations[i + 1]
+        for i in range(len(current_line_stations) - 1):
+            start_ls = current_line_stations[i]
+            end_ls = current_line_stations[i + 1]
             
-            start_station = db.query(BusStation).filter(
-                BusStation.station_id == start_ls.station_id
-            ).first()
-            end_station = db.query(BusStation).filter(
-                BusStation.station_id == end_ls.station_id
-            ).first()
+            start_station = station_map.get(start_ls.station_id)
+            end_station = station_map.get(end_ls.station_id)
             
             if start_station and end_station:
                 distance = haversine_distance(
@@ -104,25 +119,34 @@ def get_road_segments(db: Session) -> RoadSegmentResponse:
 
 def get_map_lines(db: Session) -> MapLineResponse:
     lines = db.query(BusLine).all()
+    line_stations = db.query(LineStation).order_by(LineStation.line_id, LineStation.order_index).all()
+    station_map = _station_map_by_ids(db, list({ls.station_id for ls in line_stations}))
+
+    line_station_map: dict[int, list[LineStation]] = {}
+    for ls in line_stations:
+        line_station_map.setdefault(ls.line_id, []).append(ls)
     
     line_dtos = []
     for line in lines:
-        line_stations = db.query(LineStation).filter(
-            LineStation.line_id == line.line_id
-        ).order_by(LineStation.order_index).all()
+        current_line_stations = line_station_map.get(line.line_id, [])
         
         path_coordinates = []
-        for ls in line_stations:
-            station = db.query(BusStation).filter(BusStation.station_id == ls.station_id).first()
+        start_station_name = None
+        end_station_name = None
+        for ls in current_line_stations:
+            station = station_map.get(ls.station_id)
             if station:
+                if start_station_name is None:
+                    start_station_name = station.station_name
+                end_station_name = station.station_name
                 path_coordinates.append([station.longitude, station.latitude])
         
         line_dtos.append(MapLineDTO(
             line_id=line.line_id,
             line_name=line.line_name,
             line_code=line.line_code,
-            start_station=line.start_station,
-            end_station=line.end_station,
+            start_station=start_station_name or line.start_station or "",
+            end_station=end_station_name or line.end_station or "",
             path_coordinates=path_coordinates
         ))
     
@@ -132,13 +156,14 @@ def get_map_stations_by_line(db: Session, line_id: int) -> MapStationResponse:
     line_stations = db.query(LineStation).filter(
         LineStation.line_id == line_id
     ).order_by(LineStation.order_index).all()
+    station_map = _station_map_by_ids(db, [ls.station_id for ls in line_stations])
     
     station_dtos = []
     line = db.query(BusLine).filter(BusLine.line_id == line_id).first()
     line_name = line.line_name if line else ""
     
     for ls in line_stations:
-        station = db.query(BusStation).filter(BusStation.station_id == ls.station_id).first()
+        station = station_map.get(ls.station_id)
         if station:
             station_dtos.append(MapStationDTO(
                 station_id=station.station_id,
