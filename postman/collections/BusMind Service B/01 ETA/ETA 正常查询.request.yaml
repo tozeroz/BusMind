@@ -1,6 +1,5 @@
 $kind: http-request
-url: "{{base_url}}/eta?vehicle_id={{vehicle_id}}&target_station_id={{station_id\
-  }}&line_id={{line_id}}"
+url: "{{base_url}}/eta?vehicle_id={{vehicle_id}}&target_station_id={{station_id}}&line_id={{line_id}}"
 method: GET
 headers:
   Content-Type: application/json

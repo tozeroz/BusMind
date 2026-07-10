@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, DECIMAL, ForeignKey, Integer, String, text
+from sqlalchemy.orm import synonym
 from sqlalchemy.sql import func
 
 from app.db.base import BIGINT_COMPAT, Base
@@ -95,6 +96,9 @@ class EtaPrediction(Base):
     )
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    eta_status_id = synonym("eta_prediction_id")
+    query_time = synonym("prediction_time")
+    eta_minutes = synonym("predicted_eta_minutes")
 
     @property
     def model_version(self) -> None:
@@ -134,6 +138,10 @@ class LoadPrediction(Base):
     )
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    load_status_id = synonym("load_prediction_id")
+    query_time = synonym("prediction_time")
+    load_level = synonym("predicted_load_level")
+    load_rate = synonym("predicted_load_rate")
 
     @property
     def model_version(self) -> None:

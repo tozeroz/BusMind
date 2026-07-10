@@ -1,5 +1,5 @@
 from sqlalchemy import Column, DateTime, DECIMAL, ForeignKey, Integer, String, text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from sqlalchemy.sql import func
 
 from app.db.base import BIGINT_COMPAT, Base, runtime_bigint_id, runtime_string_id
@@ -59,38 +59,11 @@ class BusVehicle(Base):
     line = relationship("BusLine")
     current_station = relationship("BusStation", foreign_keys=[current_station_id])
     next_station = relationship("BusStation", foreign_keys=[next_station_id])
-
-    @property
-    def longitude(self):
-        return self.current_longitude
-
-    @longitude.setter
-    def longitude(self, value):
-        self.current_longitude = value
-
-    @property
-    def latitude(self):
-        return self.current_latitude
-
-    @latitude.setter
-    def latitude(self, value):
-        self.current_latitude = value
-
-    @property
-    def speed_kph(self):
-        return self.speed_kmh
-
-    @speed_kph.setter
-    def speed_kph(self, value):
-        self.speed_kmh = value
-
-    @property
-    def operation_status(self) -> str:
-        return self.status
-
-    @operation_status.setter
-    def operation_status(self, value: str) -> None:
-        self.status = value
+    longitude = synonym("current_longitude")
+    latitude = synonym("current_latitude")
+    speed_kph = synonym("speed_kmh")
+    operation_status = synonym("status")
+    last_reported_at = synonym("last_updated_at")
 
     @property
     def progress(self) -> float:

@@ -11,8 +11,6 @@ from app.core.exception_handlers import register_intelligence_exception_handlers
 from app.db.schema_check import validate_database_schema
 from app.db.session import engine
 from app.models import Base
-from app.models import transit  # noqa: F401 - register transit ORM models
-
 
 logger = logging.getLogger(__name__)
 

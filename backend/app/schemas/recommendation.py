@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from app.schemas.common import RouteSegment, StationSummary, StrictModel
 from app.schemas.passenger_load import LoadLevel
@@ -26,6 +26,30 @@ class RecommendType(StrEnum):
 
 
 class RecommendRoutesRequest(StrictModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "start_station_id": 1,
+                    "end_station_id": 12,
+                    "preference": "balanced",
+                    "allow_transfer": True,
+                    "max_transfer_count": 2,
+                    "max_walk_minutes": None,
+                },
+                {
+                    "origin_longitude": 116.3974,
+                    "origin_latitude": 39.9093,
+                    "destination_longitude": 116.4074,
+                    "destination_latitude": 39.9193,
+                    "preference": "less_walking",
+                    "allow_transfer": True,
+                    "max_transfer_count": 1,
+                },
+            ]
+        }
+    )
+
     start_station_id: int | None = Field(default=None, gt=0)
     end_station_id: int | None = Field(default=None, gt=0)
     origin_longitude: float | None = Field(default=None, ge=-180, le=180)

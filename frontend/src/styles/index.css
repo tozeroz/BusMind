@@ -789,10 +789,15 @@ label {
 }
 
 .search-header-line {
-  min-height: 38px;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 82px;
+  align-items: center;
+  gap: 0;
+  min-height: 48px;
   border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 13px;
+  padding: 5px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .location-line strong {
@@ -803,14 +808,32 @@ label {
   color: #fff;
 }
 
+.locate-current-button {
+  width: 82px;
+  min-height: 38px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  background: linear-gradient(135deg, rgba(32, 84, 140, 0.92), rgba(38, 139, 132, 0.92));
+  box-shadow: 0 8px 20px rgba(25, 70, 110, 0.22);
+}
+
+.locate-current-button:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(26, 75, 132, 0.98), rgba(30, 128, 124, 0.98));
+}
+
 .search-box-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: 88px minmax(0, 1fr) 82px;
   align-items: center;
-  gap: 10px;
-  min-height: 54px;
+  gap: 0;
+  min-height: 48px;
   border-radius: 999px;
-  padding: 6px 6px 6px 16px;
+  padding: 5px;
   color: rgba(255, 255, 255, 0.78);
   background: rgba(255, 255, 255, 0.9);
 }
@@ -818,27 +841,58 @@ label {
 .search-box-row span {
   color: rgba(17, 24, 39, 0.58);
   font-size: 13px;
+  padding-left: 12px;
+  white-space: nowrap;
 }
 
-.search-box-row input {
-  min-height: 34px;
+.current-location-row span {
+  color: rgba(17, 24, 39, 0.58);
+  font-size: 13px;
+  padding-left: 12px;
+  white-space: nowrap;
+}
+
+.search-box-row > *,
+.current-location-row > * {
+  align-self: center;
+}
+
+.search-box-row input,
+.current-location-row input {
+  min-height: 32px;
   min-width: 0;
   border: 0;
   padding: 0;
   color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 32px;
   background: transparent;
 }
 
-.search-box-row input:focus {
+.search-box-row input::placeholder,
+.current-location-row input::placeholder {
+  color: rgba(17, 24, 39, 0.48);
+}
+
+.search-box-row input::selection,
+.current-location-row input::selection {
+  color: #fff;
+  background: rgba(42, 132, 145, 0.72);
+}
+
+.search-box-row input:focus,
+.current-location-row input:focus {
   box-shadow: none;
 }
 
 .search-submit-chip {
-  min-width: 74px;
-  min-height: 42px;
+  width: 82px;
+  min-height: 38px;
   border: 0;
   border-radius: 999px;
-  padding: 0 16px;
+  padding: 0;
   color: #fff;
   font-weight: 800;
   background: linear-gradient(135deg, rgba(32, 84, 140, 0.92), rgba(38, 139, 132, 0.92));
@@ -985,8 +1039,8 @@ label {
 
 .map-chart-card {
   position: absolute;
-  right: 22px;
-  top: 78px;
+  right: 78px;
+  top: 22px;
   z-index: 8;
   width: min(360px, calc(100% - 44px));
   border: 1px solid rgba(255, 255, 255, 0.58);
@@ -1052,6 +1106,28 @@ label {
   background: rgba(44, 68, 96, 0.34);
   backdrop-filter: blur(24px);
   box-shadow: var(--shadow);
+}
+
+.map-current-locate-button {
+  position: absolute;
+  top: 68px;
+  right: 10px;
+  z-index: 11;
+  width: 29px;
+  height: 29px;
+  border: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 0 0 4px 4px;
+  color: #2e3b46;
+  font-size: 13px;
+  line-height: 1;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+}
+
+.map-current-locate-button:hover {
+  color: #1f6f93;
+  background: #fff;
 }
 
 .map-mini-toggle {

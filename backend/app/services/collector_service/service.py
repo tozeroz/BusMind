@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from backend.app.cache import CacheProvider, memory_cache_provider
-from backend.app.cache.cache_keys import bus_arrival_service, bus_arrival_stop
-from backend.app.core.time_utils import now_local
-from backend.app.services.lta_service import LtaDataMallClient
+from app.cache import CacheProvider, memory_cache_provider
+from app.cache.cache_keys import (
+    bus_arrival_service,
+    bus_arrival_stop,
+    traffic_speed_band_link,
+    traffic_speed_bands_latest,
+)
+from app.core.time_utils import now_local
+from app.services.lta_service import LtaDataMallClient
 
 
 class LtaCollectorService:
@@ -14,10 +19,12 @@ class LtaCollectorService:
         lta_client: LtaDataMallClient,
         cache: CacheProvider | None = None,
         arrival_ttl_seconds: int = 75,
+        traffic_ttl_seconds: int = 180,
     ) -> None:
         self.lta_client = lta_client
         self.cache = cache or memory_cache_provider
         self.arrival_ttl_seconds = arrival_ttl_seconds
+        self.traffic_ttl_seconds = traffic_ttl_seconds
 
     async def refresh_bus_arrival(
         self,
@@ -41,5 +48,25 @@ class LtaCollectorService:
             bus_arrival_stop(bus_stop_code),
             payloads,
             ttl_seconds=self.arrival_ttl_seconds,
+        )
+        return payloads
+
+    async def refresh_traffic_speed_bands(self) -> list[dict[str, object]]:
+        bands = await self.lta_client.get_traffic_speed_bands()
+        payloads: list[dict[str, object]] = []
+        for band in bands:
+            payload = asdict(band)
+            payload["query_time"] = band.query_time.isoformat()
+            payloads.append(payload)
+            if band.link_id is not None:
+                self.cache.set(
+                    traffic_speed_band_link(band.link_id),
+                    payload,
+                    ttl_seconds=self.traffic_ttl_seconds,
+                )
+        self.cache.set(
+            traffic_speed_bands_latest(),
+            payloads,
+            ttl_seconds=self.traffic_ttl_seconds,
         )
         return payloads
