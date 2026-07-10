@@ -7,6 +7,19 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 class UserRegisterRequest(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "username": "testuser",
+                    "password": "testpassword123",
+                    "nickname": "Test User",
+                    "role": "passenger",
+                }
+            ]
+        }
+    )
+
     username: str
     password: str
     nickname: Optional[str] = ""

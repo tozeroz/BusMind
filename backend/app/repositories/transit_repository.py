@@ -51,6 +51,9 @@ class TransitRepository:
     def get_vehicle(self, vehicle_id: int) -> BusVehicle | None:
         return self.db.query(BusVehicle).filter(BusVehicle.vehicle_id == vehicle_id).first()
 
+    def get_line(self, line_id: int) -> BusLine | None:
+        return self.db.query(BusLine).filter(BusLine.line_id == line_id).first()
+
     def get_latest_eta(
         self,
         vehicle_id: int | None = None,

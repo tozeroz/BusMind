@@ -16,3 +16,7 @@ values:
     value: route_001
   - key: recommend_context
     value: '{"items":[]}'
+  - key: lta_bus_stop_code
+    value: '83139'
+  - key: lta_service_no
+    value: '15'

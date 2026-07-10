@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from app.schemas.common import StrictModel
 from app.schemas.recommendation import Preference, RouteRecommendation
@@ -15,8 +15,26 @@ class AiMode(StrEnum):
     EXPLAIN = "explain"
 
 
-class AiTravelRequest(StrictModel):
-    mode: AiMode
+class AiTravelRequest(StrictModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "mode": "suggest",
+                    "question": "哪条路线比较舒适？",
+                    "start_station_id": 1,
+                    "end_station_id": 12,
+                    "preference": "balanced",
+                },
+                {
+                    "mode": "qa",
+                    "question": "高峰期出行有什么建议？",
+                },
+            ]
+        }
+    )
+
+    mode: AiMode
     question: str | None = Field(default=None, min_length=1, max_length=1000)
     route_id: str | None = Field(default=None, max_length=100)
     start_station_id: int | None = Field(default=None, gt=0)
