@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 
-from backend.app.api import router as api_router
-from backend.app.core.exception_handlers import register_intelligence_exception_handlers
-from backend.app.db.session import engine
-from backend.app.models.user import Base
+from app.api import router as api_router
+from app.core.exception_handlers import register_intelligence_exception_handlers
+from app.db.session import engine
+from app.models.user import Base
 
 Base.metadata.create_all(bind=engine)
 

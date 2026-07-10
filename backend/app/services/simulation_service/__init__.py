@@ -1,5 +1,5 @@
-from backend.app.services.simulation_service.service import SimulationService
-from backend.app.services.simulation_service.store import (
+from app.services.simulation_service.service import SimulationService
+from app.services.simulation_service.store import (
     PredictionOverride,
     SimulationStateStore,
     simulation_state_store,

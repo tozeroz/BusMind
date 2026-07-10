@@ -6,15 +6,14 @@ from typing import Any
 
 from pydantic import Field, model_validator
 
-from backend.app.schemas.common import StrictModel
-from backend.app.schemas.passenger_load import LoadLevel
+from app.schemas.common import StrictModel
+from app.schemas.passenger_load import LoadLevel
 
 
 class VehicleRunStatus(StrEnum):
     NORMAL = "normal"
     DELAYED = "delayed"
     OFFLINE = "offline"
-    MAINTENANCE = "maintenance"
 
 
 class VehicleStatusUpdateRequest(StrictModel):
@@ -70,11 +69,13 @@ class PredictionResultUpdateRequest(StrictModel):
     predicted_eta_minutes: float | None = Field(default=None, ge=0, le=240)
     arrival_time: datetime | None = None
 
-    predicted_load_rate: float | None = Field(default=None, ge=0, le=1)
+    predicted_load_rate: float | None = Field(default=None, ge=0, le=2)
     predicted_load_level: LoadLevel | None = None
     predicted_onboard_count: int | None = Field(default=None, ge=0)
     capacity: int | None = Field(default=None, gt=0, le=300)
+    load_score: float | None = Field(default=None, ge=0, le=100)
     confidence: float = Field(default=0.9, ge=0, le=1)
+    prediction_time: datetime | None = None
 
     model_version: str = Field(default="manual_update_v1", min_length=1, max_length=80)
     source: str = Field(default="simulation", min_length=1, max_length=40)
@@ -84,13 +85,13 @@ class PredictionResultUpdateRequest(StrictModel):
     @model_validator(mode="after")
     def validate_by_prediction_type(self) -> "PredictionResultUpdateRequest":
         if self.prediction_type == PredictionType.ETA:
-            if self.vehicle_id is None or self.target_station_id is None:
-                raise ValueError("ETA 更新必须提供 vehicle_id 和 target_station_id")
+            if self.vehicle_id is None or self.line_id is None or self.target_station_id is None:
+                raise ValueError("ETA 更新必须提供 vehicle_id、line_id 和 target_station_id")
             if self.predicted_eta_minutes is None and self.arrival_time is None:
                 raise ValueError("ETA 更新必须提供 predicted_eta_minutes 或 arrival_time")
         else:
-            if self.line_id is None or self.station_id is None:
-                raise ValueError("客载预测更新必须提供 line_id 和 station_id")
+            if self.vehicle_id is None or self.line_id is None:
+                raise ValueError("客载预测更新必须提供 vehicle_id 和 line_id")
             if self.predicted_load_rate is None and self.predicted_load_level is None:
                 raise ValueError(
                     "客载预测更新必须提供 predicted_load_rate 或 predicted_load_level"

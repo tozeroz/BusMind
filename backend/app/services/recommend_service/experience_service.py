@@ -7,15 +7,15 @@ from algorithm.recommend import (
     transfer_score_from_count,
     walk_score_from_minutes,
 )
-from backend.app.core.intelligence_exceptions import BusinessError
-from backend.app.core.intelligence_settings import settings
-from backend.app.schemas.passenger_load import LoadLevel
-from backend.app.schemas.travel_experience import (
+from app.core.intelligence_exceptions import BusinessError
+from app.core.intelligence_settings import settings
+from app.schemas.passenger_load import LoadLevel
+from app.schemas.travel_experience import (
     ExperienceWeights,
     TravelExperienceRequest,
     TravelExperienceResult,
 )
-from backend.app.services.load_service.service import LOAD_LEVEL_SCORE, PassengerLoadService
+from app.services.load_service.service import LOAD_LEVEL_SCORE, PassengerLoadService
 
 
 class TravelExperienceService:
@@ -73,4 +73,6 @@ class TravelExperienceService:
             return LoadLevel.SEATS_AVAILABLE
         if rate <= 0.85:
             return LoadLevel.STANDING_AVAILABLE
-        return LoadLevel.LIMITED_STANDING
+        if rate <= 1.0:
+            return LoadLevel.LIMITED_STANDING
+        return LoadLevel.OVERCROWDED

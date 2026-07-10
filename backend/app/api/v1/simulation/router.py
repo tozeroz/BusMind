@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Path
 
-from backend.app.api.v1.dependencies import get_simulation_service
-from backend.app.core.api_response import ApiResponse, success_response
-from backend.app.schemas.simulation import (
+from app.api.v1.dependencies import get_simulation_service
+from app.core.api_response import ApiResponse, success_response
+from app.schemas.simulation import (
     LtaBusArrivalRefreshRequest,
     PredictionResultUpdateRequest,
     VehicleStatusUpdateRequest,
 )
-from backend.app.services.simulation_service import SimulationService
+from app.services.simulation_service import SimulationService
 
 router = APIRouter(prefix="/simulation", tags=["Simulation and Prediction Updates"])
 

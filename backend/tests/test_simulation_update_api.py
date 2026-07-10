@@ -123,3 +123,64 @@ def test_lta_refresh_reports_missing_account_key(client):
     )
     assert response.status_code == 503
     assert response.json()["code"] == 50320
+
+
+def test_eta_update_requires_line_id_for_database_mapping(client):
+    response = client.post(
+        "/api/v1/simulation/prediction-results",
+        json={
+            "prediction_type": "eta",
+            "vehicle_id": 101,
+            "target_station_id": 3,
+            "predicted_eta_minutes": 4.0,
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == 42200
+
+
+def test_load_update_supports_database_nullable_station_and_overcrowded(client):
+    update = client.post(
+        "/api/v1/simulation/prediction-results",
+        json={
+            "prediction_type": "passenger_load",
+            "vehicle_id": 101,
+            "line_id": 1,
+            "predicted_load_level": "overcrowded",
+            "predicted_load_rate": 1.12,
+            "predicted_onboard_count": 67,
+            "capacity": 60,
+            "confidence": 0.93,
+            "model_version": "load_db_aligned_v1",
+        },
+    )
+    assert update.status_code == 200
+    payload = update.json()["data"]["payload"]
+    assert payload["prediction_time"]
+    assert payload["predicted_load_level"] == "overcrowded"
+    assert payload["predicted_load_rate"] == 1.12
+    assert payload["onboard_count"] == 67
+    assert payload["load_score"] == 38.0
+
+    load = client.post(
+        "/api/v1/passenger-load-prediction",
+        json={"line_id": 1, "station_id": 3, "vehicle_id": 101},
+    )
+    assert load.status_code == 200
+    data = load.json()["data"]
+    assert data["predicted_load_level"] == "overcrowded"
+    assert data["predicted_load_rate"] == 1.12
+
+
+def test_load_update_requires_vehicle_id_for_database_mapping(client):
+    response = client.post(
+        "/api/v1/simulation/prediction-results",
+        json={
+            "prediction_type": "passenger_load",
+            "line_id": 1,
+            "station_id": 3,
+            "predicted_load_level": "standing_available",
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == 42200

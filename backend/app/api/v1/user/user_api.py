@@ -2,19 +2,23 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
-from backend.app.dependencies.auth import get_db, get_current_user
-from backend.app.services.user_service import register_user, login_user, get_current_user as get_current_user_service, update_user
-from backend.app.schemas.user_schema import (
+from app.dependencies.auth import get_db, get_current_user
+from app.services.user_service import register_user, login_user, get_current_user as get_current_user_service, update_user, get_user_history, get_user_favorites, add_user_favorite, delete_user_favorite
+from app.schemas.user_schema import (
     UserRegisterRequest,
     UserLoginRequest,
     UserUpdateRequest,
     UserDTO,
     LoginResponse,
-    ApiResponse
+    ApiResponse,
+    QueryHistoryResponse,
+    UserFavoriteResponse,
+    UserFavoriteRequest,
+    UserFavoriteDTO
 )
-from backend.app.models.user import User
+from app.models.user import User
 
-router = APIRouter(prefix="/users", tags=["用户"])
+router = APIRouter(prefix="/users", tags=["User"])
 
 def get_trace_id() -> str:
     return f"req_{uuid4().hex[:12]}"
@@ -35,11 +39,11 @@ def build_response(code: int, message: str, data=None) -> ApiResponse:
     "/register",
     response_model=ApiResponse,
     status_code=201,
-    summary="用户注册",
+    summary="User Register",
     responses={
-        201: {"description": "注册成功"},
-        400: {"description": "参数错误"},
-        409: {"description": "用户名已存在"}
+        201: {"description": "Register success"},
+        400: {"description": "Bad request"},
+        409: {"description": "Username exists"}
     }
 )
 async def register(
@@ -50,10 +54,10 @@ async def register(
         user = register_user(db, request)
         return build_response(0, "success", user.model_dump())
     except ValueError as e:
-        if str(e) == "用户名已存在":
+        if str(e) == "Username already exists":
             raise HTTPException(
                 status_code=409,
-                detail=build_response(40900, "用户名已存在").model_dump()
+                detail=build_response(40900, "Username already exists").model_dump()
             )
         raise HTTPException(
             status_code=400,
@@ -64,10 +68,10 @@ async def register(
     "/login",
     response_model=ApiResponse,
     status_code=200,
-    summary="用户登录",
+    summary="User Login",
     responses={
-        200: {"description": "登录成功"},
-        400: {"description": "用户名或密码错误"}
+        200: {"description": "Login success"},
+        400: {"description": "Username or password error"}
     }
 )
 async def login(
@@ -87,10 +91,10 @@ async def login(
     "/me",
     response_model=ApiResponse,
     status_code=200,
-    summary="获取当前用户信息",
+    summary="Get Current User",
     responses={
-        200: {"description": "获取成功"},
-        401: {"description": "未授权"}
+        200: {"description": "Get success"},
+        401: {"description": "Unauthorized"}
     }
 )
 async def get_me(
@@ -104,11 +108,11 @@ async def get_me(
     "/me",
     response_model=ApiResponse,
     status_code=200,
-    summary="修改当前用户信息",
+    summary="Update Current User",
     responses={
-        200: {"description": "修改成功"},
-        400: {"description": "参数错误或旧密码错误"},
-        401: {"description": "未授权"}
+        200: {"description": "Update success"},
+        400: {"description": "Bad request or wrong old password"},
+        401: {"description": "Unauthorized"}
     }
 )
 async def update_me(
@@ -124,3 +128,99 @@ async def update_me(
             status_code=400,
             detail=build_response(40002, str(e)).model_dump()
         )
+
+@router.get(
+    "/me/query-history",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get User Query History",
+    responses={
+        200: {"description": "Get success"},
+        401: {"description": "Unauthorized"}
+    }
+)
+async def get_query_history(
+    page: int = 1,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    history_response = get_user_history(db, current_user.user_id, page, limit)
+    return build_response(0, "success", history_response.model_dump())
+
+
+@router.get(
+    "/me/favorites",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get User Favorites",
+    responses={
+        200: {"description": "Get success"},
+        401: {"description": "Unauthorized"}
+    }
+)
+async def get_favorites(
+    page: int = 1,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    favorites_response = get_user_favorites(db, current_user.user_id, page, limit)
+    return build_response(0, "success", favorites_response.model_dump())
+
+
+@router.post(
+    "/me/favorites",
+    response_model=ApiResponse,
+    status_code=201,
+    summary="Add User Favorite",
+    responses={
+        201: {"description": "Add success"},
+        400: {"description": "Bad request"},
+        401: {"description": "Unauthorized"},
+        409: {"description": "Favorite already exists"}
+    }
+)
+async def add_favorite(
+    request: UserFavoriteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        favorite = add_user_favorite(db, current_user.user_id, request)
+        return build_response(0, "success", favorite.model_dump())
+    except ValueError as e:
+        if str(e) == "Favorite already exists":
+            raise HTTPException(
+                status_code=409,
+                detail=build_response(40901, str(e)).model_dump()
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=build_response(40001, str(e)).model_dump()
+        )
+
+
+@router.delete(
+    "/me/favorites/{favorite_id}",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Delete User Favorite",
+    responses={
+        200: {"description": "Delete success"},
+        401: {"description": "Unauthorized"},
+        404: {"description": "Favorite not found"}
+    }
+)
+async def delete_favorite(
+    favorite_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    success = delete_user_favorite(db, current_user.user_id, favorite_id)
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail=build_response(40400, "Favorite not found").model_dump()
+        )
+    return build_response(0, "success", None)

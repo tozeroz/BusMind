@@ -5,8 +5,8 @@ from enum import StrEnum
 
 from pydantic import Field, model_validator
 
-from backend.app.schemas.common import RouteSegment, StationSummary, StrictModel
-from backend.app.schemas.passenger_load import LoadLevel
+from app.schemas.common import RouteSegment, StationSummary, StrictModel
+from app.schemas.passenger_load import LoadLevel
 
 
 class Preference(StrEnum):
@@ -53,7 +53,7 @@ class RecommendRoutesRequest(StrictModel):
 
 
 class PredictedLoadSummary(StrictModel):
-    predicted_load_rate: float | None = Field(default=None, ge=0, le=1)
+    predicted_load_rate: float | None = Field(default=None, ge=0, le=2)
     predicted_load_level: LoadLevel
     predicted_onboard_count: int | None = Field(default=None, ge=0)
     capacity: int | None = Field(default=None, gt=0)

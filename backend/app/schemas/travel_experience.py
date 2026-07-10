@@ -4,8 +4,8 @@ from typing import Any
 
 from pydantic import Field, model_validator
 
-from backend.app.schemas.common import StrictModel
-from backend.app.schemas.passenger_load import LoadLevel
+from app.schemas.common import StrictModel
+from app.schemas.passenger_load import LoadLevel
 
 
 class ExperienceWeights(StrictModel):
@@ -15,7 +15,7 @@ class ExperienceWeights(StrictModel):
 
 
 class TravelExperienceRequest(StrictModel):
-    predicted_load_rate: float | None = Field(default=None, ge=0, le=1)
+    predicted_load_rate: float | None = Field(default=None, ge=0, le=2)
     predicted_load_level: LoadLevel | None = None
     transfer_count: int = Field(ge=0)
     walk_time_minutes: float = Field(ge=0)

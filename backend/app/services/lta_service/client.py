@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from backend.app.core.time_utils import now_local
+from app.core.time_utils import now_local
 
 
 class LtaDataMallError(RuntimeError):

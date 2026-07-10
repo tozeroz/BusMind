@@ -5,9 +5,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from backend.app.api.v1.dependencies import get_eta_service
-from backend.app.core.api_response import ApiResponse, success_response
-from backend.app.services.eta_service import EtaService
+from app.api.v1.dependencies import get_eta_service
+from app.core.api_response import ApiResponse, success_response
+from app.services.eta_service import EtaService
 
 router = APIRouter(tags=["ETA"])
 

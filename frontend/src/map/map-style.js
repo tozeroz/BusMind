@@ -1,6 +1,6 @@
 import { layers, namedFlavor } from '@protomaps/basemaps'
 
-const TILES_ROOT = 'https://assets.busrouter.sg/tiles/'
+const TILES_ROOT = '/tiles/'
 const singaporeTilesUrl = `${TILES_ROOT}singapore.pmtiles`
 const singaporeBuildingsTilesUrl = `${TILES_ROOT}singapore-buildings.pmtiles`
 

@@ -1,15 +1,1 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.sql import func
-from sqlalchemy.ext.declarative import declarative_base
-
-Base = declarative_base()
-
-class User(Base):
-    __tablename__ = "user"
-    
-    user_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    username = Column(String(50), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
-    nickname = Column(String(32), default="")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+from sqlalchemy import Column, BIGINT, Integer, String, DateTime, DECIMAL, ForeignKey, TEXTfrom sqlalchemy.sql import funcfrom sqlalchemy.ext.declarative import declarative_baseBase = declarative_base()class User(Base):    __tablename__ = "users"    user_id = Column(BIGINT, primary_key=True, autoincrement=True)    username = Column(String(50), unique=True, nullable=False, index=True)    password_hash = Column(String(255), nullable=False)    nickname = Column(String(50))    role = Column(String(20), nullable=False, default='passenger')    created_at = Column(DateTime, nullable=False, server_default=func.now())class QueryHistory(Base):    __tablename__ = "query_history"    history_id = Column(BIGINT, primary_key=True, autoincrement=True)    user_id = Column(BIGINT, ForeignKey("users.user_id"))    query_type = Column(String(50))    query_params = Column(TEXT)    result_summary = Column(TEXT)    created_at = Column(DateTime, nullable=False, server_default=func.now())class UserFavorite(Base):    __tablename__ = "user_favorites"    favorite_id = Column(BIGINT, primary_key=True, autoincrement=True)    user_id = Column(BIGINT, ForeignKey("users.user_id"))    favorite_type = Column(String(50), nullable=False)    target_id = Column(BIGINT, nullable=False)    target_name = Column(String(100))    created_at = Column(DateTime, nullable=False, server_default=func.now())

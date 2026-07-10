@@ -3,17 +3,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from backend.app.core.intelligence_exceptions import BusinessError
-from backend.app.core.intelligence_settings import settings
-from backend.app.core.time_utils import ensure_local_datetime
-from backend.app.schemas.passenger_load import (
+from app.core.intelligence_exceptions import BusinessError
+from app.core.intelligence_settings import settings
+from app.core.time_utils import ensure_local_datetime
+from app.schemas.passenger_load import (
     LoadLevel,
     PassengerLoadPredictionRequest,
     PassengerLoadPredictionResult,
 )
-from backend.app.services.intelligence_gateway import IntelligenceDataGateway
-from backend.app.services.model_adapter import OptionalPredictor
-from backend.app.services.simulation_service.store import (
+from app.services.intelligence_gateway import IntelligenceDataGateway
+from app.services.model_adapter import OptionalPredictor
+from app.services.simulation_service.store import (
     SimulationStateStore,
     simulation_state_store,
 )
@@ -23,6 +23,7 @@ LOAD_LEVEL_SCORE: dict[LoadLevel, float] = {
     LoadLevel.SEATS_AVAILABLE: 100.0,
     LoadLevel.STANDING_AVAILABLE: 70.0,
     LoadLevel.LIMITED_STANDING: 35.0,
+    LoadLevel.OVERCROWDED: 10.0,
 }
 
 
@@ -178,7 +179,7 @@ class PassengerLoadService:
         # monotonic formula below gives that result while retaining level-only
         # compatibility with LTA SEA/SDA/LSD labels.
         if load_rate is not None:
-            return float(round(max(0.0, min(100.0, 100.0 - load_rate * 55.0))))
+            return float(round(max(0.0, min(100.0, 100.0 - min(load_rate, 2.0) * 55.0))))
         return LOAD_LEVEL_SCORE[load_level]
 
     @staticmethod
@@ -187,7 +188,9 @@ class PassengerLoadService:
             return LoadLevel.SEATS_AVAILABLE
         if rate <= 0.85:
             return LoadLevel.STANDING_AVAILABLE
-        return LoadLevel.LIMITED_STANDING
+        if rate <= 1.0:
+            return LoadLevel.LIMITED_STANDING
+        return LoadLevel.OVERCROWDED
 
     def _rule_predict(
         self,
@@ -206,7 +209,7 @@ class PassengerLoadService:
         if weather in {"rain", "rainy", "snow", "storm"}:
             delta += round(capacity * 0.05)
         predicted_count = max(0, min(round(capacity * 1.05), current_onboard + delta))
-        rate = round(min(predicted_count / capacity, 1.0), 2)
+        rate = round(min(predicted_count / capacity, 2.0), 2)
         level = self._level_from_rate(rate)
         confidence = 0.72 if is_peak or flow_level == "high" else 0.66
         return predicted_count, rate, level, confidence
@@ -224,6 +227,7 @@ class PassengerLoadService:
             "seats_available": LoadLevel.SEATS_AVAILABLE,
             "standing_available": LoadLevel.STANDING_AVAILABLE,
             "limited_standing": LoadLevel.LIMITED_STANDING,
+            "overcrowded": LoadLevel.OVERCROWDED,
         }
         level = mapping.get(str(raw_level))
         count = result.get("predicted_onboard_count")
@@ -233,9 +237,9 @@ class PassengerLoadService:
         else:
             count = None
         if isinstance(rate, (int, float)):
-            rate = round(max(0.0, min(float(rate), 1.0)), 2)
+            rate = round(max(0.0, min(float(rate), 2.0)), 2)
         elif count is not None:
-            rate = round(min(count / capacity, 1.0), 2)
+            rate = round(min(count / capacity, 2.0), 2)
         else:
             rate = None
         if level is None and rate is not None:

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from algorithm.recommend import build_route_reason, select_route_ids
-from backend.app.core.intelligence_exceptions import BusinessError
-from backend.app.core.time_utils import ensure_local_datetime, now_local
-from backend.app.schemas.common import RouteSegment, StationSummary
-from backend.app.schemas.passenger_load import PassengerLoadPredictionRequest
-from backend.app.schemas.recommendation import (
+from app.core.intelligence_exceptions import BusinessError
+from app.core.time_utils import ensure_local_datetime, now_local
+from app.schemas.common import RouteSegment, StationSummary
+from app.schemas.passenger_load import PassengerLoadPredictionRequest
+from app.schemas.recommendation import (
     PredictedLoadSummary,
     Preference,
     RecommendRoutesRequest,
@@ -15,11 +13,14 @@ from backend.app.schemas.recommendation import (
     RecommendType,
     RouteRecommendation,
 )
-from backend.app.schemas.travel_experience import TravelExperienceRequest
-from backend.app.services.eta_service import EtaService
-from backend.app.services.intelligence_gateway import CandidateRouteData, IntelligenceDataGateway
-from backend.app.services.load_service import PassengerLoadService
-from backend.app.services.recommend_service.experience_service import TravelExperienceService
+from app.schemas.travel_experience import TravelExperienceRequest
+from app.services.eta_service import EtaService
+from app.services.intelligence_gateway import (
+    CandidateRouteData,
+    IntelligenceDataGateway,
+)
+from app.services.load_service import PassengerLoadService
+from app.services.recommend_service.experience_service import TravelExperienceService
 
 
 class RecommendationService:
@@ -35,11 +36,13 @@ class RecommendationService:
         self.load_service = load_service
         self.experience_service = experience_service
 
-    async def recommend(self, request: RecommendRoutesRequest) -> RecommendRoutesResult:
+    async def recommend(
+        self, request: RecommendRoutesRequest
+    ) -> RecommendRoutesResult:
         depart_time = ensure_local_datetime(request.depart_time)
         start_station_id, end_station_id = await self._resolve_station_ids(request)
         if start_station_id == end_station_id:
-            raise BusinessError(40003, "起点与终点不能相同", 400)
+            raise BusinessError(40003, "起点和终点不能相同", 400)
 
         max_transfer = request.max_transfer_count if request.allow_transfer else 0
         candidates = await self.gateway.get_candidate_routes(
@@ -49,13 +52,16 @@ class RecommendationService:
         )
         if request.max_walk_minutes is not None:
             candidates = [
-                item for item in candidates if item.walk_time_minutes <= request.max_walk_minutes
+                item
+                for item in candidates
+                if item.walk_time_minutes <= request.max_walk_minutes
             ]
         if not candidates:
             raise BusinessError(40400, "未找到满足条件的公交方案", 404)
 
         items = [await self._build_route(item, depart_time) for item in candidates]
         selections = select_route_ids(items)
+
         tags: dict[str, set[RecommendType]] = {item.route_id: set() for item in items}
         tags[selections["best_experience"]].add(RecommendType.BEST_EXPERIENCE)
         tags[selections["fastest"]].add(RecommendType.FASTEST)
@@ -64,10 +70,13 @@ class RecommendationService:
         tags[selections["least_transfer"]].add(RecommendType.LEAST_TRANSFER)
 
         tagged_items = [
-            item.model_copy(update={"recommend_types": sorted(tags[item.route_id], key=str)})
+            item.model_copy(
+                update={"recommend_types": sorted(tags[item.route_id], key=str)}
+            )
             for item in items
         ]
         ordered_items = self._sort_by_preference(tagged_items, request.preference)
+
         return RecommendRoutesResult(
             items=ordered_items,
             best_experience_route_id=selections["best_experience"],
@@ -79,18 +88,27 @@ class RecommendationService:
             generated_at=now_local(),
         )
 
-    async def _resolve_station_ids(self, request: RecommendRoutesRequest) -> tuple[int, int]:
+    async def _resolve_station_ids(
+        self, request: RecommendRoutesRequest
+    ) -> tuple[int, int]:
         if request.start_station_id is not None and request.end_station_id is not None:
             await self.gateway.get_station(request.start_station_id)
             await self.gateway.get_station(request.end_station_id)
             return request.start_station_id, request.end_station_id
+
         assert request.origin_longitude is not None and request.origin_latitude is not None
-        assert request.destination_longitude is not None and request.destination_latitude is not None
+        assert (
+            request.destination_longitude is not None
+            and request.destination_latitude is not None
+        )
+
         start = await self.gateway.find_nearest_station(
-            request.origin_longitude, request.origin_latitude
+            request.origin_longitude,
+            request.origin_latitude,
         )
         end = await self.gateway.find_nearest_station(
-            request.destination_longitude, request.destination_latitude
+            request.destination_longitude,
+            request.destination_latitude,
         )
         return start.station_id, end.station_id
 
@@ -100,6 +118,7 @@ class RecommendationService:
         boarding = await self.gateway.get_station(candidate.boarding_station_id)
         alighting = await self.gateway.get_station(candidate.alighting_station_id)
         first_line_id = candidate.line_ids[0]
+
         eta = await self.eta_service.calculate_eta(
             candidate.vehicle_id,
             candidate.boarding_station_id,
@@ -122,6 +141,7 @@ class RecommendationService:
                 walk_time_minutes=candidate.walk_time_minutes,
             )
         )
+
         line_names = [segment.line_name for segment in candidate.segments]
         total_time = round(
             candidate.walk_time_minutes
@@ -129,6 +149,7 @@ class RecommendationService:
             + candidate.ride_time_minutes,
             1,
         )
+
         return RouteRecommendation(
             route_id=candidate.route_id,
             line_ids=list(candidate.line_ids),
@@ -185,14 +206,29 @@ class RecommendationService:
         items: list[RouteRecommendation], preference: Preference
     ) -> list[RouteRecommendation]:
         if preference == Preference.FASTEST:
-            return sorted(items, key=lambda item: (item.total_time_minutes, -item.experience_score))
+            return sorted(
+                items,
+                key=lambda item: (item.total_time_minutes, -item.experience_score),
+            )
         if preference == Preference.LOW_LOAD:
             return sorted(
                 items,
-                key=lambda item: (-item.predicted_load.load_score, item.total_time_minutes),
+                key=lambda item: (
+                    -item.predicted_load.load_score,
+                    item.total_time_minutes,
+                ),
             )
         if preference == Preference.LESS_WALKING:
-            return sorted(items, key=lambda item: (item.walk_time_minutes, -item.experience_score))
+            return sorted(
+                items,
+                key=lambda item: (item.walk_time_minutes, -item.experience_score),
+            )
         if preference == Preference.LESS_TRANSFER:
-            return sorted(items, key=lambda item: (item.transfer_count, -item.experience_score))
-        return sorted(items, key=lambda item: (-item.experience_score, item.total_time_minutes))
+            return sorted(
+                items,
+                key=lambda item: (item.transfer_count, -item.experience_score),
+            )
+        return sorted(
+            items,
+            key=lambda item: (-item.experience_score, item.total_time_minutes),
+        )

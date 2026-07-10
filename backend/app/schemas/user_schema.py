@@ -6,24 +6,31 @@ class UserRegisterRequest(BaseModel):
     username: str
     password: str
     nickname: Optional[str] = ""
+    role: Optional[str] = "passenger"
 
     @field_validator('username')
     def validate_username(cls, v):
         if len(v) < 4 or len(v) > 32:
-            raise ValueError('用户名长度必须在4-32字符之间')
+            raise ValueError('Username must be 4-32 characters')
         return v
 
     @field_validator('password')
     def validate_password(cls, v):
         if len(v) < 8 or len(v) > 64:
-            raise ValueError('密码长度必须在8-64字符之间')
+            raise ValueError('Password must be 8-64 characters')
         return v
 
     @field_validator('nickname')
     def validate_nickname(cls, v):
         if v and len(v) > 32:
-            raise ValueError('昵称长度不能超过32字符')
+            raise ValueError('Nickname cannot exceed 32 characters')
         return v
+
+    @field_validator('role')
+    def validate_role(cls, v):
+        if v and v not in ['passenger', 'admin']:
+            raise ValueError('Role must be passenger or admin')
+        return v or 'passenger'
 
 class UserLoginRequest(BaseModel):
     username: str
@@ -37,21 +44,22 @@ class UserUpdateRequest(BaseModel):
     @field_validator('nickname')
     def validate_nickname(cls, v):
         if v and len(v) > 32:
-            raise ValueError('昵称长度不能超过32字符')
+            raise ValueError('Nickname cannot exceed 32 characters')
         return v
 
     @field_validator('new_password')
     def validate_new_password(cls, v, values):
         if v and len(v) < 8:
-            raise ValueError('新密码长度必须至少8个字符')
+            raise ValueError('New password must be at least 8 characters')
         if v and not values.get('old_password'):
-            raise ValueError('修改密码时必须提供旧密码')
+            raise ValueError('Old password is required to change password')
         return v
 
 class UserDTO(BaseModel):
     user_id: int
     username: str
     nickname: str
+    role: str
     created_at: datetime
 
     class Config:
@@ -71,9 +79,62 @@ class LoginResponse(BaseModel):
     expires_in: int
     user: UserDTO
 
+class QueryHistoryDTO(BaseModel):
+    history_id: int
+    user_id: int
+    query_type: str
+    query_params: str
+    result_summary: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+class QueryHistoryResponse(BaseModel):
+    histories: list[QueryHistoryDTO]
+    total: int
+
+class UserFavoriteDTO(BaseModel):
+    favorite_id: int
+    user_id: int
+    favorite_type: str
+    target_id: int
+    target_name: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+class UserFavoriteRequest(BaseModel):
+    favorite_type: str
+    target_id: int
+    target_name: Optional[str] = ""
+
+    @field_validator('favorite_type')
+    def validate_favorite_type(cls, v):
+        if not v:
+            raise ValueError('Favorite type is required')
+        return v
+
+    @field_validator('target_id')
+    def validate_target_id(cls, v):
+        if v <= 0:
+            raise ValueError('Target id must be positive')
+        return v
+
+class UserFavoriteResponse(BaseModel):
+    favorites: list[UserFavoriteDTO]
+    total: int
+
 class ApiResponse(BaseModel):
     code: int
     message: str
-    data: Optional[dict] = None
+    data: Optional[dict | list] = None
     trace_id: str
     timestamp: str
