@@ -9,21 +9,18 @@ Base = declarative_base()
 class PassengerFlowTrend(Base):
     __tablename__ = "passenger_flow_trend"
 
-    flow_record_id = Column("id", BIGINT, primary_key=True, autoincrement=True)
-    year_month = Column(String(7))
-    hour = Column(Integer)
-    target_id = Column("station_id", BIGINT, nullable=False, index=True)
+    flow_record_id = Column(BIGINT, primary_key=True, autoincrement=True)
+    target_type = Column(String(20), nullable=False, index=True)
+    target_id = Column(BIGINT, nullable=False, index=True)
+    bus_stop_code = Column(String(30))
+    record_time = Column(DateTime, nullable=False, index=True)
     day_type = Column(String(20))
     tap_in_volume = Column(Integer, nullable=False, default=0)
     tap_out_volume = Column(Integer, nullable=False, default=0)
     total_flow = Column(Integer, nullable=False, default=0)
     flow_level = Column(String(20))
+    data_source = Column(String(100))
     created_at = Column(DateTime, nullable=False, server_default=func.now())
-    
-    target_type = column_property("station")
-    bus_stop_code = column_property(None)
-    record_time = column_property(None)
-    data_source = column_property(None)
 
 
 class PassengerFlowPrediction(Base):
@@ -42,37 +39,42 @@ class PassengerFlowPrediction(Base):
 
 
 class EtaPrediction(Base):
-    __tablename__ = "eta_prediction"
+    __tablename__ = "bus_eta_status"
 
-    eta_prediction_id = Column("id", BIGINT, primary_key=True, autoincrement=True)
+    eta_prediction_id = Column("eta_status_id", BIGINT, primary_key=True, autoincrement=True)
     vehicle_id = Column(BIGINT, nullable=False, index=True)
-    line_id = Column(BIGINT, nullable=False, index=True)
-    target_station_id = Column(BIGINT, nullable=False, index=True)
-    predicted_eta_minutes = Column(Float, nullable=False)
+    line_id = Column(BIGINT, ForeignKey("bus_line.line_id"), nullable=False, index=True)
+    target_station_id = Column(BIGINT, ForeignKey("bus_station.station_id"), nullable=False, index=True)
+    bus_stop_code = Column(String(30))
+    prediction_time = Column("query_time", DateTime, index=True)
+    predicted_eta_minutes = Column("eta_minutes", Float, nullable=False)
     arrival_time = Column(DateTime)
     vehicle_to_stop_distance_m = Column(Float)
     speed_kph = Column(Float)
-    model_version = Column(String(50))
+    confidence = Column(Float)
+    data_source = Column(String(50))
     created_at = Column(DateTime, nullable=False, server_default=func.now())
-    
-    prediction_time = column_property(None)
-    confidence = column_property(None)
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    model_version = column_property(None)
 
 
 class LoadPrediction(Base):
-    __tablename__ = "load_prediction"
+    __tablename__ = "bus_load_status"
 
-    load_prediction_id = Column("id", BIGINT, primary_key=True, autoincrement=True)
+    load_prediction_id = Column("load_status_id", BIGINT, primary_key=True, autoincrement=True)
     vehicle_id = Column(BIGINT, nullable=False, index=True)
-    line_id = Column(BIGINT, nullable=False, index=True)
-    station_id = Column(BIGINT, index=True)
-    predicted_load_level = Column(String(32), nullable=False)
+    line_id = Column(BIGINT, ForeignKey("bus_line.line_id"), nullable=False, index=True)
+    station_id = Column(BIGINT, ForeignKey("bus_station.station_id"), index=True)
+    bus_stop_code = Column(String(30))
+    prediction_time = Column("query_time", DateTime, index=True)
+    load_code = Column(String(20))
+    predicted_load_level = Column("load_level", String(32), nullable=False)
     load_score = Column(Float)
-    predicted_load_rate = Column(Float)
+    predicted_load_rate = Column("load_rate", Float)
     onboard_count = Column(Integer)
     capacity = Column(Integer)
     confidence = Column(Float)
-    model_version = Column(String(50))
+    data_source = Column(String(50))
     created_at = Column(DateTime, nullable=False, server_default=func.now())
-    
-    prediction_time = column_property(None)
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    model_version = column_property(None)
