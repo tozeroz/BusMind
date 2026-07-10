@@ -10,7 +10,8 @@ from app.services.history_service import (
     get_eta_prediction,
     get_load_prediction,
     get_eta_predictions_by_line,
-    get_load_predictions_by_line
+    get_load_predictions_by_line,
+    get_predictions
 )
 from app.schemas.user_schema import ApiResponse
 from app.schemas.history_schema import (
@@ -198,3 +199,72 @@ async def get_load(
         status_code=404,
         detail=build_response(404, "Load prediction not found").model_dump()
     )
+
+
+@router.get(
+    "/passenger-load",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Passenger Load (Compatible)",
+    responses={
+        200: {"description": "Get success"},
+        404: {"description": "Not found"}
+    }
+)
+async def get_passenger_load(
+    line_id: Optional[int] = Query(None, ge=1),
+    station_id: Optional[int] = Query(None, ge=1),
+    vehicle_id: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db)
+):
+    if line_id is not None:
+        if station_id is not None or vehicle_id is not None:
+            result = get_load_prediction(
+                db=db,
+                line_id=line_id,
+                station_id=station_id,
+                vehicle_id=vehicle_id
+            )
+            if result:
+                return build_response(0, "success", result.model_dump())
+            raise HTTPException(
+                status_code=404,
+                detail=build_response(404, "Load prediction not found").model_dump()
+            )
+        else:
+            results = get_load_predictions_by_line(
+                db=db,
+                line_id=line_id,
+                station_id=station_id
+            )
+            return build_response(0, "success", [r.model_dump() for r in results])
+    raise HTTPException(
+        status_code=400,
+        detail=build_response(400, "line_id is required").model_dump()
+    )
+
+
+@router.get(
+    "/predictions",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Predictions (Aggregated)",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def get_predictions_api(
+    prediction_type: Optional[str] = Query(None, regex="^(eta|passenger_load|passenger_flow)$"),
+    line_id: Optional[int] = Query(None, ge=1),
+    station_id: Optional[int] = Query(None, ge=1),
+    vehicle_id: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db)
+):
+    results = get_predictions(
+        db=db,
+        prediction_type=prediction_type,
+        line_id=line_id,
+        station_id=station_id,
+        vehicle_id=vehicle_id
+    )
+    return build_response(0, "success", results)

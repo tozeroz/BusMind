@@ -379,6 +379,41 @@ async def list_stations(
     result = get_station_list(db, page, limit, station_name)
     return build_response(0, "success", result.model_dump())
 
+# Static paths must be registered before /{station_id}; otherwise FastAPI treats
+# them as station_id values and returns validation errors.
+@station_router.post(
+    "/nearby",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Search Nearby Stations",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def search_nearby_stations(
+    latitude: float = Body(..., embed=True),
+    longitude: float = Body(..., embed=True),
+    radius_km: float = Body(1.0, embed=True),
+    db: Session = Depends(get_db)
+):
+    result = get_nearby_stations(db, latitude, longitude, radius_km)
+    return build_response(0, "success", result.model_dump())
+
+@station_router.get(
+    "/coordinates/all",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get All Station Coordinates",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def get_all_station_coordinates(
+    db: Session = Depends(get_db)
+):
+    stations = get_stations_with_coordinates(db)
+    return build_response(0, "success", {"stations": stations})
+
 @station_router.get(
     "/{station_id}",
     response_model=ApiResponse,
@@ -502,39 +537,6 @@ async def get_station_lines_api(
             detail=build_response(40401, "Station not found").model_dump()
         )
     return build_response(0, "success", result.model_dump())
-
-@station_router.post(
-    "/nearby",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Search Nearby Stations",
-    responses={
-        200: {"description": "Get success"}
-    }
-)
-async def search_nearby_stations(
-    latitude: float = Body(..., embed=True),
-    longitude: float = Body(..., embed=True),
-    radius_km: float = Body(1.0, embed=True),
-    db: Session = Depends(get_db)
-):
-    result = get_nearby_stations(db, latitude, longitude, radius_km)
-    return build_response(0, "success", result.model_dump())
-
-@station_router.get(
-    "/coordinates/all",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Get All Station Coordinates",
-    responses={
-        200: {"description": "Get success"}
-    }
-)
-async def get_all_station_coordinates(
-    db: Session = Depends(get_db)
-):
-    stations = get_stations_with_coordinates(db)
-    return build_response(0, "success", {"stations": stations})
 
 
 bus_stations_router = APIRouter(prefix="/bus-stations", tags=["Stations"])

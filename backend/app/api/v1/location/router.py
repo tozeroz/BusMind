@@ -25,6 +25,26 @@ def build_response(code: int, message: str, data=None) -> ApiResponse:
         timestamp=get_timestamp()
     )
 
+# Static paths must be registered before /{station_id}; otherwise FastAPI treats
+# "nearby" as a station_id and returns a validation error.
+@router.get(
+    "/nearby",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Nearby Stations",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def get_nearby(
+    latitude: float = Query(..., ge=-90, le=90, description="Current latitude"),
+    longitude: float = Query(..., ge=-180, le=180, description="Current longitude"),
+    radius_km: float = Query(1.0, ge=0.1, le=10.0, description="Search radius in km"),
+    db: Session = Depends(get_db)
+):
+    result = get_nearby_stations(db, latitude, longitude, radius_km)
+    return build_response(0, "success", result.model_dump())
+
 @router.get(
     "/{station_id}",
     response_model=ApiResponse,
@@ -46,21 +66,3 @@ async def get_location(
             detail=build_response(40401, "Location not found").model_dump()
         )
     return build_response(0, "success", station.model_dump())
-
-@router.get(
-    "/nearby",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Get Nearby Stations",
-    responses={
-        200: {"description": "Get success"}
-    }
-)
-async def get_nearby(
-    latitude: float = Query(..., ge=-90, le=90, description="Current latitude"),
-    longitude: float = Query(..., ge=-180, le=180, description="Current longitude"),
-    radius_km: float = Query(1.0, ge=0.1, le=10.0, description="Search radius in km"),
-    db: Session = Depends(get_db)
-):
-    result = get_nearby_stations(db, latitude, longitude, radius_km)
-    return build_response(0, "success", result.model_dump())
