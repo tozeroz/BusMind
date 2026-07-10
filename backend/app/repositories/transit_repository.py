@@ -373,3 +373,4 @@ def _haversine_meters(longitude_1: float, latitude_1: float, longitude_2: float,
     delta_lat = lat_2 - lat_1
     value = sin(delta_lat / 2) ** 2 + cos(lat_1) * cos(lat_2) * sin(delta_lon / 2) ** 2
     return 2 * earth_radius * asin(sqrt(value))
+

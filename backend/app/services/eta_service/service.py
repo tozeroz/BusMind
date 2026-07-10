@@ -75,6 +75,29 @@ class EtaService:
                 ),
             )
 
+        latest_eta = await self.gateway.get_latest_eta_status(
+            vehicle_id=vehicle_id,
+            target_station_id=target_station_id,
+            line_id=line_id or vehicle.line_id,
+        )
+        if latest_eta is not None:
+            eta_minutes = round(max(0.0, min(float(latest_eta.eta_minutes), 240.0)), 1)
+            return EtaResult(
+                vehicle_id=vehicle_id,
+                target_station_id=target_station_id,
+                predicted_eta_minutes=eta_minutes,
+                arrival_time=latest_eta.arrival_time,
+                factors={
+                    "source": latest_eta.source,
+                    "query_time": latest_eta.query_time.isoformat(),
+                    "distance_meters": latest_eta.vehicle_to_stop_distance_m,
+                    "speed_kph": latest_eta.speed_kph,
+                    "confidence": latest_eta.confidence,
+                },
+                model_version="eta_mysql_realtime_v1",
+            )
+
+
         distance_meters = await self.gateway.get_distance_to_station_meters(
             vehicle_id, target_station_id
         )
@@ -131,3 +154,4 @@ class EtaService:
             if isinstance(value, (int, float)):
                 return float(value), str(result.get("model_version", "eta_external_model"))
         return None, ""
+
