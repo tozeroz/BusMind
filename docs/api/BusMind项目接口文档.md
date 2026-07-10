@@ -22,9 +22,9 @@
 
 |**统计项**|**数量**|**说明**|
 |---|---|---|
-|业务路由路径|46|不含根路径健康检查；同一路径可有多个 HTTP 方法。|
-|业务接口操作|59|GET/POST/PATCH/DELETE   操作总数。|
-|主接口操作|54|均有   frontend/src/api 中的对应方法。|
+|业务路由路径|48|不含根路径健康检查；同一路径可有多个 HTTP 方法。|
+|业务接口操作|61|GET/POST/PATCH/DELETE   操作总数。|
+|主接口操作|56|含 2 个后台管理触发接口；其余主接口均有 frontend/src/api 中的对应方法。|
 |兼容别名操作|5|/bus\-lines   与 /bus\-stations，仅为旧路径兼容。|
 |健康检查|1|GET   /，返回简单对象，不使用统一 ApiResponse 外壳。|
 
@@ -89,6 +89,7 @@
 |线路、站点、车辆、地图、位置、历史查询|否|便于演示和前端联调。|
 |ETA、客载、步行、推荐、AI|否|当前代码未绑定用户；AI   可使用请求 context。|
 |线路/站点/车辆写接口|否|当前代码可直接调用；生产环境建议增加 admin 权限。|
+|后台 LTA 采集刷新|否|当前代码未绑定鉴权；建议仅内部或管理员调用。|
 |仿真与预测更新|否|建议部署时限制为内部服务或 admin。|
 
 ## 2\.5 主要枚举
@@ -112,7 +113,7 @@
 
 # 三、接口总览
 
-下表列出正式 FastAPI 应用中的全部 60 个操作（59 个业务接口 \+ 1 个健康检查）。
+下表列出正式 FastAPI 应用中的全部 62 个操作（61 个业务接口 \+ 1 个健康检查）。
 
 |**序号**|**模块**|**方法**|**路径**|**功能**|**鉴权**|**前端方法**|
 |---|---|---|---|---|---|---|
@@ -172,10 +173,12 @@
 |54|步行、体验评价与路线推荐|POST|/api/v1/travel\-experience/evaluate|计算出行体验评分|无需鉴权（按当前代码）|evaluateTravelExperience\(data\)|
 |55|步行、体验评价与路线推荐|POST|/api/v1/walking\-time\-estimation|估算前往上车站的步行时间|无需鉴权（按当前代码）|estimateWalkingTime\(data\)|
 |56|AI   出行助手|POST|/api/v1/ai/travel|AI 出行问答、建议与路线解释|无需鉴权（按当前代码）|askAiTravel\(data\)|
-|57|仿真与预测更新|POST|/api/v1/simulation/lta\-bus\-arrival/refresh|刷新   LTA 公交到站数据|无需鉴权（按当前代码）|refreshLtaBusArrival\(data\)|
-|58|仿真与预测更新|POST|/api/v1/simulation/prediction\-results|写入/刷新预测结果|无需鉴权（按当前代码）|updatePredictionResult\(data\)|
-|59|仿真与预测更新|PATCH|/api/v1/simulation/vehicle\-status/\{vehicle\_id\}|更新仿真车辆状态|无需鉴权（按当前代码）|updateVehicleStatus\(vehicleId,   data\)|
-|60|健康检查|GET|/|服务健康检查|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|57|后台 LTA 采集刷新|POST|/api/v1/admin/lta/bus\-arrival/refresh|手动刷新 LTA 公交到站并可同步入库|无需鉴权（按当前代码）|后端管理/无直接调用|
+|58|后台 LTA 采集刷新|POST|/api/v1/admin/lta/traffic\-speed\-bands/refresh|手动刷新 LTA 路况速度带并可同步入库|无需鉴权（按当前代码）|后端管理/无直接调用|
+|59|仿真与预测更新|POST|/api/v1/simulation/lta\-bus\-arrival/refresh|刷新   LTA 公交到站数据（兼容旧入口，已废弃）|无需鉴权（按当前代码）|refreshLtaBusArrival\(data\)|
+|60|仿真与预测更新|POST|/api/v1/simulation/prediction\-results|写入/刷新预测结果|无需鉴权（按当前代码）|updatePredictionResult\(data\)|
+|61|仿真与预测更新|PATCH|/api/v1/simulation/vehicle\-status/\{vehicle\_id\}|更新仿真车辆状态|无需鉴权（按当前代码）|updateVehicleStatus\(vehicleId,   data\)|
+|62|健康检查|GET|/|服务健康检查|无需鉴权（按当前代码）|后端兼容/无直接调用|
 
 
 
@@ -183,7 +186,7 @@
 
 # 四、各模块接口说明
 
-本章详细说明 54 个主接口。兼容别名接口在第五章单独列出，避免重复。
+本章详细说明 56 个主接口。兼容别名接口在第五章单独列出，避免重复。
 
 ## 4\.1 用户与鉴权
 

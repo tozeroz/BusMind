@@ -14,11 +14,13 @@ from app.services.intelligence_gateway import get_intelligence_gateway
 from app.services.intelligence_gateway_mysql import MySQLTransitGateway
 from app.services.load_service import PassengerLoadService
 from app.services.lta_service import LtaDataMallClient, LtaDataMallConfig
+from app.services.collector_service.service import LtaCollectorService
 from app.services.recommend_service import (
     RecommendationService,
     TravelExperienceService,
     WalkingTimeService,
 )
+from app.services.sync_service.service import CacheSyncService
 from app.services.simulation_service import (
     SimulationService,
     simulation_state_store,
@@ -80,20 +82,34 @@ def get_ai_service(
     return AiTravelService(recommendation_service)
 
 
+def get_lta_client() -> LtaDataMallClient | None:
+    if not settings.lta_account_key:
+        return None
+    return LtaDataMallClient(
+        LtaDataMallConfig(
+            account_key=settings.lta_account_key,
+            base_url=settings.lta_base_url,
+            timeout_seconds=settings.lta_timeout_seconds,
+        )
+    )
+
+
+def get_lta_collector_service() -> LtaCollectorService | None:
+    lta_client = get_lta_client()
+    if lta_client is None:
+        return None
+    return LtaCollectorService(lta_client)
+
+
+def get_cache_sync_service() -> CacheSyncService:
+    return CacheSyncService()
+
+
 def get_simulation_service(
     gateway: MySQLTransitGateway = Depends(get_transit_gateway),
 ) -> SimulationService:
-    lta_client = None
-    if settings.lta_account_key:
-        lta_client = LtaDataMallClient(
-            LtaDataMallConfig(
-                account_key=settings.lta_account_key,
-                base_url=settings.lta_base_url,
-                timeout_seconds=settings.lta_timeout_seconds,
-            )
-        )
     return SimulationService(
         gateway=gateway,
         store=simulation_state_store,
-        lta_client=lta_client,
+        lta_client=get_lta_client(),
     )

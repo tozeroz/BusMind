@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.admin import router as admin_router
 from app.api.v1.intelligence_router import router as intelligence_router
 from app.api.v1.user.user_api import router as user_router
 from app.core.api_response import ApiResponse, success_response
@@ -18,6 +19,7 @@ async def api_v1_health() -> ApiResponse:
 
 
 router.include_router(user_router)
+router.include_router(admin_router)
 router.include_router(intelligence_router)
 router.include_router(line_router)
 router.include_router(station_router)

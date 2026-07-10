@@ -39,6 +39,9 @@ def _candidate_env_files() -> list[Path]:
     cwd = Path.cwd()
     candidates.extend(
         [
+            PROJECT_ROOT / ".env",
+            BACKEND_ROOT / ".env",
+            cwd / ".env",
             PROJECT_ROOT / "service-b.env",
             PROJECT_ROOT / "sevice-b.env",
             BACKEND_ROOT / "service-b.env",

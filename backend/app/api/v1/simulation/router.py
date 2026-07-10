@@ -33,10 +33,10 @@ async def update_prediction_result(
     return success_response(result, "req_sim_prediction")
 
 
-@router.post("/lta-bus-arrival/refresh", response_model=ApiResponse)
+@router.post("/lta-bus-arrival/refresh", response_model=ApiResponse, deprecated=True)
 async def refresh_lta_bus_arrival(
     request: LtaBusArrivalRefreshRequest,
     service: SimulationService = Depends(get_simulation_service),
 ) -> ApiResponse:
-    result = await service.refresh_from_lta(request)
+    result = await service.refresh_bus_arrival_status_from_lta(request)
     return success_response(result, "req_lta_arrival")

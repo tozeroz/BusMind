@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from math import asin, cos, radians, sin, sqrt
 
 from sqlalchemy import desc, func
@@ -14,7 +15,9 @@ from app.models.transit import (
     BusVehicle,
     LineStation,
     LtaBusArrival,
+    MapRoadSegment,
     PassengerFlowTrend,
+    TrafficSpeedBand,
 )
 
 
@@ -39,6 +42,17 @@ class CandidateRouteRecord:
     walk_time_minutes: float
     ride_time_minutes: float
     transfer_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class SegmentTrafficRecord:
+    link_id: int | None
+    road_name: str | None
+    speed_band: int
+    congestion_score: float | None
+    minimum_speed_kmh: float | None
+    maximum_speed_kmh: float | None
+    query_time: datetime
 
 
 class TransitRepository:
@@ -146,6 +160,75 @@ class TransitRepository:
             .first()
         )
         return str(fallback[0]) if fallback else "medium"
+
+    def get_segment_traffic(
+        self,
+        *,
+        link_id: int | None = None,
+        segment_id: str | None = None,
+        road_name: str | None = None,
+        start_lon: float | None = None,
+        start_lat: float | None = None,
+        end_lon: float | None = None,
+        end_lat: float | None = None,
+    ) -> SegmentTrafficRecord | None:
+        if link_id is not None:
+            row = (
+                self.db.query(TrafficSpeedBand)
+                .filter(TrafficSpeedBand.link_id == link_id)
+                .order_by(desc(TrafficSpeedBand.query_time))
+                .first()
+            )
+            return _traffic_record(row) if row is not None else None
+
+        if segment_id is not None:
+            segment = (
+                self.db.query(MapRoadSegment)
+                .filter(MapRoadSegment.segment_id == segment_id)
+                .first()
+            )
+            if segment is None:
+                return None
+            start_lon = float(segment.start_lon)
+            start_lat = float(segment.start_lat)
+            end_lon = float(segment.end_lon)
+            end_lat = float(segment.end_lat)
+
+        if road_name:
+            row = (
+                self.db.query(TrafficSpeedBand)
+                .filter(TrafficSpeedBand.road_name == road_name)
+                .order_by(desc(TrafficSpeedBand.query_time))
+                .first()
+            )
+            if row is not None:
+                return _traffic_record(row)
+
+        if None in {start_lon, start_lat, end_lon, end_lat}:
+            return None
+
+        latest_time = self.db.query(func.max(TrafficSpeedBand.query_time)).scalar()
+        if latest_time is None:
+            return None
+        rows = (
+            self.db.query(TrafficSpeedBand)
+            .filter(TrafficSpeedBand.query_time == latest_time)
+            .all()
+        )
+        if not rows:
+            return None
+        target_mid_lon = (float(start_lon) + float(end_lon)) / 2
+        target_mid_lat = (float(start_lat) + float(end_lat)) / 2
+        nearest = min(
+            rows,
+            key=lambda row: _haversine_meters(
+                target_mid_lon,
+                target_mid_lat,
+                (float(row.start_lon) + float(row.end_lon)) / 2,
+                (float(row.start_lat) + float(row.end_lat)) / 2,
+            ),
+        )
+        return _traffic_record(nearest)
 
     def get_candidate_routes(
         self,
@@ -376,4 +459,16 @@ def _haversine_meters(longitude_1: float, latitude_1: float, longitude_2: float,
     delta_lat = lat_2 - lat_1
     value = sin(delta_lat / 2) ** 2 + cos(lat_1) * cos(lat_2) * sin(delta_lon / 2) ** 2
     return 2 * earth_radius * asin(sqrt(value))
+
+
+def _traffic_record(row: TrafficSpeedBand) -> SegmentTrafficRecord:
+    return SegmentTrafficRecord(
+        link_id=int(row.link_id) if row.link_id is not None else None,
+        road_name=str(row.road_name) if row.road_name else None,
+        speed_band=int(row.speed_band),
+        congestion_score=float(row.congestion_score) if row.congestion_score is not None else None,
+        minimum_speed_kmh=float(row.minimum_speed_kmh) if row.minimum_speed_kmh is not None else None,
+        maximum_speed_kmh=float(row.maximum_speed_kmh) if row.maximum_speed_kmh is not None else None,
+        query_time=row.query_time,
+    )
 
