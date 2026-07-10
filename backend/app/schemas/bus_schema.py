@@ -19,7 +19,7 @@ class BusStationDTO(BaseModel):
         }
 
 class LineStationDTO(BaseModel):
-    id: int
+    id: str
     line_id: int
     station_id: int
     order_index: int

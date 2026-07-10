@@ -21,6 +21,54 @@ from app.schemas.bus_schema import (
     StationListResponse
 )
 
+
+def _station_map_by_ids(db: Session, station_ids: list[int]) -> dict[int, BusStation]:
+    if not station_ids:
+        return {}
+    stations = db.query(BusStation).filter(BusStation.station_id.in_(station_ids)).all()
+    return {station.station_id: station for station in stations}
+
+
+def _station_map_by_codes(db: Session, station_codes: list[str]) -> dict[str, BusStation]:
+    normalized_codes = [code for code in station_codes if code]
+    if not normalized_codes:
+        return {}
+    stations = db.query(BusStation).filter(BusStation.station_code.in_(normalized_codes)).all()
+    return {station.station_code: station for station in stations}
+
+
+def _line_terminal_names(
+    line: BusLine,
+    station_by_code: dict[str, BusStation],
+) -> tuple[str, str]:
+    start_station = station_by_code.get(line.start_station)
+    end_station = station_by_code.get(line.end_station)
+    return (
+        start_station.station_name if start_station else (line.start_station or ""),
+        end_station.station_name if end_station else (line.end_station or ""),
+    )
+
+
+def _build_line_dto(
+    line: BusLine,
+    station_by_code: dict[str, BusStation],
+) -> BusLineDTO:
+    start_station_name, end_station_name = _line_terminal_names(line, station_by_code)
+    return BusLineDTO(
+        line_id=line.line_id,
+        line_name=line.line_name,
+        line_code=line.line_code,
+        start_station=start_station_name,
+        end_station=end_station_name,
+        total_stations=line.total_stations,
+        distance_km=line.distance_km,
+        first_departure_time=line.first_departure_time,
+        last_departure_time=line.last_departure_time,
+        interval_minutes=line.interval_minutes,
+        status=line.status,
+        created_at=line.created_at
+    )
+
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
     lat1_rad = math.radians(lat1)
@@ -45,23 +93,12 @@ def get_line_list(db: Session, page: int = 1, limit: int = 20, line_name: Option
     
     lines = query.order_by(BusLine.line_code).offset(offset).limit(limit).all()
     total = query.count()
-    
-    line_dtos = [
-        BusLineDTO(
-            line_id=line.line_id,
-            line_name=line.line_name,
-            line_code=line.line_code,
-            start_station=line.start_station,
-            end_station=line.end_station,
-            total_stations=line.total_stations,
-            distance_km=line.distance_km,
-            first_departure_time=line.first_departure_time,
-            last_departure_time=line.last_departure_time,
-            interval_minutes=line.interval_minutes,
-            status=line.status,
-            created_at=line.created_at
-        ) for line in lines
-    ]
+
+    station_by_code = _station_map_by_codes(
+        db,
+        [line.start_station for line in lines] + [line.end_station for line in lines],
+    )
+    line_dtos = [_build_line_dto(line, station_by_code) for line in lines]
     
     return LineListResponse(lines=line_dtos, total=total)
 
@@ -73,10 +110,12 @@ def get_line_by_id(db: Session, line_id: int) -> Optional[BusLineWithStationsDTO
     line_stations = db.query(LineStation).filter(
         LineStation.line_id == line_id
     ).order_by(LineStation.order_index).all()
+
+    station_map = _station_map_by_ids(db, [ls.station_id for ls in line_stations])
     
     station_dtos = []
     for ls in line_stations:
-        station = db.query(BusStation).filter(BusStation.station_id == ls.station_id).first()
+        station = station_map.get(ls.station_id)
         if station:
             station_dtos.append(LineStationDTO(
                 id=ls.id,
@@ -96,19 +135,11 @@ def get_line_by_id(db: Session, line_id: int) -> Optional[BusLineWithStationsDTO
                 )
             ))
     
+    station_by_code = _station_map_by_codes(db, [line.start_station, line.end_station])
+    line_dto = _build_line_dto(line, station_by_code)
+
     return BusLineWithStationsDTO(
-        line_id=line.line_id,
-        line_name=line.line_name,
-        line_code=line.line_code,
-        start_station=line.start_station,
-        end_station=line.end_station,
-        total_stations=line.total_stations,
-        distance_km=line.distance_km,
-        first_departure_time=line.first_departure_time,
-        last_departure_time=line.last_departure_time,
-        interval_minutes=line.interval_minutes,
-        status=line.status,
-        created_at=line.created_at,
+        **line_dto.model_dump(),
         stations=station_dtos
     )
 
@@ -134,20 +165,8 @@ def create_line(db: Session, request: BusLineCreateRequest) -> BusLineDTO:
     db.commit()
     db.refresh(new_line)
     
-    return BusLineDTO(
-        line_id=new_line.line_id,
-        line_name=new_line.line_name,
-        line_code=new_line.line_code,
-        start_station=new_line.start_station,
-        end_station=new_line.end_station,
-        total_stations=new_line.total_stations,
-        distance_km=new_line.distance_km,
-        first_departure_time=new_line.first_departure_time,
-        last_departure_time=new_line.last_departure_time,
-        interval_minutes=new_line.interval_minutes,
-        status=new_line.status,
-        created_at=new_line.created_at
-    )
+    station_by_code = _station_map_by_codes(db, [new_line.start_station, new_line.end_station])
+    return _build_line_dto(new_line, station_by_code)
 
 def update_line(db: Session, line_id: int, request: BusLineUpdateRequest) -> Optional[BusLineDTO]:
     line = db.query(BusLine).filter(BusLine.line_id == line_id).first()
@@ -176,20 +195,8 @@ def update_line(db: Session, line_id: int, request: BusLineUpdateRequest) -> Opt
     db.commit()
     db.refresh(line)
     
-    return BusLineDTO(
-        line_id=line.line_id,
-        line_name=line.line_name,
-        line_code=line.line_code,
-        start_station=line.start_station,
-        end_station=line.end_station,
-        total_stations=line.total_stations,
-        distance_km=line.distance_km,
-        first_departure_time=line.first_departure_time,
-        last_departure_time=line.last_departure_time,
-        interval_minutes=line.interval_minutes,
-        status=line.status,
-        created_at=line.created_at
-    )
+    station_by_code = _station_map_by_codes(db, [line.start_station, line.end_station])
+    return _build_line_dto(line, station_by_code)
 
 def delete_line(db: Session, line_id: int) -> bool:
     line = db.query(BusLine).filter(BusLine.line_id == line_id).first()
@@ -205,10 +212,12 @@ def get_line_stations(db: Session, line_id: int) -> List[LineStationDTO]:
     line_stations = db.query(LineStation).filter(
         LineStation.line_id == line_id
     ).order_by(LineStation.order_index).all()
+
+    station_map = _station_map_by_ids(db, [ls.station_id for ls in line_stations])
     
     station_dtos = []
     for ls in line_stations:
-        station = db.query(BusStation).filter(BusStation.station_id == ls.station_id).first()
+        station = station_map.get(ls.station_id)
         if station:
             station_dtos.append(LineStationDTO(
                 id=ls.id,
@@ -467,22 +476,11 @@ def get_station_lines(db: Session, station_id: int) -> Optional[StationLinesResp
     
     lines = db.query(BusLine).filter(BusLine.line_id.in_(line_ids)).all()
     
-    line_dtos = [
-        BusLineDTO(
-            line_id=line.line_id,
-            line_name=line.line_name,
-            line_code=line.line_code,
-            start_station=line.start_station,
-            end_station=line.end_station,
-            total_stations=line.total_stations,
-            distance_km=line.distance_km,
-            first_departure_time=line.first_departure_time,
-            last_departure_time=line.last_departure_time,
-            interval_minutes=line.interval_minutes,
-            status=line.status,
-            created_at=line.created_at
-        ) for line in lines
-    ]
+    station_by_code = _station_map_by_codes(
+        db,
+        [line.start_station for line in lines] + [line.end_station for line in lines],
+    )
+    line_dtos = [_build_line_dto(line, station_by_code) for line in lines]
     
     return StationLinesResponse(
         station_id=station.station_id,
