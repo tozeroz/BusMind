@@ -20,6 +20,7 @@ from app.services.vehicle_service import (
 )
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
+bus_vehicles_router = APIRouter(prefix="/bus-vehicles", tags=["Vehicles"])
 
 
 def build_response(code: int, message: str, data=None) -> ApiResponse:
@@ -47,6 +48,18 @@ async def list_vehicles(
 # "realtime" as a vehicle_id and returns a validation error.
 @router.get("/realtime", response_model=ApiResponse, summary="Get Real-time Vehicle Positions")
 async def get_realtime_vehicles(
+    line_id: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db),
+):
+    if line_id is not None:
+        vehicles = get_vehicles_by_line(db, line_id)
+    else:
+        vehicles = get_vehicle_list(db, page=1, limit=100).vehicles
+    return build_response(0, "success", {"vehicles": [item.model_dump() for item in vehicles]})
+
+
+@bus_vehicles_router.get("/realtime", response_model=ApiResponse, summary="Get Real-time Bus Vehicle Positions")
+async def get_bus_realtime_vehicles(
     line_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db),
 ):

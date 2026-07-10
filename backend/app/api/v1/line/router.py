@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
@@ -23,6 +24,7 @@ from app.services.bus_service import (
     get_station_lines,
     get_stations_with_coordinates
 )
+from app.services.map_service import get_line_map_data
 from app.schemas.bus_schema import (
     BusLineDTO,
     BusLineWithStationsDTO,
@@ -335,6 +337,29 @@ async def list_line_stations_alias(
     stations = get_line_stations(db, line_id)
     return build_response(0, "success", {"stations": stations})
 
+@bus_lines_router.get(
+    "/{line_id}/map",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Line Map Data",
+    responses={
+        200: {"description": "Get success"},
+        404: {"description": "Line not found"}
+    }
+)
+async def get_line_map(
+    line_id: int,
+    direction: Optional[str] = Query(None, description="Direction filter (reserved for future use)"),
+    db: Session = Depends(get_db)
+):
+    result = get_line_map_data(db, line_id, direction)
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail=build_response(40400, "Line not found").model_dump()
+        )
+    return build_response(0, "success", result.model_dump())
+
 station_router = APIRouter(prefix="/stations", tags=["Stations"])
 
 @station_router.get(
@@ -354,6 +379,61 @@ async def list_stations(
 ):
     result = get_station_list(db, page, limit, station_name)
     return build_response(0, "success", result.model_dump())
+
+# Static paths must be registered before /{station_id}; otherwise FastAPI treats
+# them as station_id values and returns validation errors.
+@station_router.post(
+    "/nearby",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Search Nearby Stations",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def search_nearby_stations(
+    latitude: float = Body(..., embed=True),
+    longitude: float = Body(..., embed=True),
+    radius_km: float = Body(1.0, embed=True),
+    db: Session = Depends(get_db)
+):
+    result = get_nearby_stations(db, latitude, longitude, radius_km)
+    return build_response(0, "success", result.model_dump())
+
+
+@station_router.get(
+    "/nearby",
+    response_model=ApiResponse,
+    status_code=405,
+    summary="Nearby Stations via GET Is Not Supported",
+    responses={
+        405: {"description": "Use POST /api/v1/stations/nearby or GET /api/v1/bus-stations/nearby"}
+    }
+)
+async def search_nearby_stations_get_not_supported():
+    return JSONResponse(
+        status_code=405,
+        content=build_response(
+            40500,
+            "Use POST /api/v1/stations/nearby or GET /api/v1/bus-stations/nearby",
+            None,
+        ).model_dump(mode="json"),
+    )
+
+@station_router.get(
+    "/coordinates/all",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get All Station Coordinates",
+    responses={
+        200: {"description": "Get success"}
+    }
+)
+async def get_all_station_coordinates(
+    db: Session = Depends(get_db)
+):
+    stations = get_stations_with_coordinates(db)
+    return build_response(0, "success", {"stations": stations})
 
 @station_router.get(
     "/{station_id}",
@@ -479,39 +559,6 @@ async def get_station_lines_api(
         )
     return build_response(0, "success", result.model_dump())
 
-@station_router.post(
-    "/nearby",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Search Nearby Stations",
-    responses={
-        200: {"description": "Get success"}
-    }
-)
-async def search_nearby_stations(
-    latitude: float = Body(..., embed=True),
-    longitude: float = Body(..., embed=True),
-    radius_km: float = Body(1.0, embed=True),
-    db: Session = Depends(get_db)
-):
-    result = get_nearby_stations(db, latitude, longitude, radius_km)
-    return build_response(0, "success", result.model_dump())
-
-@station_router.get(
-    "/coordinates/all",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Get All Station Coordinates",
-    responses={
-        200: {"description": "Get success"}
-    }
-)
-async def get_all_station_coordinates(
-    db: Session = Depends(get_db)
-):
-    stations = get_stations_with_coordinates(db)
-    return build_response(0, "success", {"stations": stations})
-
 
 bus_stations_router = APIRouter(prefix="/bus-stations", tags=["Stations"])
 
@@ -531,6 +578,32 @@ async def list_stations_alias(
     db: Session = Depends(get_db)
 ):
     result = get_station_list(db, page, limit, station_name)
+    return build_response(0, "success", result.model_dump())
+
+@bus_stations_router.get(
+    "/nearby",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Nearby Stations",
+    responses={
+        200: {"description": "Get success"},
+        422: {"description": "Invalid coordinates"}
+    }
+)
+async def get_nearby_stations_alias(
+    latitude: float = Query(..., ge=-90.0, le=90.0, description="Current latitude"),
+    longitude: float = Query(..., ge=-180.0, le=180.0, description="Current longitude"),
+    radius_meters: float = Query(1000.0, ge=10.0, le=50000.0, description="Search radius in meters"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of results"),
+    db: Session = Depends(get_db)
+):
+    radius_km = radius_meters / 1000.0
+    result = get_nearby_stations(db, latitude, longitude, radius_km)
+    
+    if limit < len(result.stations):
+        result.stations = result.stations[:limit]
+        result.total = limit
+    
     return build_response(0, "success", result.model_dump())
 
 @bus_stations_router.get(

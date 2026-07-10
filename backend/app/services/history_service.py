@@ -209,3 +209,73 @@ def get_load_predictions_by_line(
     if station_id is not None:
         query = query.filter(LoadPrediction.station_id == station_id)
     return [_load_dto(record) for record in query.order_by(LoadPrediction.prediction_time.desc()).all()]
+
+
+def get_predictions(
+    db: Session,
+    prediction_type: Optional[str] = None,
+    line_id: Optional[int] = None,
+    station_id: Optional[int] = None,
+    vehicle_id: Optional[int] = None,
+) -> list[dict]:
+    results = []
+    
+    if prediction_type is None or prediction_type == "eta":
+        eta_query = db.query(EtaPrediction)
+        if line_id is not None:
+            eta_query = eta_query.filter(EtaPrediction.line_id == line_id)
+        if station_id is not None:
+            eta_query = eta_query.filter(EtaPrediction.target_station_id == station_id)
+        if vehicle_id is not None:
+            eta_query = eta_query.filter(EtaPrediction.vehicle_id == vehicle_id)
+        
+        for record in eta_query.order_by(EtaPrediction.prediction_time.desc()).all():
+            dto = _eta_dto(record)
+            results.append({
+                "prediction_type": "eta",
+                **dto.__dict__
+            })
+    
+    if prediction_type is None or prediction_type == "passenger_load":
+        load_query = db.query(LoadPrediction)
+        if line_id is not None:
+            load_query = load_query.filter(LoadPrediction.line_id == line_id)
+        if station_id is not None:
+            load_query = load_query.filter(LoadPrediction.station_id == station_id)
+        if vehicle_id is not None:
+            load_query = load_query.filter(LoadPrediction.vehicle_id == vehicle_id)
+        
+        for record in load_query.order_by(LoadPrediction.prediction_time.desc()).all():
+            dto = _load_dto(record)
+            results.append({
+                "prediction_type": "passenger_load",
+                **dto.__dict__
+            })
+    
+    if prediction_type is None or prediction_type == "passenger_flow":
+        flow_query = db.query(PassengerFlowPrediction)
+        if line_id is not None:
+            flow_query = flow_query.filter(PassengerFlowPrediction.target_type == "line")
+            flow_query = flow_query.filter(PassengerFlowPrediction.target_id == str(line_id))
+        if station_id is not None:
+            flow_query = flow_query.filter(PassengerFlowPrediction.target_type == "station")
+            flow_query = flow_query.filter(PassengerFlowPrediction.target_id == str(station_id))
+        
+        for record in flow_query.order_by(PassengerFlowPrediction.predict_time.desc()).all():
+            dto = PassengerFlowPredictionDTO(
+                prediction_id=int(record.prediction_id),
+                target_type=record.target_type,
+                target_id=record.target_id,
+                prediction_time=record.prediction_time,
+                predict_time=record.predict_time,
+                predicted_flow=int(record.predicted_flow),
+                crowd_level=record.crowd_level,
+                confidence=_as_float(record.confidence),
+                model_version=record.model_version,
+            )
+            results.append({
+                "prediction_type": "passenger_flow",
+                **dto.__dict__
+            })
+    
+    return sorted(results, key=lambda x: x.get('prediction_time') or x.get('predict_time'), reverse=True)

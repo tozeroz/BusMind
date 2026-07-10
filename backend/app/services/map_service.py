@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.models.bus_line import BusLine, BusStation, LineStation
 from app.models.transit_extra import MapRoadSegment
 from app.schemas.map_schema import (
+    LineMapBoundsDTO,
+    LineMapDataDTO,
     MapLineDTO,
     MapLineResponse,
     MapStationDTO,
@@ -286,3 +288,41 @@ def get_map_stations_by_line(db: Session, line_id: int) -> MapStationResponse:
             )
         )
     return MapStationResponse(stations=items, total=len(items))
+
+
+def get_line_map_data(db: Session, line_id: int, direction: str | None = None) -> LineMapDataDTO | None:
+    # Direction is reserved for future use. The current schema stores one ordered
+    # station chain per line record, so we ignore it for now while keeping the API stable.
+    line = db.query(BusLine).filter(BusLine.line_id == line_id).first()
+    if line is None:
+        return None
+
+    station_response = get_map_stations_by_line(db, line_id)
+    stations = station_response.stations
+    polyline = [[station.longitude, station.latitude] for station in stations]
+
+    if polyline:
+        longitudes = [point[0] for point in polyline]
+        latitudes = [point[1] for point in polyline]
+        bounds = LineMapBoundsDTO(
+            min_latitude=min(latitudes),
+            max_latitude=max(latitudes),
+            min_longitude=min(longitudes),
+            max_longitude=max(longitudes),
+        )
+    else:
+        bounds = LineMapBoundsDTO(
+            min_latitude=0.0,
+            max_latitude=0.0,
+            min_longitude=0.0,
+            max_longitude=0.0,
+        )
+
+    return LineMapDataDTO(
+        line_id=int(line.line_id),
+        line_name=line.line_name,
+        line_code=line.line_code,
+        polyline=polyline,
+        stations=stations,
+        bounds=bounds,
+    )
