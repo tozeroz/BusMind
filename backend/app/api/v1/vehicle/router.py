@@ -1,209 +1,123 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from uuid import uuid4
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
 from app.dependencies.auth import get_db
-from app.services.vehicle_service import (
-    get_vehicle_list,
-    get_vehicle_by_id,
-    create_vehicle,
-    update_vehicle,
-    delete_vehicle,
-    get_vehicles_by_line
-)
-from app.schemas.vehicle_schema import (
-    BusVehicleDTO,
-    VehicleListResponse,
-    VehicleCreateRequest,
-    VehicleUpdateRequest
-)
 from app.schemas.user_schema import ApiResponse
+from app.schemas.vehicle_schema import VehicleCreateRequest, VehicleUpdateRequest
+from app.services.vehicle_service import (
+    create_vehicle,
+    delete_vehicle,
+    get_vehicle_by_id,
+    get_vehicle_list,
+    get_vehicles_by_line,
+    update_vehicle,
+)
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
-bus_vehicles_router = APIRouter(prefix="/bus-vehicles", tags=["Bus Vehicles"])
 
-def get_trace_id() -> str:
-    return f"req_{uuid4().hex[:12]}"
-
-def get_timestamp() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat()
 
 def build_response(code: int, message: str, data=None) -> ApiResponse:
     return ApiResponse(
         code=code,
         message=message,
         data=data,
-        trace_id=get_trace_id(),
-        timestamp=get_timestamp()
+        trace_id=f"req_{uuid4().hex[:12]}",
+        timestamp=datetime.now(timezone.utc).astimezone().isoformat(),
     )
 
-def _get_realtime_vehicles_data(db: Session, line_id: Optional[int] = None):
-    if line_id:
-        vehicles = get_vehicles_by_line(db, line_id)
-    else:
-        result = get_vehicle_list(db, page=1, limit=100)
-        vehicles = result.vehicles
-    return {"vehicles": vehicles}
 
-@router.get(
-    "",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Get Vehicle List",
-    responses={
-        200: {"description": "Get success"}
-    }
-)
+@router.get("", response_model=ApiResponse, summary="Get Vehicle List")
 async def list_vehicles(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     line_id: Optional[int] = Query(None, ge=1),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     result = get_vehicle_list(db, page, limit, line_id)
     return build_response(0, "success", result.model_dump())
 
-@router.get(
-    "/{vehicle_id}",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Get Vehicle Detail",
-    responses={
-        200: {"description": "Get success"},
-        404: {"description": "Vehicle not found"}
-    }
-)
-async def get_vehicle(
-    vehicle_id: int,
-    db: Session = Depends(get_db)
+
+# Static paths must be registered before /{vehicle_id}; otherwise FastAPI treats
+# "realtime" as a vehicle_id and returns a validation error.
+@router.get("/realtime", response_model=ApiResponse, summary="Get Real-time Vehicle Positions")
+async def get_realtime_vehicles(
+    line_id: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db),
 ):
+    if line_id is not None:
+        vehicles = get_vehicles_by_line(db, line_id)
+    else:
+        vehicles = get_vehicle_list(db, page=1, limit=100).vehicles
+    return build_response(0, "success", {"vehicles": [item.model_dump() for item in vehicles]})
+
+
+@router.get("/line/{line_id}", response_model=ApiResponse, summary="Get Vehicles by Line")
+async def get_vehicles_for_line(line_id: int, db: Session = Depends(get_db)):
+    vehicles = get_vehicles_by_line(db, line_id)
+    return build_response(0, "success", {"vehicles": [item.model_dump() for item in vehicles]})
+
+
+@router.get("/{vehicle_id}", response_model=ApiResponse, summary="Get Vehicle Detail")
+async def get_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
     vehicle = get_vehicle_by_id(db, vehicle_id)
     if not vehicle:
         raise HTTPException(
             status_code=404,
-            detail=build_response(40403, "Vehicle not found").model_dump()
+            detail=build_response(40403, "Vehicle not found").model_dump(),
         )
     return build_response(0, "success", vehicle.model_dump())
 
-@router.post(
-    "",
-    response_model=ApiResponse,
-    status_code=201,
-    summary="Create Vehicle",
-    responses={
-        201: {"description": "Create success"},
-        400: {"description": "Bad request"},
-        409: {"description": "Vehicle code exists"}
-    }
-)
+
+@router.post("", response_model=ApiResponse, status_code=201, summary="Create Vehicle")
 async def create_vehicle_api(
     request: VehicleCreateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     try:
         vehicle = create_vehicle(db, request)
         return build_response(0, "success", vehicle.model_dump())
-    except ValueError as e:
-        if str(e) == "Vehicle code already exists":
-            raise HTTPException(
-                status_code=409,
-                detail=build_response(40903, "Vehicle code already exists").model_dump()
-            )
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 409 if message in {"Vehicle code already exists", "Vehicle id already exists"} else 400
+        business_code = 40903 if status_code == 409 else 40001
         raise HTTPException(
-            status_code=400,
-            detail=build_response(40001, str(e)).model_dump()
-        )
+            status_code=status_code,
+            detail=build_response(business_code, message).model_dump(),
+        ) from exc
 
-@router.patch(
-    "/{vehicle_id}",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Update Vehicle",
-    responses={
-        200: {"description": "Update success"},
-        404: {"description": "Vehicle not found"}
-    }
-)
+
+@router.patch("/{vehicle_id}", response_model=ApiResponse, summary="Update Vehicle")
 async def update_vehicle_api(
     vehicle_id: int,
     request: VehicleUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    vehicle = update_vehicle(db, vehicle_id, request)
+    try:
+        vehicle = update_vehicle(db, vehicle_id, request)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=build_response(40001, str(exc)).model_dump(),
+        ) from exc
     if not vehicle:
         raise HTTPException(
             status_code=404,
-            detail=build_response(40403, "Vehicle not found").model_dump()
+            detail=build_response(40403, "Vehicle not found").model_dump(),
         )
     return build_response(0, "success", vehicle.model_dump())
 
-@router.delete(
-    "/{vehicle_id}",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Delete Vehicle",
-    responses={
-        200: {"description": "Delete success"},
-        404: {"description": "Vehicle not found"}
-    }
-)
-async def delete_vehicle_api(
-    vehicle_id: int,
-    db: Session = Depends(get_db)
-):
-    success = delete_vehicle(db, vehicle_id)
-    if not success:
+
+@router.delete("/{vehicle_id}", response_model=ApiResponse, summary="Delete Vehicle")
+async def delete_vehicle_api(vehicle_id: int, db: Session = Depends(get_db)):
+    if not delete_vehicle(db, vehicle_id):
         raise HTTPException(
             status_code=404,
-            detail=build_response(40403, "Vehicle not found").model_dump()
+            detail=build_response(40403, "Vehicle not found").model_dump(),
         )
     return build_response(0, "success", None)
-
-@router.get(
-    "/line/{line_id}",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Get Vehicles by Line",
-    responses={
-        200: {"description": "Get success"}
-    }
-)
-async def get_vehicles_for_line(
-    line_id: int,
-    db: Session = Depends(get_db)
-):
-    vehicles = get_vehicles_by_line(db, line_id)
-    return build_response(0, "success", {"vehicles": vehicles})
-
-@router.get(
-    "/realtime",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Get Real-time Vehicle Positions",
-    responses={
-        200: {"description": "Get success"}
-    }
-)
-async def get_realtime_vehicles(
-    line_id: Optional[int] = Query(None, ge=1),
-    db: Session = Depends(get_db)
-):
-    data = _get_realtime_vehicles_data(db, line_id)
-    return build_response(0, "success", data)
-
-@bus_vehicles_router.get(
-    "/realtime",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Get Real-time Bus Vehicle Positions (Compatible)",
-    responses={
-        200: {"description": "Get success"}
-    }
-)
-async def get_bus_realtime_vehicles(
-    line_id: Optional[int] = Query(None, ge=1),
-    db: Session = Depends(get_db)
-):
-    data = _get_realtime_vehicles_data(db, line_id)
-    return build_response(0, "success", data)

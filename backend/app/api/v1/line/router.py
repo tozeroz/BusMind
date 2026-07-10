@@ -118,10 +118,10 @@ async def create_line_api(
         line = create_line(db, request)
         return build_response(0, "success", line.model_dump())
     except ValueError as e:
-        if str(e) == "Line code already exists":
+        if str(e) in {"Line code already exists", "Line id already exists"}:
             raise HTTPException(
                 status_code=409,
-                detail=build_response(40900, "Line code already exists").model_dump()
+                detail=build_response(40900, str(e)).model_dump()
             )
         raise HTTPException(
             status_code=400,
@@ -143,7 +143,13 @@ async def update_line_api(
     request: BusLineUpdateRequest,
     db: Session = Depends(get_db)
 ):
-    line = update_line(db, line_id, request)
+    try:
+        line = update_line(db, line_id, request)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=build_response(40001, str(e)).model_dump()
+        ) from e
     if not line:
         raise HTTPException(
             status_code=404,
@@ -197,7 +203,7 @@ async def list_line_stations(
     responses={
         201: {"description": "Add success"},
         400: {"description": "Bad request"},
-        409: {"description": "Station already in line"}
+        409: {"description": "Station sequence already exists"}
     }
 )
 async def add_station_to_line(
@@ -210,7 +216,7 @@ async def add_station_to_line(
         result = add_line_station(db, request)
         return build_response(0, "success", result.model_dump())
     except ValueError as e:
-        if str(e) == "Station already in line":
+        if str(e) in {"Station sequence already exists", "Line station id already exists"}:
             raise HTTPException(
                 status_code=409,
                 detail=build_response(40901, str(e)).model_dump()
@@ -231,11 +237,17 @@ async def add_station_to_line(
     }
 )
 async def update_line_station_api(
-    line_station_id: int,
+    line_station_id: str,
     request: LineStationUpdateRequest,
     db: Session = Depends(get_db)
 ):
-    result = update_line_station(db, line_station_id, request)
+    try:
+        result = update_line_station(db, line_station_id, request)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=409,
+            detail=build_response(40901, str(e)).model_dump()
+        ) from e
     if not result:
         raise HTTPException(
             status_code=404,
@@ -254,7 +266,7 @@ async def update_line_station_api(
     }
 )
 async def remove_station_from_line(
-    line_station_id: int,
+    line_station_id: str,
     db: Session = Depends(get_db)
 ):
     success = remove_line_station(db, line_station_id)
@@ -408,10 +420,10 @@ async def create_station_api(
         station = create_station(db, request)
         return build_response(0, "success", station.model_dump())
     except ValueError as e:
-        if str(e) == "Station code already exists":
+        if str(e) in {"Station code already exists", "Station id already exists"}:
             raise HTTPException(
                 status_code=409,
-                detail=build_response(40902, "Station code already exists").model_dump()
+                detail=build_response(40902, str(e)).model_dump()
             )
         raise HTTPException(
             status_code=400,
@@ -433,7 +445,13 @@ async def update_station_api(
     request: BusStationUpdateRequest,
     db: Session = Depends(get_db)
 ):
-    station = update_station(db, station_id, request)
+    try:
+        station = update_station(db, station_id, request)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=build_response(40001, str(e)).model_dump()
+        ) from e
     if not station:
         raise HTTPException(
             status_code=404,

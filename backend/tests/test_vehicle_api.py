@@ -116,8 +116,8 @@ def test_get_vehicle_by_id(db_session, test_data):
     assert result.current_station_name == "站点A"
     assert result.next_station_id == test_data["station2"].station_id
     assert result.next_station_name == "站点B"
-    assert result.progress == 25.5
-    assert result.status == "running"
+    assert result.progress == 0.0  # final bus_vehicle table has no progress column
+    assert result.status == "normal"
     assert result.speed_kmh == 30.0
     assert result.speed == 30.0
     assert result.onboard_count == 25
@@ -144,7 +144,7 @@ def test_get_vehicles_by_line(db_session, test_data):
 def test_vehicle_list_pagination(db_session, test_data):
     for i in range(15):
         vehicle_request = VehicleCreateRequest(
-            vehicle_code=f"VH{i:03d}",
+            vehicle_code=f"VH{i + 100:03d}",
             line_id=test_data["line"].line_id,
             current_latitude=31.2300 + i * 0.0001,
             current_longitude=121.4730 + i * 0.0001
