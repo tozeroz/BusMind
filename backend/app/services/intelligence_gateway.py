@@ -8,6 +8,7 @@ replace the demo gateway with an adapter backed by its repositories.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from datetime import datetime
 from math import asin, cos, radians, sin, sqrt
 from typing import Protocol
 
@@ -59,6 +60,36 @@ class CandidateRouteData:
     transfer_count: int
 
 
+@dataclass(frozen=True, slots=True)
+class EtaStatusData:
+    vehicle_id: int
+    line_id: int
+    target_station_id: int
+    eta_minutes: float
+    arrival_time: datetime
+    query_time: datetime
+    vehicle_to_stop_distance_m: float | None
+    speed_kph: float | None
+    confidence: float | None
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
+class LoadStatusData:
+    vehicle_id: int | None
+    line_id: int
+    station_id: int
+    load_level: str
+    load_code: str | None
+    load_rate: float | None
+    load_score: float | None
+    onboard_count: int | None
+    capacity: int | None
+    confidence: float | None
+    query_time: datetime
+    source: str
+
+
 class IntelligenceDataGateway(Protocol):
     async def get_station(self, station_id: int) -> StationData: ...
 
@@ -71,6 +102,20 @@ class IntelligenceDataGateway(Protocol):
     async def get_remaining_stop_count(
         self, vehicle_id: int, target_station_id: int
     ) -> int: ...
+
+    async def get_latest_eta_status(
+        self,
+        vehicle_id: int,
+        target_station_id: int,
+        line_id: int | None = None,
+    ) -> EtaStatusData | None: ...
+
+    async def get_latest_load_status(
+        self,
+        line_id: int,
+        station_id: int,
+        vehicle_id: int | None = None,
+    ) -> LoadStatusData | None: ...
 
     async def get_station_flow_level(self, station_id: int, hour: int) -> str: ...
 
@@ -140,6 +185,22 @@ class DemoIntelligenceGateway:
         await self.get_vehicle(vehicle_id)
         await self.get_station(target_station_id)
         return max(1, min(8, abs(target_station_id - 1) + 1))
+
+    async def get_latest_eta_status(
+        self,
+        vehicle_id: int,
+        target_station_id: int,
+        line_id: int | None = None,
+    ) -> EtaStatusData | None:
+        return None
+
+    async def get_latest_load_status(
+        self,
+        line_id: int,
+        station_id: int,
+        vehicle_id: int | None = None,
+    ) -> LoadStatusData | None:
+        return None
 
     async def get_station_flow_level(self, station_id: int, hour: int) -> str:
         await self.get_station(station_id)
@@ -301,3 +362,5 @@ def configure_intelligence_gateway(gateway: IntelligenceDataGateway) -> None:
     """Replace demo data with a team-A repository adapter at application startup."""
     global _gateway
     _gateway = gateway
+
+
