@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from algorithm.recommend import build_route_reason, select_route_ids
 from app.core.intelligence_exceptions import BusinessError
 from app.core.time_utils import ensure_local_datetime, now_local
 from app.schemas.common import RouteSegment, StationSummary
@@ -56,7 +55,7 @@ class RecommendationService:
 
         weights = self._weights_for_preference(request.preference)
         items = [await self._build_route(item, depart_time, weights) for item in candidates]
-        selections = select_route_ids(items)
+        selections = self._select_route_ids(items)
 
         tags: dict[str, set[RecommendType]] = {item.route_id: set() for item in items}
         tags[selections["best_experience"]].add(RecommendType.BEST_EXPERIENCE)
@@ -203,7 +202,7 @@ class RecommendationService:
             transfer_count=candidate.transfer_count,
             experience_score=experience.experience_score,
             recommend_types=[],
-            reason=build_route_reason(
+            reason=self._build_route_reason(
                 line_names=line_names,
                 eta_minutes=eta.predicted_eta_minutes,
                 load_level=load.predicted_load_level.value,
@@ -216,6 +215,54 @@ class RecommendationService:
                 reliability_score=reliability_score,
             ),
         )
+
+    @staticmethod
+    def _select_route_ids(items: list[RouteRecommendation]) -> dict[str, str]:
+        best = max(items, key=lambda item: (item.experience_score, -item.total_time_minutes))
+        fastest = min(items, key=lambda item: (item.total_time_minutes, -item.experience_score))
+        least_crowded = max(items, key=lambda item: (item.predicted_load.load_score, -item.total_time_minutes))
+        least_walking = min(items, key=lambda item: (item.walk_time_minutes, -item.experience_score))
+        least_transfer = min(items, key=lambda item: (item.transfer_count, -item.experience_score))
+        return {
+            "best_experience": best.route_id,
+            "fastest": fastest.route_id,
+            "least_crowded": least_crowded.route_id,
+            "least_walking": least_walking.route_id,
+            "least_transfer": least_transfer.route_id,
+        }
+
+    @staticmethod
+    def _build_route_reason(
+        *,
+        line_names: list[str],
+        eta_minutes: float | None,
+        load_level: str,
+        walk_time_minutes: float,
+        transfer_count: int,
+        experience_score: float,
+        avg_service_frequency: float | None,
+        station_flow_level: str | None,
+        congestion_score: float | None,
+        reliability_score: float | None,
+    ) -> str:
+        line_text = " -> ".join(line_names) if line_names else "候选线路"
+        parts = [
+            f"推荐线路 {line_text}",
+            "预计等待未知" if eta_minutes is None else f"预计等待约 {eta_minutes:.1f} 分钟",
+            f"客载状态为 {load_level}",
+            f"步行约 {walk_time_minutes:.1f} 分钟",
+            "无需换乘" if transfer_count == 0 else f"需要换乘 {transfer_count} 次",
+        ]
+        if avg_service_frequency is not None:
+            parts.append(f"平均发车间隔约 {avg_service_frequency:.1f} 分钟")
+        if station_flow_level:
+            parts.append(f"历史客流等级为 {station_flow_level}")
+        if congestion_score is not None:
+            parts.append("已结合道路拥堵特征")
+        if reliability_score is not None:
+            parts.append(f"可靠性约 {reliability_score:.1f} 分")
+        parts.append(f"综合体验分 {experience_score:.1f}")
+        return "；".join(parts) + "。"
 
     async def _get_route_frequency(self, candidate: CandidateRouteData) -> float | None:
         values: list[float] = []

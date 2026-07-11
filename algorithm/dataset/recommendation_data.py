@@ -45,7 +45,11 @@ def default_processed_dir() -> Path:
 
 
 def default_model_dir() -> Path:
-    return project_root() / "algorithm" / "model_files"
+    return project_root() / "algorithm" / "model" / "artifacts"
+
+
+def default_dataset_dir() -> Path:
+    return project_root() / "algorithm" / "dataset" / "recommendation" / "v1"
 
 
 def normalize_stop_code(value: Any) -> str:
@@ -598,3 +602,78 @@ def build_recommendation_feature_frame(
     counts = frame.groupby("candidate_group_id")["route_id"].transform("count")
     frame = frame[counts >= 2].copy()
     return frame.sort_values(["candidate_group_id", "eta_minutes", "route_id"]).reset_index(drop=True)
+
+
+def _history_flow_score(level: Any) -> float:
+    mapping = {
+        "low": 90.0,
+        "medium": 70.0,
+        "high": 45.0,
+    }
+    return mapping.get(str(level or "").lower(), 60.0)
+
+
+def _traffic_score(congestion_pressure: Any) -> float:
+    try:
+        pressure = float(congestion_pressure)
+    except (TypeError, ValueError):
+        return 60.0
+    if pressure <= 1.0:
+        return round(max(0.0, min(100.0, 100.0 - pressure * 70.0)), 2)
+    return round(max(0.0, min(100.0, pressure)), 2)
+
+
+def build_model_feature_frame(
+    *,
+    processed_dir: Path | None = None,
+    raw_dir: Path | None = None,
+    month: str | None = None,
+    max_groups: int | None = None,
+) -> pd.DataFrame:
+    frame = build_recommendation_feature_frame(
+        processed_dir=processed_dir,
+        raw_dir=raw_dir,
+        month=month,
+        max_groups=max_groups,
+    )
+    output = frame.copy()
+    output["service_nos"] = output["service_no"].astype(str)
+    output["walk_distance_meters"] = (pd.to_numeric(output["walk_time_minutes"], errors="coerce").fillna(0.0) * 80.0).round(1)
+    output["history_flow_score"] = output["station_flow_level"].map(_history_flow_score)
+    output["congestion_score"] = output["congestion_score"].map(_traffic_score)
+    output["data_freshness_seconds"] = 60.0
+    output["monitored_score"] = (pd.to_numeric(output["confidence"], errors="coerce").fillna(0.75) * 100.0).clip(0, 100)
+    output["completeness_score"] = output["is_synthetic"].map(lambda value: 85.0 if bool(value) else 100.0)
+    output["avg_service_frequency_minutes"] = output["avg_service_frequency"]
+    output["load_code"] = output["load_code"].fillna("UNKNOWN")
+    output["load_score"] = pd.to_numeric(output["load_score"], errors="coerce").fillna(60.0)
+    output["feature_sources"] = output["is_synthetic"].map(
+        lambda value: "eta:lta_realtime|load:lta_realtime|flow:historical|traffic:historical|walk:rule_estimate"
+        if bool(value)
+        else "eta:lta_realtime|load:lta_realtime|flow:historical|traffic:historical|walk:default"
+    )
+    output["degraded_fields"] = output["is_synthetic"].map(
+        lambda value: "walk_time_minutes|transfer_count" if bool(value) else ""
+    )
+    columns = [
+        "candidate_group_id",
+        "route_id",
+        "service_nos",
+        "eta_minutes",
+        "ride_time_minutes",
+        "walk_time_minutes",
+        "walk_distance_meters",
+        "transfer_count",
+        "load_code",
+        "load_score",
+        "history_flow_score",
+        "congestion_score",
+        "data_freshness_seconds",
+        "monitored_score",
+        "completeness_score",
+        "avg_service_frequency_minutes",
+        "feature_sources",
+        "degraded_fields",
+        "is_synthetic",
+    ]
+    return output[columns].sort_values(["candidate_group_id", "route_id"]).reset_index(drop=True)
