@@ -1,5 +1,18 @@
 # BusMind项目接口文档
 
+> 文档角色：后端接口路径、请求参数、响应结构和数据模型的唯一真相来源。
+> 核对基线：2026-07-12；运行时 `app.openapi()`（BusMind API v1.2.0）优先于代码注释和历史文档。
+
+## 2026-07-12 增量核对结论
+
+- 当前运行时 OpenAPI 共 **72 个操作**：`/`、`/api/v1/` 两个健康检查及 70 个业务操作。
+- 正式主路径使用 `/lines`、`/stations`、`/vehicles`、`/locations` 等；`/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime` 是兼容路径。`POST /simulation/lta-bus-arrival/refresh` 在 OpenAPI 中明确 `deprecated: true`，正式替代入口为 `/admin/lta/bus-arrival/refresh`。
+- ETA 的业务来源应解释为 **LTA Bus Arrival 实时数据**；Load 的业务来源应解释为 **LTA 实时客载字段**。当前代码仍沿用 `predicted_eta_minutes`、`predicted_load_*`、`model_version` 等历史命名，这些是现行接口字段，不代表项目训练了 ETA 或客载预测模型。
+- Passenger Flow 是历史客流分析能力，第一阶段不作为预测模型。`/history/passenger-flow/prediction` 和仿真预测写入接口仍在运行，保留但标为历史/兼容能力，不作为第一阶段核心算法宣传。
+- 核心算法口径统一为：**多源数据融合、多目标评分和个性化推荐**。
+- 正式推荐偏好目标为 `balanced`、`fastest`、`comfort`、`less_walking`、`less_transfer`，`low_load` 仅为兼容别名并应映射到 `comfort`。但当前运行时 OpenAPI 的 `Preference` 仍接受 `low_load`、不接受 `comfort`，且代码中未发现映射；在后端修复前，调用方只能按现行契约传 `low_load`。此项列入《接口文档冲突与待确认清单.md》。
+- 统一响应字段是 `trace_id`，不是 `request_id`；分页参数以运行时 OpenAPI 的 `page`、`limit` 为准。
+
 # 目录
 
 **一、文档结论与接口规模**
@@ -22,11 +35,11 @@
 
 |**统计项**|**数量**|**说明**|
 |---|---|---|
-|业务路由路径|48|不含根路径健康检查；同一路径可有多个 HTTP 方法。|
-|业务接口操作|61|GET/POST/PATCH/DELETE   操作总数。|
-|主接口操作|56|含 2 个后台管理触发接口；其余主接口均有 frontend/src/api 中的对应方法。|
-|兼容别名操作|5|/bus\-lines   与 /bus\-stations，仅为旧路径兼容。|
-|健康检查|1|GET   /，返回简单对象，不使用统一 ApiResponse 外壳。|
+|运行时路径|60|由 2026-07-12 `app.openapi()` 统计；同一路径可有多个 HTTP 方法。|
+|运行时接口操作|72|GET/POST/PATCH/DELETE 操作总数，含两个健康检查。|
+|业务接口操作|70|不含 `GET /` 与 `GET /api/v1/`。|
+|兼容接口|见第五章|包含 `/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime`、部分 history 聚合/兼容路径。|
+|废弃接口|1|`POST /api/v1/simulation/lta-bus-arrival/refresh`。|
 
 
 
@@ -101,7 +114,7 @@
 |车辆   CRUD status|running   / stopped / maintenance|数据库车辆运行状态。|
 |仿真   VehicleRunStatus|normal   / delayed / offline|智能/仿真模块运行状态。|
 |LoadLevel|seats\_available   / standing\_available / limited\_standing|有座位 / 可站立 / 站立空间有限。|
-|preference|balanced   / low\_load / less\_walking / less\_transfer / fastest|推荐偏好。|
+|preference（正式业务口径）|balanced / fastest / comfort / less\_walking / less\_transfer|正式推荐偏好；low\_load 只作为映射到 comfort 的兼容别名。当前 OpenAPI 尚未完成该迁移，仍枚举 low\_load 而非 comfort。|
 |ai   mode|qa   / suggest / explain|问答   / 建议 / 路线解释。|
 |route\_mode|straight\_line   / map\_api|步行估算模式。|
 |prediction\_type|eta   / passenger\_load / passenger\_flow|写入的预测结果类别。|
@@ -113,7 +126,7 @@
 
 # 三、接口总览
 
-下表列出正式 FastAPI 应用中的全部 62 个操作（61 个业务接口 \+ 1 个健康检查）。
+下表是原有 62 项基线清单；2026-07-12 运行时 OpenAPI 已增至 72 个操作。新增/遗漏操作包括 `GET /api/v1/`、`GET /api/v1/stations/nearby`、`GET /api/v1/bus-lines/{line_id}/map`、`GET /api/v1/bus-lines/{line_id}/geometry`、`GET /api/v1/bus-stations/nearby`、`GET /api/v1/bus-vehicles/realtime`、`GET /api/v1/history/passenger-load`、`GET /api/v1/history/predictions`、`GET /api/v1/location/nearby`、`GET /api/v1/location/{station_id}`。这些运行中接口不得因旧表遗漏而视为不存在；状态见第五章和本节增量说明。
 
 |**序号**|**模块**|**方法**|**路径**|**功能**|**鉴权**|**前端方法**|
 |---|---|---|---|---|---|---|
@@ -167,8 +180,8 @@
 |48|历史与预测查询|GET|/api/v1/history/load/\{line\_id\}|查询最新客载预测|无需鉴权（按当前代码）|getLoadPrediction\(lineId,   params\)|
 |49|历史与预测查询|GET|/api/v1/history/passenger\-flow|查询历史客流趋势|无需鉴权（按当前代码）|getPassengerFlowTrend\(params\)|
 |50|历史与预测查询|GET|/api/v1/history/passenger\-flow/prediction|查询客流预测记录|无需鉴权（按当前代码）|getPassengerFlowPrediction\(params\)|
-|51|ETA   预测|GET|/api/v1/eta|计算车辆预计到站时间|无需鉴权（按当前代码）|getEta\(params\)|
-|52|车辆客载预测|POST|/api/v1/passenger\-load\-prediction|预测车辆客载状态|无需鉴权（按当前代码）|predictPassengerLoad\(data\)|
+|51|实时 ETA（兼容字段仍含 predicted）|GET|/api/v1/eta|基于 LTA Bus Arrival 实时数据计算预计到站时间|无需鉴权（按当前代码）|getEta\(params\)|
+|52|实时客载（兼容路径仍含 prediction）|POST|/api/v1/passenger\-load\-prediction|读取/整理 LTA 实时客载状态|无需鉴权（按当前代码）|predictPassengerLoad\(data\)|
 |53|步行、体验评价与路线推荐|POST|/api/v1/recommend\-routes|生成公交出行推荐方案|无需鉴权（按当前代码）|recommendRoutes\(data\)|
 |54|步行、体验评价与路线推荐|POST|/api/v1/travel\-experience/evaluate|计算出行体验评分|无需鉴权（按当前代码）|evaluateTravelExperience\(data\)|
 |55|步行、体验评价与路线推荐|POST|/api/v1/walking\-time\-estimation|估算前往上车站的步行时间|无需鉴权（按当前代码）|estimateWalkingTime\(data\)|
@@ -186,7 +199,7 @@
 
 # 四、各模块接口说明
 
-本章详细说明 56 个主接口。兼容别名接口在第五章单独列出，避免重复。
+本章保留原有 56 个主接口的详细说明；运行时新增与兼容操作按 2026-07-12 增量说明及第五章为准，避免因大规模重排破坏原文档引用。
 
 ## 4\.1 用户与鉴权
 
@@ -1747,7 +1760,7 @@
 
 
 
-## 4\.9 车辆客载预测
+## 4\.9 实时车辆客载（兼容路径名仍为 passenger-load-prediction）
 
 根据线路、站点、车辆和时段等信息预测车辆客载。
 
