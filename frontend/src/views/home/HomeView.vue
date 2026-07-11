@@ -355,10 +355,10 @@ const selectStation = (stop) => {
   openChartPanel('station')
   selectedInfo.id = stop.stop_id
   selectedInfo.name = stop.stop_name
-  selectedInfo.crowd = loadLevelText(stop.crowd_level)
-  selectedInfo.status = stop.crowd_level === 'high' ? '较高' : '正常'
-  selectedInfo.eta = `约 ${stop.eta_minutes} 分钟`
-  selectedInfo.routes = stop.passing_routes?.join(' / ') || '市中心环线'
+  selectedInfo.crowd = stop.crowd_level ? loadLevelText(stop.crowd_level) : '暂无实时客流'
+  selectedInfo.status = stop.crowd_level ? (stop.crowd_level === 'high' ? '较高' : '正常') : '站点数据已接入'
+  selectedInfo.eta = Number.isFinite(Number(stop.eta_minutes)) ? `约 ${stop.eta_minutes} 分钟` : '暂无实时到站'
+  selectedInfo.routes = stop.passing_routes?.join(' / ') || '暂无线路关联'
   selectedInfo.chart = stop.crowd_level === 'high' ? [68, 74, 82, 90, 76] : [34, 48, 56, 52, 44]
 }
 

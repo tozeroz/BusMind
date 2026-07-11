@@ -10,14 +10,27 @@ import maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
+import { getMapLines, getMapStations } from '@/api/map'
+import { getLines } from '@/api/transit'
 import { createProtomapsStyle } from '@/map/map-style'
-import { mockBusRouteGeoJSON, mockBusStops, mockBusStopsGeoJSON } from '@/map/mock-bus-data'
 
 const emit = defineEmits(['select-stop', 'select-route'])
 
 const mapContainer = ref(null)
 let map = null
 let pmtilesProtocol = null
+let busStops = []
+let busStopsGeoJSON = {
+  type: 'FeatureCollection',
+  features: []
+}
+let busRoutesGeoJSON = {
+  type: 'FeatureCollection',
+  features: []
+}
+let visibleLineIds = new Set()
+let busRoutesLoaded = false
+let isRouteBoundsFitted = false
 
 const emptyFeatureCollection = {
   type: 'FeatureCollection',
@@ -54,7 +67,7 @@ function coordinatesMatch(first, second) {
 function routeStopFeatures(routeCoordinates) {
   const features = []
 
-  mockBusStopsGeoJSON.features.forEach((feature) => {
+  busStopsGeoJSON.features.forEach((feature) => {
     const stopCoordinate = feature.geometry.coordinates
     const isOnRoute = routeCoordinates.some((coordinate) => coordinatesMatch(coordinate, stopCoordinate))
 
@@ -65,13 +78,14 @@ function routeStopFeatures(routeCoordinates) {
 }
 
 function findRouteFeature(routeId) {
-  return mockBusRouteGeoJSON.features.find((feature) => {
-    return feature.id === routeId || feature.properties.line_id === routeId
+  const id = Number(routeId)
+  return busRoutesGeoJSON.features.find((feature) => {
+    return Number(feature.id) === id || Number(feature.properties.line_id) === id
   })
 }
 
 function findStopFeature(stopId) {
-  return mockBusStopsGeoJSON.features.find((feature) => feature.properties.stop_id === stopId)
+  return busStopsGeoJSON.features.find((feature) => String(feature.properties.stop_id) === String(stopId))
 }
 
 function clearSelection() {
@@ -163,7 +177,7 @@ function scheduleFocusOnCoordinates(coordinates, maxZoom) {
 }
 
 function fitRouteBounds() {
-  const coordinates = mockBusRouteGeoJSON.features.flatMap((feature) => feature.geometry.coordinates)
+  const coordinates = busRoutesGeoJSON.features.flatMap((feature) => feature.geometry.coordinates)
   focusOnCoordinates(coordinates, 13.4, 0)
 }
 
@@ -173,7 +187,7 @@ function addRouteSources() {
   map.addSource('routes', {
     type: 'geojson',
     promoteId: 'line_id',
-    data: mockBusRouteGeoJSON
+    data: busRoutesGeoJSON
   })
 
   map.addSource('routes-path', {
@@ -309,7 +323,7 @@ function addStopSources() {
   map.addSource('stops', {
     type: 'geojson',
     promoteId: 'stop_id',
-    data: mockBusStopsGeoJSON
+    data: busStopsGeoJSON
   })
 
   map.addSource('stops-highlight', {
@@ -401,7 +415,7 @@ function bindStopLayerEvents() {
     event.preventDefault()
     const feature = event.features && event.features[0]
     const stopId = feature && feature.properties ? feature.properties.stop_id : ''
-    const stop = mockBusStops.find((item) => item.stop_id === stopId)
+    const stop = busStops.find((item) => String(item.stop_id) === String(stopId))
 
     if (!stop) return
 
@@ -458,7 +472,10 @@ function focusStopByName(name) {
   const text = (name || '').trim()
   if (!text || !map || !map.getSource('stops-highlight-selected')) return null
 
-  const stop = mockBusStops.find((item) => item.stop_name === text)
+  const normalizedText = text.toLowerCase()
+  const stop = busStops.find((item) =>
+    item.stop_name.toLowerCase() === normalizedText || item.station_code === text
+  )
 
   if (!stop) return null
 
@@ -466,6 +483,120 @@ function focusStopByName(name) {
   scheduleFocusOnCoordinates([[stop.lng, stop.lat]], 15.6)
 
   return stop
+}
+
+function stationToFeature(station) {
+  return {
+    type: 'Feature',
+    id: String(station.station_id),
+    geometry: {
+      type: 'Point',
+      coordinates: [Number(station.longitude), Number(station.latitude)]
+    },
+    properties: {
+      stop_id: String(station.station_id),
+      stop_name: station.station_name,
+      station_code: station.station_code || station.bus_stop_code || '',
+      road_name: station.road_name || station.address || ''
+    }
+  }
+}
+
+async function loadRealBusStops() {
+  try {
+    const linesResponse = await getLines({ page: 1, limit: 10 })
+    const visibleLines = (linesResponse?.data?.lines || [])
+      .filter((line) => !String(line.line_code || '').includes('{{'))
+      .filter((line) => !String(line.line_name || '').toLowerCase().includes('postman test'))
+      .slice(0, 9)
+
+    visibleLineIds = new Set(visibleLines.map((line) => Number(line.line_id)))
+
+    const stationResponses = await Promise.all(
+      visibleLines.map((line) => getMapStations({ line_id: line.line_id }))
+    )
+    const stationById = new Map()
+    stationResponses.forEach((response) => {
+      ;(response?.data?.stations || []).forEach((station) => {
+        const existing = stationById.get(station.station_id)
+        if (!existing) {
+          stationById.set(station.station_id, station)
+          return
+        }
+        existing.service_nos = [...new Set([...(existing.service_nos || []), ...(station.service_nos || [])])]
+      })
+    })
+    const stations = [...stationById.values()]
+    busStops = stations
+      .filter((station) => Number.isFinite(Number(station.longitude)) && Number.isFinite(Number(station.latitude)))
+      .map((station) => ({
+        stop_id: String(station.station_id),
+        stop_name: station.station_name,
+        station_code: station.station_code || station.bus_stop_code || '',
+        road_name: station.road_name || station.address || '',
+        lng: Number(station.longitude),
+        lat: Number(station.latitude),
+        passing_routes: station.service_nos || [],
+        crowd_level: null,
+        eta_minutes: null
+      }))
+    busStopsGeoJSON = createFeatureCollection(stations.map(stationToFeature))
+    setSourceData('stops', busStopsGeoJSON)
+
+    await loadRealBusRoutes()
+  } catch (error) {
+    console.warn('真实地图站点加载失败。', error?.message)
+  }
+}
+
+function lineToFeature(line) {
+  const coordinates = Array.isArray(line.path_coordinates) ? line.path_coordinates : []
+  return {
+    type: 'Feature',
+    id: Number(line.line_id),
+    properties: {
+      line_id: Number(line.line_id),
+      line_name: line.line_name,
+      line_code: line.line_code,
+      service_no: line.service_no,
+      start_station: line.start_station,
+      end_station: line.end_station,
+      color: line.color
+    },
+    geometry: {
+      type: 'LineString',
+      coordinates
+    }
+  }
+}
+
+async function loadRealBusRoutes() {
+  if (busRoutesLoaded) return
+  if (!visibleLineIds.size) return
+
+  try {
+    const response = await getMapLines()
+    const lines = response?.data?.lines || []
+    const selectedLines = lines.filter((line) => visibleLineIds.has(Number(line.line_id)))
+
+    busRoutesGeoJSON = createFeatureCollection(
+      selectedLines
+        .filter((line) => Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2)
+        .map(lineToFeature)
+    )
+
+    busRoutesLoaded = true
+
+    if (map && map.getSource('routes')) {
+      setSourceData('routes', busRoutesGeoJSON)
+      if (!isRouteBoundsFitted) {
+        fitRouteBounds()
+        isRouteBoundsFitted = true
+      }
+    }
+  } catch (error) {
+    console.warn('真实地图线路加载失败。', error?.message)
+  }
 }
 
 onMounted(() => {
@@ -485,9 +616,9 @@ onMounted(() => {
     addStopSources()
     addRouteLayers()
     addStopLayers()
-    fitRouteBounds()
     bindRouteLayerEvents()
     bindStopLayerEvents()
+    loadRealBusStops()
   })
 })
 

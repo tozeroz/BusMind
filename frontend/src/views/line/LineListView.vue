@@ -58,13 +58,20 @@ const filteredLines = computed(() => {
 
 onMounted(async () => {
   try {
-    const response = await getLines({ page: 1, limit: 10 })
-    lines.value = response?.data?.lines || []
-    total.value = response?.data?.total || lines.value.length
+    const response = await getLines({ page: 1, limit: 20 })
+    const receivedLines = response?.data?.lines || []
+    lines.value = receivedLines.filter(isDisplayableLine).slice(0, 10)
+    total.value = Math.max((response?.data?.total || lines.value.length) - 1, lines.value.length)
   } catch (error) {
     errorMessage.value = error?.response?.data?.message || '真实线路加载失败，请检查后端和数据库连接。'
   } finally {
     loading.value = false
   }
 })
+
+function isDisplayableLine(line) {
+  const code = String(line?.line_code || '').toLowerCase()
+  const name = String(line?.line_name || '').toLowerCase()
+  return !code.includes('{{') && !name.includes('postman test')
+}
 </script>
