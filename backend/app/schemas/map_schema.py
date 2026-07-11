@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -83,3 +83,20 @@ class LineMapDataDTO(BaseModel):
     polyline: List[List[float]] = Field(default_factory=list)
     stations: List[MapStationDTO] = Field(default_factory=list)
     bounds: LineMapBoundsDTO
+
+
+class GeoJSONLineStringDTO(BaseModel):
+    type: Literal["LineString"] = "LineString"
+    coordinates: List[List[float]] = Field(default_factory=list)
+
+
+class LineGeometryPropertiesDTO(BaseModel):
+    line_id: int
+    line_name: str
+    line_code: str
+
+
+class LineGeometryFeatureDTO(BaseModel):
+    type: Literal["Feature"] = "Feature"
+    geometry: GeoJSONLineStringDTO
+    properties: LineGeometryPropertiesDTO

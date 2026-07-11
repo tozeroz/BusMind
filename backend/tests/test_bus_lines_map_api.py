@@ -2,7 +2,7 @@ import pytest
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Literal, Optional, List
 from pydantic import BaseModel
 
 
@@ -32,6 +32,23 @@ class LineMapDataDTO(BaseModel):
     polyline: List[List[float]] = []
     stations: List[MapStationDTO] = []
     bounds: LineMapBoundsDTO
+
+
+class GeoJSONLineStringDTO(BaseModel):
+    type: Literal["LineString"] = "LineString"
+    coordinates: List[List[float]] = []
+
+
+class LineGeometryPropertiesDTO(BaseModel):
+    line_id: int
+    line_name: str
+    line_code: str
+
+
+class LineGeometryFeatureDTO(BaseModel):
+    type: Literal["Feature"] = "Feature"
+    geometry: GeoJSONLineStringDTO
+    properties: LineGeometryPropertiesDTO
 
 
 class ApiResponse(BaseModel):
@@ -100,6 +117,21 @@ def get_line_map_data(db: Session, line_id: int, direction: Optional[str] = None
     )
 
 
+def get_line_geometry_data(db: Session, line_id: int, direction: Optional[str] = None):
+    if line_id == 999:
+        return None
+
+    coordinates = [[121.4737, 31.2304], [121.4747, 31.2314], [121.4757, 31.2324]]
+    return LineGeometryFeatureDTO(
+        geometry=GeoJSONLineStringDTO(coordinates=coordinates),
+        properties=LineGeometryPropertiesDTO(
+            line_id=line_id,
+            line_name="Line A",
+            line_code="L001",
+        ),
+    )
+
+
 app = FastAPI()
 
 
@@ -110,6 +142,21 @@ async def get_line_map(
     db: Session = Depends(lambda: None)
 ):
     result = get_line_map_data(db, line_id, direction)
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail=build_response(40400, "Line not found").model_dump()
+    )
+    return build_response(0, "success", result.model_dump())
+
+
+@app.get("/api/v1/bus-lines/{line_id}/geometry", response_model=ApiResponse)
+async def get_line_geometry(
+    line_id: int,
+    direction: Optional[str] = Query(None, description="Direction filter (reserved for future use)"),
+    db: Session = Depends(lambda: None)
+):
+    result = get_line_geometry_data(db, line_id, direction)
     if not result:
         raise HTTPException(
             status_code=404,
@@ -187,3 +234,22 @@ def test_bus_lines_map_bounds_calculation():
     assert bounds["max_latitude"] == 31.2324
     assert bounds["min_longitude"] == 121.4737
     assert bounds["max_longitude"] == 121.4757
+
+
+def test_bus_lines_geometry_returns_geojson_feature():
+    response = client.get("/api/v1/bus-lines/1/geometry")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["code"] == 0
+    feature = data["data"]
+    assert feature["type"] == "Feature"
+    assert feature["geometry"]["type"] == "LineString"
+    assert feature["geometry"]["coordinates"] == [
+        [121.4737, 31.2304],
+        [121.4747, 31.2314],
+        [121.4757, 31.2324],
+    ]
+    assert feature["properties"]["line_id"] == 1
+    assert feature["properties"]["line_name"] == "Line A"
+    assert feature["properties"]["line_code"] == "L001"
