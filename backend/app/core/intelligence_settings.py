@@ -140,9 +140,14 @@ class IntelligenceSettings:
     default_walking_speed_mps: float = _env_float("BUSMIND_WALKING_SPEED_MPS", 1.2)
     walking_road_factor: float = _env_float("BUSMIND_WALKING_ROAD_FACTOR", 1.25)
 
-    weight_load: float = _env_float("BUSMIND_WEIGHT_LOAD", 0.50)
-    weight_walk: float = _env_float("BUSMIND_WEIGHT_WALK", 0.30)
-    weight_transfer: float = _env_float("BUSMIND_WEIGHT_TRANSFER", 0.20)
+    weight_eta: float = _env_float("BUSMIND_WEIGHT_ETA", 0.20)
+    weight_load: float = _env_float("BUSMIND_WEIGHT_LOAD", 0.18)
+    weight_walk: float = _env_float("BUSMIND_WEIGHT_WALK", 0.12)
+    weight_transfer: float = _env_float("BUSMIND_WEIGHT_TRANSFER", 0.08)
+    weight_frequency: float = _env_float("BUSMIND_WEIGHT_FREQUENCY", 0.12)
+    weight_flow: float = _env_float("BUSMIND_WEIGHT_FLOW", 0.10)
+    weight_congestion: float = _env_float("BUSMIND_WEIGHT_CONGESTION", 0.10)
+    weight_reliability: float = _env_float("BUSMIND_WEIGHT_RELIABILITY", 0.10)
 
     deepseek_api_key: str | None = _api_key("DEEPSEEK_API_KEY")
     deepseek_base_url: str = _env_text(

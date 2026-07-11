@@ -209,6 +209,36 @@ class MySQLTransitGateway:
             return await self.fallback.get_station_flow_level(station_id, hour)
         return self.repository.get_station_flow_level(station_id, hour)
 
+    async def get_station_flow_average(self, station_id: int, hour: int) -> float | None:
+        if self.repository.get_station(station_id) is None:
+            return await self.fallback.get_station_flow_average(station_id, hour)
+        return self.repository.get_station_flow_average(station_id, hour)
+
+    async def get_line_frequency_minutes(self, line_id: int) -> float | None:
+        value = self.repository.get_line_frequency_minutes(line_id)
+        if value is not None:
+            return value
+        return await self.fallback.get_line_frequency_minutes(line_id)
+
+    async def get_route_congestion_score(
+        self,
+        line_id: int,
+        start_station_id: int,
+        end_station_id: int,
+    ) -> float | None:
+        value = self.repository.get_route_congestion_score(
+            line_id,
+            start_station_id,
+            end_station_id,
+        )
+        if value is not None:
+            return value
+        return await self.fallback.get_route_congestion_score(
+            line_id,
+            start_station_id,
+            end_station_id,
+        )
+
     async def get_candidate_routes(
         self,
         start_station_id: int,

@@ -119,6 +119,17 @@ class IntelligenceDataGateway(Protocol):
 
     async def get_station_flow_level(self, station_id: int, hour: int) -> str: ...
 
+    async def get_station_flow_average(self, station_id: int, hour: int) -> float | None: ...
+
+    async def get_line_frequency_minutes(self, line_id: int) -> float | None: ...
+
+    async def get_route_congestion_score(
+        self,
+        line_id: int,
+        start_station_id: int,
+        end_station_id: int,
+    ) -> float | None: ...
+
     async def get_candidate_routes(
         self,
         start_station_id: int,
@@ -209,6 +220,29 @@ class DemoIntelligenceGateway:
         if hour in {10, 11, 12, 13, 14, 15, 16}:
             return "medium"
         return "low"
+
+    async def get_station_flow_average(self, station_id: int, hour: int) -> float | None:
+        await self.get_station(station_id)
+        if hour in {7, 8, 9, 17, 18, 19}:
+            return 1200.0
+        if hour in {10, 11, 12, 13, 14, 15, 16}:
+            return 650.0
+        return 220.0
+
+    async def get_line_frequency_minutes(self, line_id: int) -> float | None:
+        mapping = {1: 6.0, 2: 8.0, 3: 5.0}
+        return mapping.get(line_id, 9.0)
+
+    async def get_route_congestion_score(
+        self,
+        line_id: int,
+        start_station_id: int,
+        end_station_id: int,
+    ) -> float | None:
+        await self.get_station(start_station_id)
+        await self.get_station(end_station_id)
+        mapping = {1: 0.32, 2: 0.46, 3: 0.28}
+        return mapping.get(line_id, 0.40)
 
     async def get_candidate_routes(
         self,

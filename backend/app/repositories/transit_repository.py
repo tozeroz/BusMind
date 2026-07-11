@@ -159,6 +159,30 @@ class TransitRepository:
         )
         return str(fallback[0]) if fallback else "medium"
 
+    def get_station_flow_average(self, station_id: int, hour: int) -> float | None:
+        value = (
+            self.db.query(func.avg(PassengerFlowTrend.total_flow))
+            .filter(PassengerFlowTrend.target_type == "station")
+            .filter(PassengerFlowTrend.target_id == station_id)
+            .filter(func.extract("hour", PassengerFlowTrend.record_time) == hour)
+            .scalar()
+        )
+        if value is not None:
+            return float(value)
+        fallback = (
+            self.db.query(func.avg(PassengerFlowTrend.total_flow))
+            .filter(PassengerFlowTrend.target_type == "station")
+            .filter(PassengerFlowTrend.target_id == station_id)
+            .scalar()
+        )
+        return float(fallback) if fallback is not None else None
+
+    def get_line_frequency_minutes(self, line_id: int) -> float | None:
+        line = self.get_line(line_id)
+        if line is None or line.avg_service_frequency is None:
+            return None
+        return float(line.avg_service_frequency)
+
     def get_segment_traffic(
         self,
         *,
@@ -249,6 +273,45 @@ class TransitRepository:
             )
         )
         return routes[:limit]
+
+    def get_route_congestion_score(
+        self,
+        line_id: int,
+        start_station_id: int,
+        end_station_id: int,
+    ) -> float | None:
+        start = self._line_station_for_station(line_id, start_station_id)
+        end = self._line_station_for_station(line_id, end_station_id)
+        if start is None or end is None:
+            return None
+        start_order = int(start.order_index)
+        end_order = int(end.order_index)
+        if end_order <= start_order:
+            return None
+
+        segments = (
+            self.db.query(MapRoadSegment)
+            .filter(MapRoadSegment.line_id == line_id)
+            .filter(MapRoadSegment.stop_sequence >= start_order)
+            .filter(MapRoadSegment.stop_sequence < end_order)
+            .order_by(MapRoadSegment.stop_sequence)
+            .all()
+        )
+        if not segments:
+            return None
+
+        weighted_total = 0.0
+        total_weight = 0.0
+        for segment in segments:
+            traffic = self.get_segment_traffic(segment_id=str(segment.segment_id))
+            if traffic is None or traffic.congestion_score is None:
+                continue
+            weight = float(segment.ride_time_minutes or segment.segment_distance_km or 1.0)
+            weighted_total += float(traffic.congestion_score) * weight
+            total_weight += weight
+        if total_weight <= 0:
+            return None
+        return round(weighted_total / total_weight, 4)
 
     def get_remaining_stop_count(self, vehicle_id: int, target_station_id: int) -> int:
         vehicle = self.get_vehicle(vehicle_id)

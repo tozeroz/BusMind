@@ -10,9 +10,9 @@ def test_experience_example_matches_document(client):
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["load_score"] == 58.0
-    assert data["walk_score"] == 84.0
+    assert data["walk_score"] == 83.8
     assert data["transfer_score"] == 100.0
-    assert data["experience_score"] == 74.2
+    assert data["experience_score"] == 65.7
 
 
 def test_experience_rejects_invalid_weights(client):
