@@ -7,10 +7,11 @@ from decimal import Decimal
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.models.bus_line import Base, BusLine, BusStation
+from app.models.bus_line import Base, BusLine, BusStation, LineStation
 from app.services.scheduler_service import (
     BusArrivalRefreshScheduler,
     build_refresh_jobs,
+    select_line_anchors,
 )
 
 
@@ -52,26 +53,89 @@ def _seed(session_factory: sessionmaker) -> None:
         db.add_all(stations)
         db.add_all(lines)
         db.commit()
+        # Seed line_station rows so the anchor selector has real pairs to pick.
+        db.add_all(
+            [
+                LineStation(
+                    line_id=1,
+                    station_id=1,
+                    order_index=1,
+                    station_code="01012",
+                    service_no="15",
+                ),
+                LineStation(
+                    line_id=1,
+                    station_id=2,
+                    order_index=2,
+                    station_code="01013",
+                    service_no="15",
+                ),
+                LineStation(
+                    line_id=2,
+                    station_id=1,
+                    order_index=1,
+                    station_code="01012",
+                    service_no="36",
+                ),
+                LineStation(
+                    line_id=2,
+                    station_id=2,
+                    order_index=2,
+                    station_code="01013",
+                    service_no="36",
+                ),
+            ]
+        )
+        db.commit()
 
 
-def test_build_refresh_jobs_uses_small_hot_pool():
+def test_select_line_anchors_pairs_real_lines_and_stops():
     session_factory = _build_session()
     _seed(session_factory)
-
     with session_factory() as db:
-        jobs = build_refresh_jobs(db, max_stations=2, max_lines=2)
+        anchors = select_line_anchors(db, max_lines=2, stops_per_line=2)
+
+    # 2 lines × 2 stops = 4 anchors; pairs are anchored to real line_station rows.
+    pairs = {(service_no, bus_stop_code) for service_no, _, bus_stop_code, _ in anchors}
+    assert pairs == {
+        ("15", "01012"),
+        ("15", "01013"),
+        ("36", "01012"),
+        ("36", "01013"),
+    }
+
+
+def test_build_refresh_jobs_uses_anchors():
+    session_factory = _build_session()
+    _seed(session_factory)
+    with session_factory() as db:
+        jobs = build_refresh_jobs(db, max_lines=2, stops_per_line=2)
 
     pairs = {(job.bus_stop_code, job.service_no) for job in jobs}
     assert pairs == {
         ("01012", "15"),
-        ("01012", "36"),
         ("01013", "15"),
+        ("01012", "36"),
         ("01013", "36"),
     }
-    # First two stations were picked; station names and line names propagated.
-    names = {job.bus_stop_code: job.station_name for job in jobs}
-    assert names["01012"] == "Stop A"
-    assert names["01013"] == "Stop B"
+    # Station and line names propagated.
+    names_by_pair = {
+        (job.bus_stop_code, job.service_no): (job.station_name, job.line_name)
+        for job in jobs
+    }
+    assert names_by_pair[("01012", "15")] == ("Stop A", "Svc 15")
+    assert names_by_pair[("01013", "15")] == ("Stop B", "Svc 15")
+
+
+def test_build_refresh_jobs_caps_stops_per_line():
+    session_factory = _build_session()
+    _seed(session_factory)
+    with session_factory() as db:
+        # Same line, two stops; cap at 1 ⇒ one anchor per line.
+        jobs = build_refresh_jobs(db, max_lines=2, stops_per_line=1)
+
+    pairs = {(job.bus_stop_code, job.service_no) for job in jobs}
+    assert pairs == {("01012", "15"), ("01012", "36")}
 
 
 @dataclass
@@ -102,8 +166,12 @@ def test_scheduler_tick_invokes_collector_and_sync():
             return _SyncResult()
 
     scheduler = BusArrivalRefreshScheduler(
-        interval_seconds=1, max_stations=2, max_lines=2, lta_client=object()
+        interval_seconds=1,
+        max_lines=2,
+        stops_per_line=2,
+        lta_client=object(),
     )
+    assert scheduler.enabled is True
 
     # Replace the async helpers used inside the production tick with fakes.
     class _StubCollector:
@@ -111,7 +179,7 @@ def test_scheduler_tick_invokes_collector_and_sync():
 
     async def _drive() -> None:
         with session_factory() as db:
-            jobs = build_refresh_jobs(db, max_stations=2, max_lines=2)
+            jobs = build_refresh_jobs(db, max_lines=2, stops_per_line=2)
 
         for job in jobs:
             await _StubCollector().refresh_bus_arrival(job.bus_stop_code, job.service_no)

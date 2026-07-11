@@ -59,6 +59,7 @@ class EtaService:
             arrival_time = override.payload.get("arrival_time")
             if not isinstance(arrival_time, datetime):
                 arrival_time = moment + timedelta(minutes=eta_minutes)
+            metadata = override.payload.get("metadata") or {}
             return EtaResult(
                 vehicle_id=vehicle_id,
                 target_station_id=target_station_id,
@@ -66,8 +67,11 @@ class EtaService:
                 arrival_time=arrival_time,
                 factors={
                     "source": override.source,
+                    "distance_meters": metadata.get("distance_meters"),
+                    "speed_kph": metadata.get("speed_kph"),
                     "confidence": override.payload.get("confidence"),
-                    "metadata": override.payload.get("metadata", {}),
+                    "remaining_stop_count": metadata.get("remaining_stop_count"),
+                    "metadata": metadata,
                     "expires_at": override.expires_at.isoformat(),
                 },
                 model_version=str(
@@ -133,12 +137,14 @@ class EtaService:
             predicted_eta_minutes=eta_minutes,
             arrival_time=moment + timedelta(minutes=eta_minutes),
             factors={
+                "source": "rule_fallback",
                 "distance_meters": round(distance_meters, 1),
                 "remaining_stop_count": stop_count,
                 "speed_kph": round(effective_speed_kph, 1),
                 "is_peak": is_peak,
                 "time_factor": time_factor,
                 "day_type": features["day_type"],
+                "confidence": None,
             },
             model_version=model_version,
         )

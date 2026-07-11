@@ -7,6 +7,7 @@ from app.services.scheduler_service.service import (
     build_refresh_jobs,
     select_hot_service_nos,
     select_hot_stop_codes,
+    select_line_anchors,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "build_refresh_jobs",
     "select_hot_service_nos",
     "select_hot_stop_codes",
+    "select_line_anchors",
 ]

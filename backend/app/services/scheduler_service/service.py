@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.time_utils import now_local
 from app.db.session import SessionLocal
-from app.models.bus_line import BusLine, BusStation
+from app.models.bus_line import BusLine, BusStation, LineStation
 from app.services.collector_service.service import LtaCollectorService
 from app.services.lta_service import LtaDataMallClient, LtaDataMallConfig
 from app.services.sync_service.service import CacheSyncService
@@ -27,6 +27,17 @@ def _env_int(name: str, default: int) -> int:
         return int(raw)
     except ValueError:
         logger.warning("invalid %s=%r, fallback to %d", name, raw, default)
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        logger.warning("invalid %s=%r, fallback to %f", name, raw, default)
         return default
 
 
@@ -74,28 +85,84 @@ def select_hot_service_nos(db: Session, *, max_lines: int) -> list[tuple[str, st
     return [(str(row.line_code), str(row.line_name)) for row in rows]
 
 
+def select_line_anchors(
+    db: Session,
+    *,
+    max_lines: int,
+    stops_per_line: int,
+) -> list[tuple[str, str, str, str]]:
+    """Pick real (service_no, line_name, bus_stop_code, station_name) anchors.
+
+    For each of the first ``max_lines`` lines (ordered by ``line_id``), pick the
+    first ``stops_per_line`` stops along ``line_station``. This yields real
+    (line, stop) pairs from the database — exactly the inputs the LTA Bus
+    Arrival API requires — instead of the Cartesian product of two unrelated
+    hot lists, which used to return "no such service" from LTA.
+    """
+
+    rows = db.execute(
+        select(
+            LineStation.service_no,
+            BusLine.line_name,
+            LineStation.station_code,
+            BusStation.station_name,
+            LineStation.order_index,
+        )
+        .join(BusLine, LineStation.line_id == BusLine.line_id)
+        .join(BusStation, LineStation.station_id == BusStation.station_id)
+        .where(LineStation.service_no.is_not(None))
+        .where(LineStation.station_code.is_not(None))
+        .order_by(BusLine.line_id.asc(), LineStation.order_index.asc())
+    ).all()
+
+    anchors: list[tuple[str, str, str, str]] = []
+    seen_lines: set[str] = set()
+    per_line_count: dict[str, int] = {}
+    for service_no_value, line_name_value, station_code_value, station_name_value, _ in rows:
+        service_no = str(service_no_value)
+        if service_no not in seen_lines:
+            if len(seen_lines) >= max_lines:
+                continue
+            seen_lines.add(service_no)
+            per_line_count[service_no] = 0
+        if per_line_count[service_no] >= stops_per_line:
+            continue
+        anchors.append(
+            (
+                service_no,
+                str(line_name_value or service_no),
+                str(station_code_value),
+                str(station_name_value or ""),
+            )
+        )
+        per_line_count[service_no] += 1
+    return anchors
+
+
 def build_refresh_jobs(
     db: Session,
     *,
-    max_stations: int,
     max_lines: int,
+    stops_per_line: int,
 ) -> list[RefreshJob]:
-    stops = select_hot_stop_codes(db, max_stations=max_stations)
-    services = select_hot_service_nos(db, max_lines=max_lines)
-    if not stops or not services:
-        return []
-    jobs: list[RefreshJob] = []
-    for stop_code, stop_name in stops:
-        for service_no, line_name in services:
-            jobs.append(
-                RefreshJob(
-                    bus_stop_code=stop_code,
-                    service_no=service_no,
-                    station_name=stop_name,
-                    line_name=line_name,
-                )
-            )
-    return jobs
+    """Build jobs from real (line, stop) anchors.
+
+    Each job requests LTA Bus Arrival for a single service at one of its real
+    stops, which matches the (BusStopCode, ServiceNo) pair LTA DataMall expects.
+    """
+
+    anchors = select_line_anchors(
+        db, max_lines=max_lines, stops_per_line=stops_per_line
+    )
+    return [
+        RefreshJob(
+            bus_stop_code=stop_code,
+            service_no=service_no,
+            station_name=station_name,
+            line_name=line_name,
+        )
+        for service_no, line_name, stop_code, station_name in anchors
+    ]
 
 
 class BusArrivalRefreshScheduler:
@@ -119,8 +186,10 @@ class BusArrivalRefreshScheduler:
         self,
         *,
         interval_seconds: int | None = None,
-        max_stations: int | None = None,
         max_lines: int | None = None,
+        stops_per_line: int | None = None,
+        concurrency: int | None = None,
+        per_job_deadline_seconds: float | None = None,
         lta_client: LtaDataMallClient | None = None,
     ) -> None:
         self.interval_seconds = (
@@ -128,8 +197,18 @@ class BusArrivalRefreshScheduler:
             if interval_seconds is not None
             else _env_int("BUSMIND_REFRESH_BUS_ARRIVAL_INTERVAL_SECONDS", 60)
         )
-        self.max_stations = max_stations if max_stations is not None else 3
         self.max_lines = max_lines if max_lines is not None else 2
+        self.stops_per_line = stops_per_line if stops_per_line is not None else 3
+        self.concurrency = (
+            concurrency
+            if concurrency is not None
+            else max(1, _env_int("BUSMIND_REFRESH_BUS_ARRIVAL_CONCURRENCY", 4))
+        )
+        self.per_job_deadline_seconds = (
+            per_job_deadline_seconds
+            if per_job_deadline_seconds is not None
+            else _env_float("BUSMIND_REFRESH_BUS_ARRIVAL_DEADLINE_SECONDS", 6.0)
+        )
         self.lta_client = lta_client
         self._task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
@@ -152,10 +231,10 @@ class BusArrivalRefreshScheduler:
         self._stop_event.clear()
         self._task = asyncio.create_task(self._run(), name="bus-arrival-refresh")
         logger.info(
-            "BusArrivalRefreshScheduler started: interval=%ds, max_stations=%d, max_lines=%d",
+            "BusArrivalRefreshScheduler started: interval=%ds, max_lines=%d, stops_per_line=%d",
             self.interval_seconds,
-            self.max_stations,
             self.max_lines,
+            self.stops_per_line,
         )
 
     async def stop(self) -> None:
@@ -196,39 +275,64 @@ class BusArrivalRefreshScheduler:
         with SessionLocal() as db:
             jobs = build_refresh_jobs(
                 db,
-                max_stations=self.max_stations,
                 max_lines=self.max_lines,
+                stops_per_line=self.stops_per_line,
             )
         if not jobs:
             return
 
         processed = 0
         skipped = 0
-        for job in jobs:
-            try:
-                await collector.refresh_bus_arrival(
-                    job.bus_stop_code, job.service_no
-                )
-                with SessionLocal() as sync_db:
-                    result = sync.sync_bus_arrival(
-                        sync_db, job.bus_stop_code, job.service_no
+        semaphore = asyncio.Semaphore(self.concurrency)
+
+        async def _run(job: RefreshJob) -> None:
+            if self._stop_event.is_set():
+                return
+            async with semaphore:
+                if self._stop_event.is_set():
+                    return
+                try:
+                    await asyncio.wait_for(
+                        collector.refresh_bus_arrival(
+                            job.bus_stop_code, job.service_no
+                        ),
+                        timeout=self.per_job_deadline_seconds,
                     )
-                    sync_db.commit()
-                processed += result.processed
-                skipped += result.skipped
-            except Exception:
-                logger.warning(
-                    "refresh_bus_arrival failed for %s/%s",
-                    job.bus_stop_code,
-                    job.service_no,
-                )
+                    with SessionLocal() as sync_db:
+                        result = sync.sync_bus_arrival(
+                            sync_db, job.bus_stop_code, job.service_no
+                        )
+                        sync_db.commit()
+                    return ("ok", result.processed, result.skipped)
+                except Exception:
+                    logger.warning(
+                        "refresh_bus_arrival failed for %s/%s",
+                        job.bus_stop_code,
+                        job.service_no,
+                    )
+                    return ("fail", 0, 1)
+
+        results = await asyncio.gather(
+            *(_run(job) for job in jobs), return_exceptions=True
+        )
+        for entry in results:
+            if not entry or isinstance(entry, Exception):
+                skipped += 1
+                continue
+            status, ok, skip = entry
+            if status == "ok":
+                processed += ok
+                skipped += skip
+            else:
                 skipped += 1
         logger.info(
-            "bus_arrival refresh tick %s processed=%d skipped=%d jobs=%d",
+            "bus_arrival refresh tick %s processed=%d skipped=%d jobs=%d concurrency=%d deadline=%.1fs",
             now_local().isoformat(),
             processed,
             skipped,
             len(jobs),
+            self.concurrency,
+            self.per_job_deadline_seconds,
         )
 
 
@@ -246,4 +350,10 @@ def build_default_scheduler() -> BusArrivalRefreshScheduler:
             timeout_seconds=settings.lta_timeout_seconds,
         )
     )
-    return BusArrivalRefreshScheduler(lta_client=client)
+    # Cover the first 10 lines × first 2 stops so the UI's "top 10 lines"
+    # actually have real bus-arrival data within a minute of startup.
+    return BusArrivalRefreshScheduler(
+        lta_client=client,
+        max_lines=10,
+        stops_per_line=2,
+    )
