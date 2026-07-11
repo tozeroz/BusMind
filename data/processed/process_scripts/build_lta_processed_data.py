@@ -47,6 +47,7 @@ BUS_CAPACITY = {
 }
 
 SPEED_BAND_COLOR = {
+    0: "#9e9e9e",
     1: "#8b0000",
     2: "#c62828",
     3: "#ef5350",
@@ -179,6 +180,16 @@ def flow_level_from_series(values: pd.Series) -> pd.Series:
     high = values.quantile(0.75)
     medium = values.quantile(0.40)
     return values.map(lambda v: "high" if v >= high else ("medium" if v >= medium else "low"))
+
+
+def traffic_congestion_score(speed_band: Any) -> float | None:
+    try:
+        band = int(speed_band)
+    except (TypeError, ValueError):
+        return None
+    if band <= 0:
+        return None
+    return round(min(1.0, max(0.0, (8 - band) / 7)), 4)
 
 
 def build_bus_station(raw_dir: Path, processed_dir: Path) -> pd.DataFrame:
@@ -341,6 +352,7 @@ def build_line_station(
 def build_passenger_flow_trend(
     raw_dir: Path,
     processed_dir: Path,
+    stations: pd.DataFrame,
     month: str | None,
 ) -> pd.DataFrame:
     stop_parent = raw_dir / "passenger_volume_stop"
@@ -365,6 +377,12 @@ def build_passenger_flow_trend(
     stop["flow_level"] = flow_level_from_series(stop["total_flow"])
     stop = stop.dropna(subset=["station_id", "hour"]).copy()
     stop["station_id"] = stop["station_id"].astype(int)
+    known_station_ids = set(stations["station_id"].astype(int))
+    before_filter = len(stop)
+    stop = stop[stop["station_id"].isin(known_station_ids)].copy()
+    dropped = before_filter - len(stop)
+    if dropped:
+        print(f"dropped {dropped} passenger-flow rows whose station_id is not in bus_station")
     stop["hour"] = stop["hour"].astype(int)
     stop["target_type"] = "station"
     stop["target_id"] = stop["station_id"]
@@ -577,7 +595,6 @@ def flatten_bus_arrival(
 
 def build_bus_vehicle(arrival: pd.DataFrame, stations: pd.DataFrame, processed_dir: Path) -> pd.DataFrame:
     df = arrival.copy()
-    df = df[(df["vehicle_latitude"] > 0) & (df["vehicle_longitude"] > 0)].copy()
     if df.empty:
         vehicle = pd.DataFrame(
             columns=[
@@ -616,6 +633,8 @@ def build_bus_vehicle(arrival: pd.DataFrame, stations: pd.DataFrame, processed_d
     latest["vehicle_code"] = "V" + latest["vehicle_id"].astype(str)
     latest["operation_status"] = "normal"
     latest["data_status"] = latest["monitored"].map(lambda v: "realtime" if int(v) == 1 else "estimated")
+    invalid_vehicle_coords = ~((latest["vehicle_latitude"] > 0) & (latest["vehicle_longitude"] > 0))
+    latest.loc[invalid_vehicle_coords, ["vehicle_latitude", "vehicle_longitude"]] = pd.NA
 
     station_names = stations[["station_id", "station_name"]].copy()
     latest = latest.merge(station_names, on="station_id", how="left", validate="many_to_one")
@@ -956,7 +975,7 @@ def build_traffic_speed_bands(raw_dir: Path, processed_dir: Path) -> pd.DataFram
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df = df.dropna(subset=["speed_band", "start_lon", "start_lat", "end_lon", "end_lat"]).copy()
     df["speed_band"] = df["speed_band"].astype(int)
-    df["congestion_score"] = ((8 - df["speed_band"]) / 7).clip(lower=0, upper=1).round(4)
+    df["congestion_score"] = df["speed_band"].map(traffic_congestion_score)
     df["heat_color"] = df["speed_band"].map(SPEED_BAND_COLOR)
     df["line_coordinates"] = df.apply(
         lambda row: json.dumps(
@@ -988,7 +1007,7 @@ def main() -> None:
     stations = build_bus_station(raw_dir, processed_dir)
     lines = build_bus_line(raw_dir, processed_dir)
     line_station = build_line_station(raw_dir, processed_dir, lines)
-    flow_trend = build_passenger_flow_trend(raw_dir, processed_dir, args.month)
+    flow_trend = build_passenger_flow_trend(raw_dir, processed_dir, stations, args.month)
     arrival = flatten_bus_arrival(raw_dir, processed_dir, lines, stations)
     vehicles = build_bus_vehicle(arrival, stations, processed_dir)
     eta, load = build_direct_status_tables(arrival, processed_dir)

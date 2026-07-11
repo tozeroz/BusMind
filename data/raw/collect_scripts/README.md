@@ -1,4 +1,4 @@
-# LTA Raw Data Collection Scripts
+# Collect Scripts
 
 这些脚本用于采集 BusMind 项目需要的 LTA DataMall 原始数据。不要把 AccountKey 写入仓库，运行时用参数传入，或先设置环境变量 `LTA_ACCOUNT_KEY`。
 
