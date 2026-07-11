@@ -4,130 +4,169 @@
       <BusMap ref="busMapRef" @select-stop="selectMapStop" @select-route="selectMapRoute" />
 
       <button
-        v-if="!isInfoPanelOpen"
-        class="map-mini-toggle"
+        class="map-current-locate-button"
         type="button"
-        @click="isInfoPanelOpen = true"
+        title="定位到当前位置"
+        @click="focusMapToCurrentLocation"
       >
-        <strong>{{ selectedInfo.name || '目的地检索' }}</strong>
-        <span>{{ panelSubtitle }}</span>
+        ▲
       </button>
 
-      <aside v-else class="map-info-dock">
-        <div class="section-title">
-          <div>
-            <p class="eyebrow">{{ panelLabel }}</p>
-            <h1>{{ panelTitle }}</h1>
-          </div>
-          <button class="ghost-button compact-ghost" type="button" @click="isInfoPanelOpen = false">
+      <Transition name="dock-pop" mode="out-in">
+        <button
+          v-if="!isInfoPanelOpen"
+          class="map-mini-toggle"
+          type="button"
+          @click="isInfoPanelOpen = true"
+        >
+          <strong>{{ selectedInfo.name || '目的地检索' }}</strong>
+          <span>{{ panelSubtitle }}</span>
+        </button>
+
+        <aside v-else :class="['map-info-dock', `weather-${weatherTone}`]">
+          <button
+            v-if="panelMode === 'search'"
+            class="dock-text-action dock-collapse-action"
+            type="button"
+            @click="isInfoPanelOpen = false"
+          >
             收起
           </button>
-        </div>
 
-        <template v-if="panelMode === 'search'">
-          <form class="destination-search floating-search" @submit.prevent="searchRoutes">
-            <p class="eyebrow">目的地检索</p>
-            <h2>你要去哪里？</h2>
-            <div class="location-line">
-              <span>当前位置</span>
-              <strong>乌节站附近</strong>
+          <div v-if="panelMode !== 'search'" class="section-title map-detail-title">
+            <div>
+              <p class="eyebrow">{{ panelLabel }}</p>
+              <h1>{{ panelTitle }}</h1>
             </div>
-            <label>
-              目的地
-              <input v-model="query.end" placeholder="如：滨海湾 / 市政厅 / 莱佛士坊" />
-            </label>
-            <button class="primary-button" type="submit">开始检索</button>
-            <p v-if="notice" class="form-tip">{{ notice }}</p>
-          </form>
-
-          <article v-if="recommendation" class="recommend-preview">
-            <p class="eyebrow">推荐结果</p>
-            <h3>{{ recommendation.title }}</h3>
-            <p>{{ recommendation.reason }}</p>
-            <div class="recommend-meta">
-              <span>ETA {{ recommendation.eta }} 分钟</span>
-              <span>体验分 {{ recommendation.score }}</span>
-              <span>{{ recommendation.load }}</span>
-            </div>
-            <button class="primary-button" type="button" @click="applyRecommendedRoute(recommendation)">
-              查看推荐路线
+            <button class="dock-text-action compact-ghost" type="button" @click="isInfoPanelOpen = false">
+              收起
             </button>
-          </article>
+          </div>
 
-          <div class="home-side-stats">
-            <article v-for="item in stats" :key="item.label" class="stat-card">
-              <span>{{ item.label }}</span>
-              <strong>{{ item.value }}</strong>
+          <template v-if="panelMode === 'search'">
+            <form class="destination-search floating-search" @submit.prevent="searchRoutes">
+              <label class="search-header-line current-location-row">
+                <span>当前位置</span>
+                <input v-model="query.start" placeholder="输入当前位置" />
+                <button class="locate-current-button" type="button" @click="getCurrentLocation">
+                  定位
+                </button>
+              </label>
+              <label class="search-box-row">
+                <span>目标地点</span>
+                <input v-model="query.end" placeholder="搜索地点、公交站、线路" />
+                <button class="search-submit-chip" type="submit">检索</button>
+              </label>
+              <p v-if="notice" class="form-tip">{{ notice }}</p>
+            </form>
+
+            <Transition name="card-pop">
+              <article v-if="recommendation" class="recommend-preview">
+                <p class="eyebrow">推荐结果</p>
+                <h3>{{ recommendation.title }}</h3>
+                <div class="recommend-meta">
+                  <span>ETA {{ recommendation.eta }} 分钟</span>
+                  <span>体验分 {{ recommendation.score }}</span>
+                  <span>{{ recommendation.load }}</span>
+                </div>
+                <button class="primary-button" type="button" @click="applyRecommendedRoute(recommendation)">
+                  查看推荐路线
+                </button>
+              </article>
+            </Transition>
+
+            <div class="home-waterfall-cards">
+              <article
+                v-for="item in localTips"
+                :key="item.label"
+                :class="['life-card', item.tone]"
+              >
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+                <p>{{ item.tip }}</p>
+              </article>
+            </div>
+          </template>
+
+          <template v-else-if="panelMode === 'station'">
+            <button class="ghost-button back-side-button" type="button" @click="resetPanel">返回检索</button>
+            <div class="info-list">
+              <p><span>经过线路</span><strong>{{ selectedInfo.routes }}</strong></p>
+              <p><span>下一班车</span><strong>{{ selectedInfo.eta }}</strong></p>
+              <p><span>当前客流</span><strong>{{ selectedInfo.crowd }}</strong></p>
+              <p><span>站点热度</span><strong>{{ selectedInfo.status }}</strong></p>
+            </div>
+          </template>
+
+          <template v-else>
+            <button class="ghost-button back-side-button" type="button" @click="resetPanel">返回检索</button>
+            <div class="info-list">
+              <p><span>路线编号</span><strong>{{ selectedInfo.id }}</strong></p>
+              <p><span>当前客流</span><strong>{{ selectedInfo.crowd }}</strong></p>
+              <p><span>预计到达</span><strong>{{ selectedInfo.eta }}</strong></p>
+              <p><span>运行状态</span><strong>{{ selectedInfo.status }}</strong></p>
+            </div>
+          </template>
+        </aside>
+      </Transition>
+
+      <Transition name="side-card">
+        <article v-if="panelMode !== 'search'" :class="['map-chart-card', `chart-${chartTone}`]">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">{{ panelMode === 'station' ? '站点图表' : '路线图表' }}</p>
+              <h3>{{ selectedInfo.name }}</h3>
+            </div>
+            <button class="ghost-button compact-ghost" type="button" @click="resetPanel">关闭</button>
+          </div>
+          <div class="mini-chart">
+            <span v-for="(item, index) in selectedInfo.chart" :key="`${item}-${index}`" :style="{ height: `${item}%` }"></span>
+          </div>
+          <p class="muted">当前为本地模拟数据，后续可接入后端展示实时客流统计。</p>
+        </article>
+      </Transition>
+
+      <Transition name="side-card">
+        <section v-if="isAiChatOpen" class="map-ai-card">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">AI 出行助手</p>
+              <h3>路线建议</h3>
+            </div>
+            <button class="ghost-button compact-ghost" type="button" @click="isAiChatOpen = false">
+              关闭
+            </button>
+          </div>
+
+          <div class="map-ai-messages">
+            <article v-for="message in aiMessages" :key="message.id" :class="['mini-message', message.role]">
+              <p>{{ message.content }}</p>
             </article>
           </div>
-        </template>
 
-        <template v-else-if="panelMode === 'station'">
-          <button class="ghost-button back-side-button" type="button" @click="resetPanel">返回检索</button>
-          <div class="info-list">
-            <p><span>经过线路</span><strong>{{ selectedInfo.routes }}</strong></p>
-            <p><span>下一班车</span><strong>{{ selectedInfo.eta }}</strong></p>
-            <p><span>当前客流</span><strong>{{ selectedInfo.crowd }}</strong></p>
-            <p><span>站点热度</span><strong>{{ selectedInfo.status }}</strong></p>
-          </div>
-        </template>
+          <Transition name="card-pop">
+            <div v-if="aiRecommendation" class="ai-route-result">
+              <div>
+                <p class="eyebrow">推荐路线</p>
+                <h4>{{ aiRecommendation.title }}</h4>
+              </div>
+              <div class="recommend-meta compact-meta">
+                <span>{{ aiRecommendation.eta }} 分钟</span>
+                <span>{{ aiRecommendation.load }}</span>
+                <span>{{ aiRecommendation.score }} 分</span>
+              </div>
+              <button class="primary-button" type="button" @click="applyRecommendedRoute(aiRecommendation)">
+                地图查看
+              </button>
+            </div>
+          </Transition>
 
-        <template v-else>
-          <button class="ghost-button back-side-button" type="button" @click="resetPanel">返回检索</button>
-          <div class="info-list">
-            <p><span>路线编号</span><strong>{{ selectedInfo.id }}</strong></p>
-            <p><span>当前客流</span><strong>{{ selectedInfo.crowd }}</strong></p>
-            <p><span>预计到达</span><strong>{{ selectedInfo.eta }}</strong></p>
-            <p><span>运行状态</span><strong>{{ selectedInfo.status }}</strong></p>
-          </div>
-        </template>
-      </aside>
-
-      <article v-if="panelMode !== 'search'" class="map-chart-card">
-        <div class="section-title">
-          <div>
-            <p class="eyebrow">{{ panelMode === 'station' ? '站点图表' : '路线图表' }}</p>
-            <h3>{{ selectedInfo.name }}</h3>
-          </div>
-          <button class="ghost-button compact-ghost" type="button" @click="resetPanel">关闭</button>
-        </div>
-        <div class="mini-chart">
-          <span v-for="(item, index) in selectedInfo.chart" :key="`${item}-${index}`" :style="{ height: `${item}%` }"></span>
-        </div>
-        <p class="muted">当前为本地模拟数据，后续可接入后端展示实时客流统计。</p>
-      </article>
-
-      <section v-if="isAiChatOpen" class="map-ai-card">
-        <div class="section-title">
-          <div>
-            <p class="eyebrow">AI 出行助手</p>
-            <h3>路线建议</h3>
-          </div>
-          <button class="ghost-button compact-ghost" type="button" @click="isAiChatOpen = false">
-            关闭
-          </button>
-        </div>
-
-        <div class="map-ai-messages">
-          <article v-for="message in aiMessages" :key="message.id" :class="['mini-message', message.role]">
-            <p>{{ message.content }}</p>
-          </article>
-        </div>
-
-        <div v-if="aiRecommendation" class="ai-route-result">
-          <p class="eyebrow">推荐路线</p>
-          <h4>{{ aiRecommendation.title }}</h4>
-          <p>{{ aiRecommendation.reason }}</p>
-          <button class="primary-button" type="button" @click="applyRecommendedRoute(aiRecommendation)">
-            在地图中查看
-          </button>
-        </div>
-
-        <form class="map-ai-input" @submit.prevent="sendAiMessage">
-          <input v-model="aiInput" placeholder="例如：去滨海湾，想少走路" />
-          <button class="primary-button" type="submit">发送</button>
-        </form>
-      </section>
+          <form class="map-ai-input" @submit.prevent="sendAiMessage">
+            <input v-model="aiInput" placeholder="例如：去滨海湾，想少走路" />
+            <button class="primary-button" type="submit">发送</button>
+          </form>
+        </section>
+      </Transition>
     </section>
 
     <button
@@ -150,11 +189,11 @@ import { askAiTravel } from '@/api/ai'
 import { mockRoutes } from '@/map/mock-bus-data'
 
 const busMapRef = ref(null)
-const query = reactive({ end: '滨海湾' })
+const query = reactive({ start: '乌节站', end: '滨海湾' })
 const notice = ref('')
 const recommendation = ref(null)
 const panelMode = ref('search')
-const isInfoPanelOpen = ref(false)
+const isInfoPanelOpen = ref(true)
 const isAiChatOpen = ref(false)
 const aiInput = ref('去滨海湾，想坐最舒适的路线')
 const aiRecommendation = ref(null)
@@ -168,13 +207,20 @@ const selectedInfo = reactive({
   chart: [42, 70, 56, 88, 64]
 })
 const floatPosition = reactive({ x: window.innerWidth - 112, y: window.innerHeight - 120 })
-const dragState = reactive({ dragging: false, moved: false, offsetX: 0, offsetY: 0 })
+const dragState = reactive({
+  dragging: false,
+  moved: false,
+  offsetX: 0,
+  offsetY: 0,
+  startX: 0,
+  startY: 0
+})
 
-const stats = [
-  { label: '运行路线', value: '4 条' },
-  { label: '在线车辆', value: '12 辆' },
-  { label: '平均等待', value: '7 分钟' },
-  { label: '当前客流', value: '适中' }
+const localTips = [
+  { label: '天气', value: '29°C 多云', tip: '体感偏热，候车注意补水。', tone: 'weather' },
+  { label: '穿衣', value: '轻薄短袖', tip: '车厢空调较足，可带薄外套。', tone: 'wear' },
+  { label: '出行', value: '建议提前 8 分钟', tip: '乌节方向当前等待较短。', tone: 'travel' },
+  { label: '客流', value: '适中', tip: '避开 18:00 后中心区高峰。', tone: 'flow' }
 ]
 
 const routeReasons = [
@@ -217,6 +263,21 @@ const panelSubtitle = computed(() => {
   return '点击展开搜索'
 })
 
+const weatherTone = computed(() => {
+  const weather = localTips.find((item) => item.label === '天气')?.value || ''
+  if (weather.includes('雨')) return 'rainy'
+  if (weather.includes('晴')) return 'sunny'
+  if (weather.includes('云')) return 'cloudy'
+  return 'mild'
+})
+
+const chartTone = computed(() => {
+  const crowdText = `${selectedInfo.crowd} ${selectedInfo.status}`
+  if (crowdText.includes('拥挤') || crowdText.includes('较高')) return 'heavy'
+  if (crowdText.includes('适中') || crowdText.includes('可站立') || crowdText.includes('建议关注')) return 'medium'
+  return 'light'
+})
+
 function loadLevelText(level) {
   const map = {
     seats_available: '预计有座',
@@ -250,10 +311,25 @@ const searchRoutes = () => {
 
   recommendation.value = {
     ...matchedRoute,
-    title: query.end ? `乌节站 → ${query.end}` : matchedRoute.title,
+    title: query.end ? `${query.start || '当前位置'} → ${query.end}` : matchedRoute.title,
     reason: `已根据“${query.end || '目的地'}”生成本地演示路线，后续可替换为后端推荐接口。`
   }
   notice.value = `已检索目的地：${query.end || '未填写'}`
+}
+
+const getCurrentLocation = () => {
+  query.start = '乌节站'
+  notice.value = '已获取当前位置：乌节站'
+}
+
+const focusMapToCurrentLocation = () => {
+  const focusedStop = busMapRef.value?.focusStopByName(query.start)
+  if (!focusedStop) {
+    notice.value = `请输入明确站点名称：${query.start || '未填写'}`
+    return
+  }
+
+  notice.value = `地图已定位到：${focusedStop.stop_name}`
 }
 
 const resetPanel = () => {
@@ -360,6 +436,8 @@ const sendAiMessage = async () => {
 const startFloatDrag = (event) => {
   dragState.dragging = true
   dragState.moved = false
+  dragState.startX = event.clientX
+  dragState.startY = event.clientY
   dragState.offsetX = event.clientX - floatPosition.x
   dragState.offsetY = event.clientY - floatPosition.y
   window.addEventListener('mousemove', onFloatDrag)
@@ -368,6 +446,8 @@ const startFloatDrag = (event) => {
 
 const onFloatDrag = (event) => {
   if (!dragState.dragging) return
+  const moveDistance = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY)
+  if (moveDistance < 6) return
   dragState.moved = true
   floatPosition.x = Math.min(Math.max(16, event.clientX - dragState.offsetX), window.innerWidth - 72)
   floatPosition.y = Math.min(Math.max(76, event.clientY - dragState.offsetY), window.innerHeight - 72)

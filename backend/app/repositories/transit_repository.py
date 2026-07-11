@@ -1,21 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from math import asin, cos, radians, sin, sqrt
 
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from app.models.transit import (
-    BusEtaStatus,
+from app.models.bus_line import (
     BusLine,
-    BusLoadStatus,
     BusStation,
-    BusVehicle,
     LineStation,
-    LtaBusArrival,
-    PassengerFlowTrend,
 )
+from app.models.bus_vehicle import BusVehicle
+from app.models.history import EtaPrediction as BusEtaStatus
+from app.models.history import LoadPrediction as BusLoadStatus
+from app.models.history import PassengerFlowTrend
+from app.models.transit_extra import LtaBusArrival, MapRoadSegment, TrafficSpeedBand
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +42,17 @@ class CandidateRouteRecord:
     transfer_count: int
 
 
+@dataclass(frozen=True, slots=True)
+class SegmentTrafficRecord:
+    link_id: int | None
+    road_name: str | None
+    speed_band: int
+    congestion_score: float | None
+    minimum_speed_kmh: float | None
+    maximum_speed_kmh: float | None
+    query_time: datetime
+
+
 class TransitRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -50,6 +62,9 @@ class TransitRepository:
 
     def get_vehicle(self, vehicle_id: int) -> BusVehicle | None:
         return self.db.query(BusVehicle).filter(BusVehicle.vehicle_id == vehicle_id).first()
+
+    def get_line(self, line_id: int) -> BusLine | None:
+        return self.db.query(BusLine).filter(BusLine.line_id == line_id).first()
 
     def get_latest_eta(
         self,
@@ -144,6 +159,75 @@ class TransitRepository:
         )
         return str(fallback[0]) if fallback else "medium"
 
+    def get_segment_traffic(
+        self,
+        *,
+        link_id: int | None = None,
+        segment_id: str | None = None,
+        road_name: str | None = None,
+        start_lon: float | None = None,
+        start_lat: float | None = None,
+        end_lon: float | None = None,
+        end_lat: float | None = None,
+    ) -> SegmentTrafficRecord | None:
+        if link_id is not None:
+            row = (
+                self.db.query(TrafficSpeedBand)
+                .filter(TrafficSpeedBand.link_id == link_id)
+                .order_by(desc(TrafficSpeedBand.query_time))
+                .first()
+            )
+            return _traffic_record(row) if row is not None else None
+
+        if segment_id is not None:
+            segment = (
+                self.db.query(MapRoadSegment)
+                .filter(MapRoadSegment.segment_id == segment_id)
+                .first()
+            )
+            if segment is None:
+                return None
+            start_lon = float(segment.start_lon)
+            start_lat = float(segment.start_lat)
+            end_lon = float(segment.end_lon)
+            end_lat = float(segment.end_lat)
+
+        if road_name:
+            row = (
+                self.db.query(TrafficSpeedBand)
+                .filter(TrafficSpeedBand.road_name == road_name)
+                .order_by(desc(TrafficSpeedBand.query_time))
+                .first()
+            )
+            if row is not None:
+                return _traffic_record(row)
+
+        if None in {start_lon, start_lat, end_lon, end_lat}:
+            return None
+
+        latest_time = self.db.query(func.max(TrafficSpeedBand.query_time)).scalar()
+        if latest_time is None:
+            return None
+        rows = (
+            self.db.query(TrafficSpeedBand)
+            .filter(TrafficSpeedBand.query_time == latest_time)
+            .all()
+        )
+        if not rows:
+            return None
+        target_mid_lon = (float(start_lon) + float(end_lon)) / 2
+        target_mid_lat = (float(start_lat) + float(end_lat)) / 2
+        nearest = min(
+            rows,
+            key=lambda row: _haversine_meters(
+                target_mid_lon,
+                target_mid_lat,
+                (float(row.start_lon) + float(row.end_lon)) / 2,
+                (float(row.start_lat) + float(row.end_lat)) / 2,
+            ),
+        )
+        return _traffic_record(nearest)
+
     def get_candidate_routes(
         self,
         start_station_id: int,
@@ -180,7 +264,7 @@ class TransitRepository:
             current = self._line_station_for_station(vehicle.line_id, int(vehicle.next_station_id))
         if current is None:
             return 1
-        return max(1, int(target.stop_sequence) - int(current.stop_sequence))
+        return max(1, int(target.order_index) - int(current.order_index))
 
     def _direct_routes(self, start_station_id: int, end_station_id: int, limit: int) -> list[CandidateRouteRecord]:
         rows = (
@@ -188,7 +272,7 @@ class TransitRepository:
             .join(BusLine, BusLine.line_id == LineStation.line_id)
             .filter(LineStation.station_id == start_station_id)
             .filter(BusLine.status == "running")
-            .order_by(LineStation.line_id, LineStation.stop_sequence)
+            .order_by(LineStation.line_id, LineStation.order_index)
             .all()
         )
         routes: list[CandidateRouteRecord] = []
@@ -197,8 +281,8 @@ class TransitRepository:
                 self.db.query(LineStation)
                 .filter(LineStation.line_id == start.line_id)
                 .filter(LineStation.station_id == end_station_id)
-                .filter(LineStation.stop_sequence > start.stop_sequence)
-                .order_by(LineStation.stop_sequence)
+                .filter(LineStation.order_index > start.order_index)
+                .order_by(LineStation.order_index)
                 .first()
             )
             if end is None:
@@ -245,7 +329,7 @@ class TransitRepository:
             .join(BusLine, BusLine.line_id == LineStation.line_id)
             .filter(LineStation.station_id == start_station_id)
             .filter(BusLine.status == "running")
-            .order_by(LineStation.line_id, LineStation.stop_sequence)
+            .order_by(LineStation.line_id, LineStation.order_index)
             .all()
         )
         end_rows = (
@@ -253,7 +337,7 @@ class TransitRepository:
             .join(BusLine, BusLine.line_id == LineStation.line_id)
             .filter(LineStation.station_id == end_station_id)
             .filter(BusLine.status == "running")
-            .order_by(LineStation.line_id, LineStation.stop_sequence)
+            .order_by(LineStation.line_id, LineStation.order_index)
             .all()
         )
         routes: list[CandidateRouteRecord] = []
@@ -269,8 +353,8 @@ class TransitRepository:
                 transfer_station_id = self._find_transfer_station(start, end)
                 if transfer_station_id is None:
                     continue
-                first_end = self._line_station_after(int(start.line_id), transfer_station_id, int(start.stop_sequence))
-                second_start = self._line_station_before(int(end.line_id), transfer_station_id, int(end.stop_sequence))
+                first_end = self._line_station_after(int(start.line_id), transfer_station_id, int(start.order_index))
+                second_start = self._line_station_before(int(end.line_id), transfer_station_id, int(end.order_index))
                 if first_end is None or second_start is None:
                     continue
                 first_ride = self._ride_time_minutes(start, first_end, first_line)
@@ -302,15 +386,15 @@ class TransitRepository:
         row = (
             self.db.query(LineStation.station_id)
             .filter(LineStation.line_id == start.line_id)
-            .filter(LineStation.stop_sequence > start.stop_sequence)
+            .filter(LineStation.order_index > start.order_index)
             .filter(
                 LineStation.station_id.in_(
                     self.db.query(LineStation.station_id)
                     .filter(LineStation.line_id == end.line_id)
-                    .filter(LineStation.stop_sequence < end.stop_sequence)
+                    .filter(LineStation.order_index < end.order_index)
                 )
             )
-            .order_by(LineStation.stop_sequence)
+            .order_by(LineStation.order_index)
             .first()
         )
         return int(row[0]) if row else None
@@ -319,8 +403,8 @@ class TransitRepository:
         return (
             self.db.query(BusVehicle)
             .filter(BusVehicle.line_id == line_id)
-            .filter(BusVehicle.operation_status != "offline")
-            .order_by(desc(BusVehicle.last_reported_at), desc(BusVehicle.updated_at))
+            .filter(BusVehicle.status != "offline")
+            .order_by(desc(BusVehicle.last_updated_at), desc(BusVehicle.updated_at))
             .first()
         )
 
@@ -329,7 +413,7 @@ class TransitRepository:
             self.db.query(LineStation)
             .filter(LineStation.line_id == line_id)
             .filter(LineStation.station_id == station_id)
-            .order_by(LineStation.stop_sequence)
+            .order_by(LineStation.order_index)
             .first()
         )
 
@@ -338,8 +422,8 @@ class TransitRepository:
             self.db.query(LineStation)
             .filter(LineStation.line_id == line_id)
             .filter(LineStation.station_id == station_id)
-            .filter(LineStation.stop_sequence > after_sequence)
-            .order_by(LineStation.stop_sequence)
+            .filter(LineStation.order_index > after_sequence)
+            .order_by(LineStation.order_index)
             .first()
         )
 
@@ -348,8 +432,8 @@ class TransitRepository:
             self.db.query(LineStation)
             .filter(LineStation.line_id == line_id)
             .filter(LineStation.station_id == station_id)
-            .filter(LineStation.stop_sequence < before_sequence)
-            .order_by(desc(LineStation.stop_sequence))
+            .filter(LineStation.order_index < before_sequence)
+            .order_by(desc(LineStation.order_index))
             .first()
         )
 
@@ -359,7 +443,7 @@ class TransitRepository:
             distance = max(0.0, float(end.route_distance_km) - float(start.route_distance_km))
             if distance > 0:
                 return round(max(3.0, distance / 22.0 * 60.0), 1)
-        stop_count = max(1, int(end.stop_sequence) - int(start.stop_sequence))
+        stop_count = max(1, int(end.order_index) - int(start.order_index))
         base_per_stop = 2.0
         if line.avg_service_frequency is not None:
             base_per_stop = 1.6 if float(line.avg_service_frequency) <= 8 else 2.1
@@ -373,4 +457,16 @@ def _haversine_meters(longitude_1: float, latitude_1: float, longitude_2: float,
     delta_lat = lat_2 - lat_1
     value = sin(delta_lat / 2) ** 2 + cos(lat_1) * cos(lat_2) * sin(delta_lon / 2) ** 2
     return 2 * earth_radius * asin(sqrt(value))
+
+
+def _traffic_record(row: TrafficSpeedBand) -> SegmentTrafficRecord:
+    return SegmentTrafficRecord(
+        link_id=int(row.link_id) if row.link_id is not None else None,
+        road_name=str(row.road_name) if row.road_name else None,
+        speed_band=int(row.speed_band),
+        congestion_score=float(row.congestion_score) if row.congestion_score is not None else None,
+        minimum_speed_kmh=float(row.minimum_speed_kmh) if row.minimum_speed_kmh is not None else None,
+        maximum_speed_kmh=float(row.maximum_speed_kmh) if row.maximum_speed_kmh is not None else None,
+        query_time=row.query_time,
+    )
 

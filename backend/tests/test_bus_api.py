@@ -149,7 +149,7 @@ def test_line_list_pagination(db_session):
     for i in range(15):
         line_request = BusLineCreateRequest(
             line_name=f"测试线路{i}",
-            line_code=f"TST{i:03d}",
+            line_code=f"TST{i + 100:03d}",
             start_station="起点",
             end_station="终点"
         )

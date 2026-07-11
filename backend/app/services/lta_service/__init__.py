@@ -3,6 +3,7 @@ from app.services.lta_service.client import (
     LtaDataMallClient,
     LtaDataMallConfig,
     LtaDataMallError,
+    LtaTrafficSpeedBand,
 )
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "LtaDataMallClient",
     "LtaDataMallConfig",
     "LtaDataMallError",
+    "LtaTrafficSpeedBand",
 ]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from app.schemas.common import GeoPoint, StationSummary, StrictModel
 
@@ -13,6 +13,20 @@ class WalkingRouteMode(StrEnum):
 
 
 class WalkingTimeRequest(StrictModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "origin_longitude": 116.3974,
+                    "origin_latitude": 39.9093,
+                    "target_station_id": 3,
+                    "walking_speed_mps": 1.2,
+                    "route_mode": "straight_line",
+                }
+            ]
+        }
+    )
+
     origin_longitude: float = Field(ge=-180, le=180)
     origin_latitude: float = Field(ge=-90, le=90)
     target_station_id: int = Field(gt=0)

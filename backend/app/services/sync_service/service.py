@@ -3,13 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha1
+import json
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.app.cache import CacheProvider, memory_cache_provider
-from backend.app.cache.cache_keys import bus_arrival_service
+from app.cache import CacheProvider, memory_cache_provider
+from app.cache.cache_keys import bus_arrival_service, traffic_speed_bands_latest
 
 
 LOAD_LEVEL = {
@@ -68,6 +69,29 @@ class CacheSyncService:
         _upsert_load_status(db, row)
         _insert_lta_arrival(db, row)
         return SyncResult(processed=1)
+
+    def sync_traffic_speed_bands(
+        self,
+        db: Session,
+        bands: list[dict[str, Any]] | None = None,
+    ) -> SyncResult:
+        cached = bands if bands is not None else self.cache.get(traffic_speed_bands_latest())
+        if not isinstance(cached, list):
+            return SyncResult(skipped=1)
+
+        processed = 0
+        skipped = 0
+        for payload in cached:
+            if not isinstance(payload, dict):
+                skipped += 1
+                continue
+            row = _build_traffic_speed_band_row(payload)
+            if row is None:
+                skipped += 1
+                continue
+            _upsert_traffic_speed_band(db, row)
+            processed += 1
+        return SyncResult(processed=processed, skipped=skipped)
 
 
 def _lookup_scalar(db: Session, sql: str, params: dict[str, object]) -> object | None:
@@ -140,6 +164,48 @@ def _optional_float(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _optional_int(value: object) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_traffic_speed_band_row(payload: dict[str, Any]) -> dict[str, Any] | None:
+    speed_band = _optional_int(payload.get("speed_band"))
+    start_lon = _optional_float(payload.get("start_lon"))
+    start_lat = _optional_float(payload.get("start_lat"))
+    end_lon = _optional_float(payload.get("end_lon"))
+    end_lat = _optional_float(payload.get("end_lat"))
+    if speed_band is None or start_lon is None or start_lat is None or end_lon is None or end_lat is None:
+        return None
+    query_time = _parse_datetime(payload.get("query_time")) or datetime.now()
+    line_coordinates = payload.get("line_coordinates")
+    if line_coordinates is None:
+        line_coordinates = [[start_lon, start_lat], [end_lon, end_lat]]
+    if not isinstance(line_coordinates, str):
+        line_coordinates = json.dumps(line_coordinates, ensure_ascii=True)
+    congestion_score = _optional_float(payload.get("congestion_score"))
+    if congestion_score is None:
+        congestion_score = round(min(1.0, max(0.0, (8 - speed_band) / 7)), 4)
+    return {
+        "query_time": query_time,
+        "link_id": _optional_int(payload.get("link_id")),
+        "road_name": payload.get("road_name"),
+        "road_category": payload.get("road_category"),
+        "speed_band": speed_band,
+        "minimum_speed_kmh": _optional_float(payload.get("minimum_speed_kmh")),
+        "maximum_speed_kmh": _optional_float(payload.get("maximum_speed_kmh")),
+        "congestion_score": congestion_score,
+        "heat_color": payload.get("heat_color"),
+        "start_lon": start_lon,
+        "start_lat": start_lat,
+        "end_lon": end_lon,
+        "end_lat": end_lat,
+        "line_coordinates": line_coordinates,
+    }
 
 
 def _upsert_bus_vehicle(db: Session, row: dict[str, Any]) -> None:
@@ -252,6 +318,38 @@ def _insert_lta_arrival(db: Session, row: dict[str, Any]) -> None:
                 eta_minutes = VALUES(eta_minutes),
                 load_level = VALUES(load_level),
                 load_score = VALUES(load_score)
+            """
+        ),
+        row,
+    )
+
+
+def _upsert_traffic_speed_band(db: Session, row: dict[str, Any]) -> None:
+    db.execute(
+        text(
+            """
+            INSERT INTO traffic_speed_bands (
+                query_time, link_id, road_name, road_category, speed_band,
+                minimum_speed_kmh, maximum_speed_kmh, congestion_score, heat_color,
+                start_lon, start_lat, end_lon, end_lat, line_coordinates
+            ) VALUES (
+                :query_time, :link_id, :road_name, :road_category, :speed_band,
+                :minimum_speed_kmh, :maximum_speed_kmh, :congestion_score, :heat_color,
+                :start_lon, :start_lat, :end_lon, :end_lat, :line_coordinates
+            )
+            ON DUPLICATE KEY UPDATE
+                road_name = VALUES(road_name),
+                road_category = VALUES(road_category),
+                speed_band = VALUES(speed_band),
+                minimum_speed_kmh = VALUES(minimum_speed_kmh),
+                maximum_speed_kmh = VALUES(maximum_speed_kmh),
+                congestion_score = VALUES(congestion_score),
+                heat_color = VALUES(heat_color),
+                start_lon = VALUES(start_lon),
+                start_lat = VALUES(start_lat),
+                end_lon = VALUES(end_lon),
+                end_lat = VALUES(end_lat),
+                line_coordinates = VALUES(line_coordinates)
             """
         ),
         row,

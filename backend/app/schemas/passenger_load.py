@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from app.schemas.common import StrictModel
 
@@ -17,6 +17,21 @@ class LoadLevel(StrEnum):
 
 
 class PassengerLoadPredictionRequest(StrictModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "line_id": 1,
+                    "station_id": 3,
+                    "vehicle_id": 101,
+                    "capacity": 60,
+                    "current_onboard_count": 40,
+                    "weather": "rain",
+                }
+            ]
+        }
+    )
+
     line_id: int = Field(gt=0)
     station_id: int = Field(gt=0)
     vehicle_id: int | None = Field(default=None, gt=0)

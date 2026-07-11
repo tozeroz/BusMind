@@ -167,7 +167,7 @@ class SimulationService:
             expires_at=record.expires_at,
         )
 
-    async def refresh_from_lta(
+    async def refresh_bus_arrival_status_from_lta(
         self,
         request: LtaBusArrivalRefreshRequest,
     ) -> LtaBusArrivalRefreshResult:
@@ -202,6 +202,7 @@ class SimulationService:
             target_station_id=request.station_id,
             line_id=request.line_id,
             payload={
+                "eta_minutes": arrival.eta_minutes,
                 "predicted_eta_minutes": arrival.eta_minutes,
                 "arrival_time": arrival.estimated_arrival,
                 "confidence": 0.95 if arrival.monitored else 0.78,
@@ -221,6 +222,9 @@ class SimulationService:
             station_id=request.station_id,
             vehicle_id=request.vehicle_id,
             payload={
+                "load_rate": rate,
+                "load_level": level.value,
+                "onboard_count": onboard_count,
                 "predicted_load_rate": rate,
                 "predicted_load_level": level.value,
                 "predicted_onboard_count": onboard_count,
@@ -270,6 +274,12 @@ class SimulationService:
             refreshed_at=eta_record.updated_at,
             expires_at=eta_record.expires_at,
         )
+
+    async def refresh_from_lta(
+        self,
+        request: LtaBusArrivalRefreshRequest,
+    ) -> LtaBusArrivalRefreshResult:
+        return await self.refresh_bus_arrival_status_from_lta(request)
 
     @staticmethod
     def _resolve_eta_minutes(

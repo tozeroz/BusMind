@@ -136,12 +136,12 @@ class DemoIntelligenceGateway:
 
     def __init__(self) -> None:
         self._stations = {
-            1: StationData(1, "a聹茅聴篓莽芦?", 116.39740, 39.90930),
-            2: StationData(2, "氓聸戮a鹿娄茅娄聠莽芦聶", 116.40120, 39.91060),
-            3: StationData(3, "忙聲聶氓颅娄忙楼录莽芦聶", 116.40510, 39.91220),
-            4: StationData(4, "氓聧聴茅聴篓莽芦?", 116.40330, 39.90670),
-            5: StationData(5, "e楼茅聴篓莽芦?", 116.39280, 39.91010),
-            12: StationData(12, "氓聢聸忙聳a颅氓聝莽芦?", 116.41180, 39.91480),
+            1: StationData(1, "东门站", 116.39740, 39.90930),
+            2: StationData(2, "图书馆站", 116.40120, 39.91060),
+            3: StationData(3, "教学楼站", 116.40510, 39.91220),
+            4: StationData(4, "南门站", 116.40330, 39.90670),
+            5: StationData(5, "西门站", 116.39280, 39.91010),
+            12: StationData(12, "创新中心站", 116.41180, 39.91480),
         }
         self._vehicles = {
             101: VehicleData(101, 1, 116.3906, 39.9088, 5, 1, 24.0, 38, 60),
@@ -153,7 +153,7 @@ class DemoIntelligenceGateway:
         station = self._stations.get(station_id)
         if station is None:
             raise ResourceNotFoundError(
-                f"莽芦聶莽聜鹿a聧氓颅聵氓聹篓茂录職station_id={station_id}"
+                f"站点不存在：station_id={station_id}"
             )
         return station
 
@@ -161,7 +161,7 @@ class DemoIntelligenceGateway:
         vehicle = self._vehicles.get(vehicle_id)
         if vehicle is None:
             raise ResourceNotFoundError(
-                f"e陆娄e戮聠a聧氓颅聵氓聹篓茂录職vehicle_id={vehicle_id}"
+                f"车辆不存在：vehicle_id={vehicle_id}"
             )
         return vehicle
 
@@ -230,7 +230,7 @@ class DemoIntelligenceGateway:
                     RouteSegmentData(
                         1,
                         1,
-                        "忙聽氓聸颅1氓聫路莽潞",
+                        "校园1号线",
                         start_station_id,
                         end_station_id,
                         18.0,
@@ -250,7 +250,7 @@ class DemoIntelligenceGateway:
                     RouteSegmentData(
                         1,
                         2,
-                        "忙聽氓聸颅2氓聫路莽潞",
+                        "校园2号线",
                         start_station_id,
                         end_station_id,
                         16.0,
@@ -273,7 +273,7 @@ class DemoIntelligenceGateway:
                         RouteSegmentData(
                             1,
                             3,
-                            "忙聽氓聸颅氓芦莽潞",
+                            "校园快线",
                             start_station_id,
                             3,
                             7.0,
@@ -281,7 +281,7 @@ class DemoIntelligenceGateway:
                         RouteSegmentData(
                             2,
                             1,
-                            "忙聽氓聸颅1氓聫路莽潞",
+                            "校园1号线",
                             3,
                             end_station_id,
                             8.0,
