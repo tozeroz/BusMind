@@ -1,4 +1,5 @@
 export * from './ai'
+export * from './admin'
 export * from './history'
 export * from './intelligence'
 export * from './location'

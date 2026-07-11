@@ -16,9 +16,9 @@
     <section class="auth-card">
       <p class="eyebrow">账号登录</p>
       <h1>欢迎使用</h1>
-      <p class="muted">当前为演示版本，可选择进入乘客端或管理员端。</p>
+      <p class="muted">登录后将根据账号角色进入乘客端或管理员端。</p>
 
-      <form class="form-block" @submit.prevent>
+      <form class="form-block" @submit.prevent="login">
         <label>
           账号
           <input v-model="form.account" placeholder="请输入账号" />
@@ -27,33 +27,52 @@
           密码
           <input v-model="form.password" type="password" placeholder="请输入密码" />
         </label>
+        <p v-if="errorMessage" class="form-tip">{{ errorMessage }}</p>
+        <button class="primary-button" type="submit" :disabled="loading">
+          {{ loading ? '登录中...' : '登录' }}
+        </button>
       </form>
-
-      <div class="login-choice-grid">
-        <button class="primary-button" type="button" @click="goClient">进入乘客端</button>
-        <button class="ghost-button" type="button" @click="goAdmin">进入管理员端</button>
-      </div>
 
       <div class="auth-actions">
         <RouterLink to="/register">注册账号</RouterLink>
-        <span>后续接入数据库后按账号权限跳转</span>
+        <span>使用后端账号与权限信息登录</span>
       </div>
     </section>
   </main>
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { loginUser, saveAuthToken } from '@/api/user'
 
 const router = useRouter()
-const form = reactive({ account: 'demo', password: '123456' })
+const form = reactive({ account: '', password: '' })
+const loading = ref(false)
+const errorMessage = ref('')
 
-const goClient = () => {
-  router.push('/home')
-}
+const login = async () => {
+  const username = form.account.trim()
+  if (!username || !form.password) {
+    errorMessage.value = '请输入账号和密码'
+    return
+  }
 
-const goAdmin = () => {
-  router.push('/admin')
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    const response = await loginUser({ username, password: form.password })
+    const result = response?.data || {}
+    if (!result?.access_token) throw new Error(result?.message || '登录响应缺少访问令牌')
+    saveAuthToken(result.access_token)
+    router.push(result.user?.role === 'admin' ? '/admin' : '/home')
+  } catch (error) {
+    errorMessage.value = error?.response?.data?.message
+      || error?.response?.data?.detail?.message
+      || error?.message
+      || '登录失败，请检查账号和密码'
+  } finally {
+    loading.value = false
+  }
 }
 </script>

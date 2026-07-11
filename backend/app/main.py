@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 import logging
+from pathlib import Path
+import sys
+
+# Make repository-level packages available for both direct Uvicorn and start.py.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from fastapi import FastAPI
 
@@ -11,8 +18,13 @@ from app.core.exception_handlers import register_intelligence_exception_handlers
 from app.db.schema_check import validate_database_schema
 from app.db.session import engine
 from app.models import Base
+from app.services.scheduler_service import build_default_scheduler
 
 logger = logging.getLogger(__name__)
+
+# Built once at import time so the lifespan handler can start/stop it; the
+# factory returns a no-op scheduler when ``LTA_ACCOUNT_KEY`` is not configured.
+_refresh_scheduler = build_default_scheduler()
 
 
 @asynccontextmanager
@@ -33,7 +45,11 @@ async def lifespan(_: FastAPI):
 
         logger.info("Database schema validation passed")
 
-    yield
+    await _refresh_scheduler.start()
+    try:
+        yield
+    finally:
+        await _refresh_scheduler.stop()
 
 
 app = FastAPI(
