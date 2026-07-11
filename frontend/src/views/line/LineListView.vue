@@ -4,24 +4,31 @@
       <div class="section-title">
         <div>
           <p class="eyebrow">路线查询</p>
-          <h2>{{ start }} 到 {{ end }} 的推荐路线</h2>
-          <p class="muted">当前使用模拟数据展示，后续由 FastAPI 返回真实推荐结果。</p>
+          <h2>新加坡公交线路</h2>
+          <p class="muted">当前展示数据库中的前 10 条线路，共 {{ total }} 条。</p>
         </div>
         <input v-model="keyword" class="compact-input" placeholder="搜索线路或站点" />
       </div>
 
+      <p v-if="loading" class="muted">正在加载线路...</p>
+      <p v-else-if="errorMessage" class="muted">{{ errorMessage }}</p>
+      <p v-else-if="filteredLines.length === 0" class="muted">没有找到匹配的线路。</p>
+
       <div class="card-list">
-        <article v-for="line in filteredLines" :key="line.id" class="line-card">
+        <article v-for="line in filteredLines" :key="line.line_id" class="line-card">
           <div>
-            <h3>{{ line.name }}</h3>
-            <p>{{ line.start }} → {{ line.end }}</p>
-            <span class="muted">预计等待 {{ line.wait }} 分钟 · 当前车辆 {{ line.vehicles }} 辆 · 首末班 {{ line.time }}</span>
+            <h3>{{ line.line_name || line.service_no || line.line_code }}</h3>
+            <p>{{ line.start_station || '起点待补充' }} → {{ line.end_station || '终点待补充' }}</p>
+            <span class="muted">
+              线路 {{ line.line_code }} · 方向 {{ line.direction }} · {{ line.total_stations }} 个站点
+              <template v-if="line.first_departure_time || line.last_departure_time">
+                · 首末班 {{ line.first_departure_time || '--' }} - {{ line.last_departure_time || '--' }}
+              </template>
+            </span>
           </div>
           <div class="card-actions">
-            <span class="level-tag" :class="crowdClass(line.crowd)">{{ line.crowd }}</span>
-            <RouterLink class="ghost-button" :to="`/lines/${line.id}`">路线信息</RouterLink>
-            <RouterLink class="ghost-button" to="/vehicles">车辆信息</RouterLink>
-            <RouterLink class="ghost-button" to="/recommend">客流数据</RouterLink>
+            <span class="level-tag">{{ line.operator || '运营商未知' }}</span>
+            <RouterLink class="ghost-button" :to="`/lines/${line.line_id}`">路线信息</RouterLink>
           </div>
         </article>
       </div>
@@ -30,18 +37,34 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { lines } from '@/utils/mockData'
-import { crowdClass } from '@/utils/format'
+import { computed, onMounted, ref } from 'vue'
+import { getLines } from '@/api/transit'
 
-const route = useRoute()
 const keyword = ref('')
-const start = computed(() => route.query.start || '出发地')
-const end = computed(() => route.query.end || '目的地')
+const lines = ref([])
+const total = ref(0)
+const loading = ref(true)
+const errorMessage = ref('')
+
 const filteredLines = computed(() => {
-  const text = keyword.value.trim()
-  if (!text) return lines
-  return lines.filter((line) => `${line.name}${line.start}${line.end}${line.stations.join('')}`.includes(text))
+  const text = keyword.value.trim().toLowerCase()
+  if (!text) return lines.value
+  return lines.value.filter((line) =>
+    `${line.line_name}${line.line_code}${line.service_no}${line.start_station}${line.end_station}`
+      .toLowerCase()
+      .includes(text)
+  )
+})
+
+onMounted(async () => {
+  try {
+    const response = await getLines({ page: 1, limit: 10 })
+    lines.value = response?.data?.lines || []
+    total.value = response?.data?.total || lines.value.length
+  } catch (error) {
+    errorMessage.value = error?.response?.data?.message || '真实线路加载失败，请检查后端和数据库连接。'
+  } finally {
+    loading.value = false
+  }
 })
 </script>

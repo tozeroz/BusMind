@@ -60,13 +60,25 @@
 
       <div class="admin-data-board">
         <section class="panel">
-          <h3>路线查询</h3>
+          <h3>LTA 实时到站刷新</h3>
           <div class="admin-form-row">
-            <input value="宿舍区" readonly />
-            <input value="教学楼" readonly />
-            <button class="ghost-button" type="button">查询</button>
+            <input v-model="arrivalForm.bus_stop_code" maxlength="5" placeholder="站点编号，例如 01012" />
+            <input v-model="arrivalForm.service_no" placeholder="线路号，可选" />
+            <label class="admin-check">
+              <input v-model="arrivalForm.sync_to_db" type="checkbox" />
+              写入数据库
+            </label>
+            <button class="ghost-button" type="button" :disabled="arrivalLoading" @click="refreshArrival">
+              {{ arrivalLoading ? '刷新中' : '刷新' }}
+            </button>
           </div>
-          <p class="muted">后续对接推荐路线接口，展示系统计算出的路线方案。</p>
+          <p v-if="arrivalMessage" class="muted">{{ arrivalMessage }}</p>
+          <div v-if="arrivalResult" class="admin-table-like">
+            <span>{{ arrivalResult.dataset }}</span>
+            <span>采集 {{ arrivalResult.collected }} 条</span>
+            <span>同步 {{ arrivalResult.synced }} 条</span>
+            <span>{{ formatRefreshTime(arrivalResult.refreshed_at) }}</span>
+          </div>
         </section>
 
         <section class="panel">
@@ -92,5 +104,47 @@
 </template>
 
 <script setup>
+import { reactive, ref } from 'vue'
+import { refreshAdminLtaBusArrival } from '@/api/admin'
 import { adminStats } from '@/utils/mockData'
+
+const arrivalForm = reactive({
+  bus_stop_code: '01012',
+  service_no: '',
+  sync_to_db: false
+})
+const arrivalLoading = ref(false)
+const arrivalMessage = ref('')
+const arrivalResult = ref(null)
+
+const refreshArrival = async () => {
+  const busStopCode = arrivalForm.bus_stop_code.trim()
+  if (!/^\d{5}$/.test(busStopCode)) {
+    arrivalMessage.value = '请输入 5 位公交站编号'
+    return
+  }
+
+  arrivalLoading.value = true
+  arrivalMessage.value = ''
+  arrivalResult.value = null
+
+  try {
+    const response = await refreshAdminLtaBusArrival({
+      bus_stop_code: busStopCode,
+      service_no: arrivalForm.service_no.trim() || null,
+      sync_to_db: arrivalForm.sync_to_db
+    })
+    arrivalResult.value = response.data
+    arrivalMessage.value = '刷新成功，已从 LTA 获取最新到站数据。'
+  } catch (error) {
+    arrivalMessage.value = error?.response?.data?.message || '刷新失败，请确认后端、LTA Key 和数据库连接状态。'
+  } finally {
+    arrivalLoading.value = false
+  }
+}
+
+const formatRefreshTime = (value) => {
+  if (!value) return '刚刚'
+  return new Date(value).toLocaleString()
+}
 </script>

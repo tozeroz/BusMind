@@ -146,6 +146,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import BusMap from '@/components/map/BusMap.vue'
+import { askAiTravel } from '@/api/ai'
 import { mockRoutes } from '@/map/mock-bus-data'
 
 const busMapRef = ref(null)
@@ -314,24 +315,46 @@ const applyRecommendedRoute = (route) => {
   })
 }
 
-const sendAiMessage = () => {
+const sendAiMessage = async () => {
   const text = aiInput.value.trim()
   if (!text) return
 
   aiMessages.value.push({ id: Date.now(), role: 'user', content: text })
-  const matchedRoute = findRouteForDestination(text)
+  const replyId = Date.now() + 1
 
-  aiRecommendation.value = {
-    ...matchedRoute,
-    title: text.includes('舒适') ? `舒适优先：${matchedRoute.title}` : `综合推荐：${matchedRoute.title}`,
-    reason: '根据你的自然语言需求，模拟推荐一条可在地图中高亮查看的公交路线。'
-  }
   aiMessages.value.push({
-    id: Date.now() + 1,
+    id: replyId,
     role: 'assistant',
-    content: '已生成一条可查看的推荐路线，点击下方按钮可在地图中高亮。'
+    content: '正在请求 DeepSeek 出行助手...'
   })
   aiInput.value = ''
+
+  try {
+    const response = await askAiTravel({
+      mode: 'qa',
+      question: text,
+      context: {
+        current_location: query.start,
+        destination: query.end,
+        visible_routes: mockRouteOptions.slice(0, 4)
+      }
+    })
+    const target = aiMessages.value.find((message) => message.id === replyId)
+    if (target) {
+      target.content = response.data?.answer || '后端未返回回答。'
+    }
+    const matchedRoute = findRouteForDestination(text)
+    aiRecommendation.value = {
+      ...matchedRoute,
+      title: text.includes('舒适') ? `舒适优先：${matchedRoute.title}` : `综合推荐：${matchedRoute.title}`,
+      reason: response.data?.answer || matchedRoute.reason
+    }
+  } catch (error) {
+    const target = aiMessages.value.find((message) => message.id === replyId)
+    if (target) {
+      target.content = error?.response?.data?.message || '后端 AI 接口暂不可用，请确认后端已启动且 DEEPSEEK_API_KEY 已配置。'
+    }
+  }
 }
 
 const startFloatDrag = (event) => {

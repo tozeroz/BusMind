@@ -3,7 +3,7 @@ import axios from 'axios'
 export const AUTH_TOKEN_KEY = 'busmind_access_token'
 
 const service = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 8000
 })
 

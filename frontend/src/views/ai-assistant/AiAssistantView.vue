@@ -18,8 +18,8 @@
       </div>
 
       <div class="sider-note">
-        <strong>后端预留</strong>
-        <span>POST /api/ai/chat</span>
+        <strong>真实接口</strong>
+        <span>POST /api/v1/ai/travel</span>
       </div>
     </aside>
 
@@ -31,7 +31,7 @@
         </div>
         <div class="ai-header-actions">
           <RouterLink class="ghost-button" to="/home">返回主页</RouterLink>
-          <span class="status-dot">演示模式</span>
+          <span class="status-dot">DeepSeek 接入</span>
         </div>
       </header>
 
@@ -128,10 +128,8 @@ const ask = async (text) => {
 
   try {
     const response = await sendAiMessage({
-      mode: 'suggest',
+      mode: 'qa',
       question,
-      start_station_id: 1,
-      end_station_id: 3,
       preference: 'balanced'
     })
     const answer = response.data?.answer
@@ -145,7 +143,7 @@ const ask = async (text) => {
   } catch (error) {
     const target = messages.value.find((message) => message.id === replyId)
     if (target) {
-      target.content = '后端 AI 接口暂不可用，当前显示本地演示回答：建议选择校园 2 号线，预计等待 8 分钟，客流适中，乘坐体验较好。'
+      target.content = error?.response?.data?.message || '后端 AI 接口暂不可用，请确认后端已启动且 DEEPSEEK_API_KEY 已配置。'
       target.time = getTime()
     }
   }
