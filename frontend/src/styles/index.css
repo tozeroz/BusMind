@@ -1451,9 +1451,24 @@ label {
 
 .admin-form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr auto auto;
+  align-items: center;
   gap: 12px;
   margin: 14px 0;
+}
+
+.admin-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.admin-check input {
+  width: 16px;
+  height: 16px;
 }
 
 .admin-table-like {

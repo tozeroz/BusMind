@@ -41,12 +41,17 @@ class DeepSeekClient:
             "Content-Type": "application/json",
         }
         try:
-            async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
+            async with httpx.AsyncClient(
+                timeout=self.config.timeout_seconds,
+                trust_env=False,
+            ) as client:
                 response = await client.post(url, headers=headers, json=payload)
         except httpx.TimeoutException as exc:
             raise DeepSeekError("DeepSeek 请求超时") from exc
         except httpx.HTTPError as exc:
             raise DeepSeekError("DeepSeek 网络请求失败") from exc
+        except (ImportError, OSError) as exc:
+            raise DeepSeekError("DeepSeek HTTP 客户端初始化失败") from exc
 
         if response.status_code >= 400:
             safe_message = _extract_error_message(response)

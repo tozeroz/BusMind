@@ -122,7 +122,7 @@
           <div class="mini-chart">
             <span v-for="(item, index) in selectedInfo.chart" :key="`${item}-${index}`" :style="{ height: `${item}%` }"></span>
           </div>
-          <p class="muted">当前为本地模拟数据，后续可接入后端展示实时客流统计。</p>
+          <p class="muted">{{ chartCaption }}</p>
         </article>
       </Transition>
 
@@ -185,7 +185,10 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import BusMap from '@/components/map/BusMap.vue'
-import { mockRoutes } from '@/map/mock-bus-data'
+import { askAiTravel } from '@/api/ai'
+import { getNearbyLocations, searchLocations } from '@/api/location'
+import { recommendRoutes } from '@/api/intelligence'
+import { getPassengerFlowTrend } from '@/api/history'
 
 const busMapRef = ref(null)
 const query = reactive({ start: '乌节站', end: '滨海湾' })
@@ -203,7 +206,9 @@ const selectedInfo = reactive({
   status: '',
   eta: '',
   routes: '',
-  chart: [42, 70, 56, 88, 64]
+  chart: [42, 70, 56, 88, 64],
+  flowSource: 'local',
+  flowSummary: ''
 })
 const floatPosition = reactive({ x: window.innerWidth - 112, y: window.innerHeight - 120 })
 const dragState = reactive({
@@ -222,23 +227,7 @@ const localTips = [
   { label: '客流', value: '适中', tip: '避开 18:00 后中心区高峰。', tone: 'flow' }
 ]
 
-const routeReasons = [
-  '途经乌节、索美塞、多美歌和市政厅，适合作为市中心通勤的综合推荐。',
-  '沿乌节路和滨海方向行驶，当前客流压力较低，适合去滨海湾一带。',
-  '覆盖莱佛士坊到市政厅方向，晚高峰客流较高，适合急需到达时选择。',
-  '经索美塞、多美歌到克拉码头，步行距离短，乘坐舒适度更好。'
-]
-
-const mockRouteOptions = mockRoutes.map((route, index) => ({
-  id: route.line_id,
-  title: route.line_name,
-  reason: routeReasons[index],
-  eta: route.eta_minutes,
-  score: [86, 91, 72, 89][index],
-  load: loadLevelText(route.crowd_level),
-  status: route.status,
-  chart: route.chart
-}))
+const routeOptions = ref([])
 
 const aiMessages = ref([
   {
@@ -277,11 +266,54 @@ const chartTone = computed(() => {
   return 'light'
 })
 
+const chartCaption = computed(() => {
+  if (selectedInfo.flowSource === 'backend') {
+    const summary = selectedInfo.flowSummary ? ` · 汇总：${selectedInfo.flowSummary}` : ''
+    return `数据来源：后端历史客流接口${summary}`
+  }
+  return '暂无后端客流数据，先显示本地估算。'
+})
+
+const buildChartFromFlow = (items, maxValue) => {
+  if (!Array.isArray(items) || !items.length) return null
+  const peak = Math.max(maxValue || 1, ...items.map((item) => Number(item.total_flow) || 0))
+  if (!peak) return null
+  return items
+    .slice(0, 6)
+    .map((item) => Math.max(6, Math.round((Number(item.total_flow || 0) / peak) * 100)))
+}
+
+const loadStationFlowChart = async (station) => {
+  const stationId = station?.station_id ?? station?.stop_id
+  if (stationId === undefined || stationId === null) return
+  try {
+    const response = await getPassengerFlowTrend({ station_id: stationId, granularity: 'hour' })
+    const data = response?.data || {}
+    const items = Array.isArray(data) ? data : (data.items || [])
+    const chart = buildChartFromFlow(items)
+    if (chart && chart.length) {
+      selectedInfo.chart = chart
+      selectedInfo.flowSource = 'backend'
+      const summary = data.summary || {}
+      selectedInfo.flowSummary = `总客流 ${summary.total_flow ?? '--'} · 主要等级 ${summary.dominant_flow_level || '--'}`
+    }
+  } catch (error) {
+    // 静默失败，保持本地默认图表
+    selectedInfo.flowSource = 'local'
+    selectedInfo.flowSummary = ''
+  }
+}
+
 function loadLevelText(level) {
   const map = {
     seats_available: '预计有座',
     standing_available: '可站立',
     limited_standing: '较拥挤',
+    overcrowded: '过度拥挤',
+    SEA: '预计有座',
+    SDA: '可站立',
+    LSD: '较拥挤',
+    UNKNOWN: '未知客流',
     low: '舒适',
     medium: '适中',
     high: '拥挤'
@@ -297,28 +329,106 @@ const normalizeChart = (chart) => {
   return [44, 62, 78, 66, 58]
 }
 
-const findRouteForDestination = (text) => {
-  if (text.includes('滨海') || text.includes('莱佛士')) return mockRouteOptions[1]
-  if (text.includes('市政厅') || text.includes('高峰')) return mockRouteOptions[2]
-  if (text.includes('克拉') || text.includes('舒适') || text.includes('少走路')) return mockRouteOptions[3]
-  return mockRouteOptions[0]
+const normalizeRecommendation = (route) => ({
+  id: route.line_ids?.[0] || route.route_id,
+  routeId: route.route_id,
+  title: route.segments?.map((item) => item.line_name).filter(Boolean).join(' → ') || `路线 ${route.route_id}`,
+  reason: route.reason || '后端已生成推荐路线。',
+  eta: Number(route.predicted_eta_minutes ?? route.total_time_minutes ?? 0).toFixed(1),
+  score: Number(route.experience_score ?? 0).toFixed(1),
+  load: loadLevelText(route.predicted_load?.predicted_load_level),
+  status: route.recommend_types?.includes('best_experience') ? '综合推荐' : '可选路线',
+  chart: [
+    route.experience_score,
+    Number(100 - (route.walk_time_minutes || 0)),
+    route.predicted_load?.load_score,
+    Number(100 - (route.transfer_count || 0) * 20),
+    Number(100 - (route.total_time_minutes || 0))
+  ].filter((value) => Number.isFinite(Number(value)))
+})
+
+const findRouteForDestination = () => routeOptions.value[0] || null
+
+const searchStation = async (keyword) => {
+  const response = await searchLocations({ keyword: keyword.trim(), page: 1, limit: 5 })
+  const stations = response.data?.stations || response.data?.items || []
+  return stations[0] || null
 }
 
-const searchRoutes = () => {
+const searchRoutes = async () => {
   busMapRef.value?.clearSelection()
-  const matchedRoute = findRouteForDestination(query.end)
-
-  recommendation.value = {
-    ...matchedRoute,
-    title: query.end ? `${query.start || '当前位置'} → ${query.end}` : matchedRoute.title,
-    reason: `已根据“${query.end || '目的地'}”生成本地演示路线，后续可替换为后端推荐接口。`
+  recommendation.value = null
+  routeOptions.value = []
+  if (!query.start.trim() || !query.end.trim()) {
+    notice.value = '请输入完整的起点和终点'
+    return
   }
-  notice.value = `已检索目的地：${query.end || '未填写'}`
+
+  notice.value = '正在搜索站点并生成推荐路线...'
+  try {
+    const [startStation, endStation] = await Promise.all([
+      searchStation(query.start),
+      searchStation(query.end)
+    ])
+    if (!startStation || !endStation) {
+      notice.value = '没有找到匹配站点，请输入更准确的站点名称'
+      return
+    }
+    if (startStation.station_id === endStation.station_id) {
+      notice.value = '起点和终点不能是同一站点'
+      return
+    }
+
+    const response = await recommendRoutes({
+      start_station_id: startStation.station_id,
+      end_station_id: endStation.station_id,
+      preference: 'balanced',
+      allow_transfer: true,
+      max_transfer_count: 1
+    })
+    routeOptions.value = (response.data?.items || []).map(normalizeRecommendation)
+    const matchedRoute = findRouteForDestination()
+    if (!matchedRoute) {
+      notice.value = '后端没有返回可用路线'
+      return
+    }
+    recommendation.value = {
+      ...matchedRoute,
+      title: `${startStation.station_name} → ${endStation.station_name}`
+    }
+    notice.value = `已找到 ${routeOptions.value.length} 条候选路线`
+  } catch (error) {
+    notice.value = error?.response?.data?.message || error?.response?.data?.detail?.message || '路线检索失败，请检查后端服务和站点数据'
+  }
 }
 
 const getCurrentLocation = () => {
-  query.start = '乌节站'
-  notice.value = '已获取当前位置：乌节站'
+  if (!navigator.geolocation) {
+    notice.value = '当前浏览器不支持定位'
+    return
+  }
+  notice.value = '正在获取当前位置...'
+  navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+    try {
+      const response = await getNearbyLocations({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        radius_km: 2
+      })
+      const nearest = response.data?.stations?.[0]
+      if (!nearest) {
+        notice.value = '当前位置附近 2 公里内没有公交站'
+        return
+      }
+      query.start = nearest.station_name
+      notice.value = `已定位到最近站点：${nearest.station_name}`
+      busMapRef.value?.focusStopByName(nearest.station_name)
+    } catch (error) {
+      notice.value = error?.response?.data?.message || '附近站点查询失败'
+    }
+  }, () => {
+    notice.value = '无法获取位置，请检查浏览器定位权限'
+  }, { enableHighAccuracy: true, timeout: 10000 })
 }
 
 const focusMapToCurrentLocation = () => {
@@ -342,6 +452,8 @@ const resetPanel = () => {
   selectedInfo.eta = ''
   selectedInfo.routes = ''
   selectedInfo.chart = [42, 70, 56, 88, 64]
+  selectedInfo.flowSource = 'local'
+  selectedInfo.flowSummary = ''
 }
 
 const openChartPanel = (mode) => {
@@ -354,11 +466,14 @@ const selectStation = (stop) => {
   openChartPanel('station')
   selectedInfo.id = stop.stop_id
   selectedInfo.name = stop.stop_name
-  selectedInfo.crowd = loadLevelText(stop.crowd_level)
-  selectedInfo.status = stop.crowd_level === 'high' ? '较高' : '正常'
-  selectedInfo.eta = `约 ${stop.eta_minutes} 分钟`
-  selectedInfo.routes = stop.passing_routes?.join(' / ') || '市中心环线'
+  selectedInfo.crowd = stop.crowd_level ? loadLevelText(stop.crowd_level) : '暂无实时客流'
+  selectedInfo.status = stop.crowd_level ? (stop.crowd_level === 'high' ? '较高' : '正常') : '站点数据已接入'
+  selectedInfo.eta = Number.isFinite(Number(stop.eta_minutes)) ? `约 ${stop.eta_minutes} 分钟` : '暂无实时到站'
+  selectedInfo.routes = stop.passing_routes?.join(' / ') || '暂无线路关联'
   selectedInfo.chart = stop.crowd_level === 'high' ? [68, 74, 82, 90, 76] : [34, 48, 56, 52, 44]
+  selectedInfo.flowSource = 'local'
+  selectedInfo.flowSummary = ''
+  loadStationFlowChart(stop)
 }
 
 const selectMapStop = (stop) => {
@@ -390,24 +505,47 @@ const applyRecommendedRoute = (route) => {
   })
 }
 
-const sendAiMessage = () => {
+const sendAiMessage = async () => {
   const text = aiInput.value.trim()
   if (!text) return
 
   aiMessages.value.push({ id: Date.now(), role: 'user', content: text })
-  const matchedRoute = findRouteForDestination(text)
+  const replyId = Date.now() + 1
 
-  aiRecommendation.value = {
-    ...matchedRoute,
-    title: text.includes('舒适') ? `舒适优先：${matchedRoute.title}` : `综合推荐：${matchedRoute.title}`,
-    reason: '根据你的自然语言需求，模拟推荐一条可在地图中高亮查看的公交路线。'
-  }
   aiMessages.value.push({
-    id: Date.now() + 1,
+    id: replyId,
     role: 'assistant',
-    content: '已生成一条可查看的推荐路线，点击下方按钮可在地图中高亮。'
+    content: '正在请求 DeepSeek 出行助手...'
   })
   aiInput.value = ''
+
+  try {
+    const response = await askAiTravel({
+      mode: 'qa',
+      question: text,
+      context: {
+        current_location: query.start,
+        destination: query.end,
+        visible_routes: routeOptions.value.slice(0, 4)
+      }
+    })
+    const target = aiMessages.value.find((message) => message.id === replyId)
+    if (target) {
+      target.content = response.data?.answer || '后端未返回回答。'
+    }
+    const relatedRoute = response.data?.related_routes?.[0]
+    const matchedRoute = relatedRoute ? normalizeRecommendation(relatedRoute) : findRouteForDestination()
+    aiRecommendation.value = matchedRoute ? {
+      ...matchedRoute,
+      title: text.includes('舒适') ? `舒适优先：${matchedRoute.title}` : `综合推荐：${matchedRoute.title}`,
+      reason: response.data?.answer || matchedRoute.reason
+    } : null
+  } catch (error) {
+    const target = aiMessages.value.find((message) => message.id === replyId)
+    if (target) {
+      target.content = error?.response?.data?.message || '后端 AI 接口暂不可用，请确认后端已启动且 DEEPSEEK_API_KEY 已配置。'
+    }
+  }
 }
 
 const startFloatDrag = (event) => {
