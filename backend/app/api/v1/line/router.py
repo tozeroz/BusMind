@@ -24,7 +24,7 @@ from app.services.bus_service import (
     get_station_lines,
     get_stations_with_coordinates
 )
-from app.services.map_service import get_line_map_data
+from app.services.map_service import get_line_geometry_data, get_line_map_data
 from app.schemas.bus_schema import (
     BusLineDTO,
     BusLineWithStationsDTO,
@@ -353,6 +353,30 @@ async def get_line_map(
     db: Session = Depends(get_db)
 ):
     result = get_line_map_data(db, line_id, direction)
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail=build_response(40400, "Line not found").model_dump()
+        )
+    return build_response(0, "success", result.model_dump())
+
+
+@bus_lines_router.get(
+    "/{line_id}/geometry",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Line Geometry (GeoJSON)",
+    responses={
+        200: {"description": "Get success"},
+        404: {"description": "Line not found"}
+    }
+)
+async def get_line_geometry(
+    line_id: int,
+    direction: Optional[str] = Query(None, description="Direction filter (reserved for future use)"),
+    db: Session = Depends(get_db)
+):
+    result = get_line_geometry_data(db, line_id, direction)
     if not result:
         raise HTTPException(
             status_code=404,

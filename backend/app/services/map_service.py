@@ -9,6 +9,9 @@ from sqlalchemy.orm import Session
 from app.models.bus_line import BusLine, BusStation, LineStation
 from app.models.transit_extra import MapRoadSegment
 from app.schemas.map_schema import (
+    GeoJSONLineStringDTO,
+    LineGeometryFeatureDTO,
+    LineGeometryPropertiesDTO,
     LineMapBoundsDTO,
     LineMapDataDTO,
     MapLineDTO,
@@ -290,6 +293,13 @@ def get_map_stations_by_line(db: Session, line_id: int) -> MapStationResponse:
     return MapStationResponse(stations=items, total=len(items))
 
 
+def _get_line_stations_and_polyline(db: Session, line_id: int) -> tuple[list[MapStationDTO], list[list[float]]]:
+    station_response = get_map_stations_by_line(db, line_id)
+    stations = station_response.stations
+    polyline = [[station.longitude, station.latitude] for station in stations]
+    return stations, polyline
+
+
 def get_line_map_data(db: Session, line_id: int, direction: str | None = None) -> LineMapDataDTO | None:
     # Direction is reserved for future use. The current schema stores one ordered
     # station chain per line record, so we ignore it for now while keeping the API stable.
@@ -297,9 +307,7 @@ def get_line_map_data(db: Session, line_id: int, direction: str | None = None) -
     if line is None:
         return None
 
-    station_response = get_map_stations_by_line(db, line_id)
-    stations = station_response.stations
-    polyline = [[station.longitude, station.latitude] for station in stations]
+    stations, polyline = _get_line_stations_and_polyline(db, line_id)
 
     if polyline:
         longitudes = [point[0] for point in polyline]
@@ -325,4 +333,25 @@ def get_line_map_data(db: Session, line_id: int, direction: str | None = None) -
         polyline=polyline,
         stations=stations,
         bounds=bounds,
+    )
+
+
+def get_line_geometry_data(
+    db: Session, line_id: int, direction: str | None = None
+) -> LineGeometryFeatureDTO | None:
+    # Direction is reserved for future use. We keep the parameter so the new
+    # endpoint stays aligned with the existing map API contract.
+    line = db.query(BusLine).filter(BusLine.line_id == line_id).first()
+    if line is None:
+        return None
+
+    _, polyline = _get_line_stations_and_polyline(db, line_id)
+
+    return LineGeometryFeatureDTO(
+        geometry=GeoJSONLineStringDTO(coordinates=polyline),
+        properties=LineGeometryPropertiesDTO(
+            line_id=int(line.line_id),
+            line_name=line.line_name,
+            line_code=line.line_code,
+        ),
     )
