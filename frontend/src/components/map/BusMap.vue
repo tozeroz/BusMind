@@ -11,7 +11,6 @@ import { Protocol } from 'pmtiles'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 import { getMapLines, getMapStations, getRoadSegments } from '@/api/map'
-import { getLines } from '@/api/transit'
 import { createProtomapsStyle } from '@/map/map-style'
 
 const emit = defineEmits(['select-stop', 'select-route', 'load-error'])
@@ -30,19 +29,35 @@ let busRoutesGeoJSON = {
 }
 let visibleLineIds = new Set()
 let busRoutesLoaded = false
-let isRouteBoundsFitted = false
+let isStopBoundsFitted = false
+let selectedStopForRoutes = null
+let selectedStopFeatureId = null
 
 const emptyFeatureCollection = {
   type: 'FeatureCollection',
   features: []
 }
 
+const mapDataCache = globalThis.__busmindMapDataCache || {
+  stops: null,
+  routes: null,
+  stopsPromise: null,
+  routesPromise: null
+}
+globalThis.__busmindMapDataCache = mapDataCache
+
 const routeRed = '#e11d2e'
-const routeMuted = '#2563eb'
+const routeMuted = '#4f8fc0'
+const routePalette = ['#FDE14E', '#FDE14E', '#F58329', '#BE9106', '#D6CB00', '#5d9eb7', '#8cb6c6', '#72c0cf', '#5798d0']
+const routeColorExpression = ['coalesce', ['get', 'display_color'], routeMuted]
 const routeBg = '#ffffff'
-const stopFill = '#ffffff'
+const stopFill = '#e11d2e'
 const stopStroke = '#e11d2e'
-const stopMutedStroke = '#2563eb'
+const stopMutedStroke = '#e11d2e'
+const stopsOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 9, 0.65, 13.5, 0.95, 15, 0]
+const stopsDimmedOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 9, 0.045, 13.5, 0.09, 15, 0]
+const stopLabelsOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 15, 0, 15.6, 0.38, 16.4, 0.88]
+const stopLabelsDimmedOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 15, 0, 16, 0.1, 17, 0.2]
 
 function getSource(sourceId) {
   return map && map.getSource(sourceId)
@@ -51,6 +66,29 @@ function getSource(sourceId) {
 function setSourceData(sourceId, data) {
   const source = getSource(sourceId)
   if (source) source.setData(data)
+}
+
+function setLayerPaintProperty(layerId, property, value) {
+  if (map && map.getLayer(layerId)) map.setPaintProperty(layerId, property, value)
+}
+
+function setStopsDimmed(isDimmed) {
+  setLayerPaintProperty('stops', 'circle-opacity', isDimmed ? stopsDimmedOpacityByZoom : stopsOpacityByZoom)
+  setLayerPaintProperty('stops-detail', 'circle-opacity', isDimmed ? ['interpolate', ['linear'], ['zoom'], 13.5, 0, 14.5, 0.18, 17, 0.28] : ['interpolate', ['linear'], ['zoom'], 13.5, 0, 14.5, 0.95])
+  setLayerPaintProperty('stop-labels', 'text-opacity', isDimmed ? stopLabelsDimmedOpacityByZoom : stopLabelsOpacityByZoom)
+}
+function setSelectedStopState(stopId) {
+  if (!map || !map.getSource('stops')) return
+
+  if (selectedStopFeatureId !== null) {
+    map.setFeatureState({ source: 'stops', id: String(selectedStopFeatureId) }, { selected: false })
+  }
+
+  selectedStopFeatureId = stopId === undefined || stopId === null ? null : String(stopId)
+
+  if (selectedStopFeatureId !== null) {
+    map.setFeatureState({ source: 'stops', id: selectedStopFeatureId }, { selected: true })
+  }
 }
 
 function createFeatureCollection(features) {
@@ -77,6 +115,60 @@ function routeStopFeatures(routeCoordinates) {
   return features
 }
 
+function normalizeRouteValues(routes) {
+  const normalizeItems = (value) => {
+    if (Array.isArray(value)) return value.flatMap((item) => normalizeItems(item))
+    if (value === undefined || value === null) return []
+
+    const text = String(value).trim()
+    if (!text) return []
+
+    if (text.startsWith('[') && text.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(text)
+        return normalizeItems(parsed)
+      } catch {
+        // Fall through to delimiter splitting for loosely formatted arrays.
+      }
+    }
+
+    return text
+      .replace(/[\[\]"']/g, '')
+      .split(/[|,\/]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+
+  return new Set(normalizeItems(routes).map((item) => String(item).toLowerCase()))
+}
+function routeFeatureMatchesValues(feature, values) {
+  if (!values.size) return false
+
+  const properties = feature.properties || {}
+  const candidates = [
+    properties.line_id,
+    properties.line_name,
+    properties.line_code,
+    properties.service_no
+  ]
+
+  return candidates.some((item) => values.has(String(item || '').toLowerCase()))
+}
+
+function routeFeatureContainsStop(feature, stop) {
+  const coordinates = feature.geometry?.coordinates || []
+  return coordinates.some((coordinate) => coordinatesMatch(coordinate, [stop.lng, stop.lat]))
+}
+
+function reachableRouteFeatures(stop) {
+  const routeValues = normalizeRouteValues([...(stop.passing_routes || []), ...(stop.line_ids || [])])
+  const matchedByRoute = busRoutesGeoJSON.features.filter((feature) => routeFeatureMatchesValues(feature, routeValues))
+
+  if (matchedByRoute.length) return matchedByRoute
+
+  return busRoutesGeoJSON.features.filter((feature) => routeFeatureContainsStop(feature, stop))
+}
+
 function findRouteFeature(routeId) {
   const id = Number(routeId)
   return busRoutesGeoJSON.features.find((feature) => {
@@ -89,23 +181,50 @@ function findStopFeature(stopId) {
 }
 
 function clearSelection() {
+  selectedStopForRoutes = null
+  setSelectedStopState(null)
+  setStopsDimmed(false)
+  setSourceData('routes', emptyFeatureCollection)
   setSourceData('routes-path', emptyFeatureCollection)
   setSourceData('stops-highlight', emptyFeatureCollection)
   setSourceData('stops-highlight-selected', emptyFeatureCollection)
 }
 
 function highlightRoute(feature) {
+  selectedStopForRoutes = null
+  setSelectedStopState(null)
+  setStopsDimmed(true)
   const routeCoordinates = feature.geometry.coordinates
+  setSourceData('routes', emptyFeatureCollection)
   setSourceData('routes-path', createFeatureCollection([feature]))
   setSourceData('stops-highlight', createFeatureCollection(routeStopFeatures(routeCoordinates)))
   setSourceData('stops-highlight-selected', emptyFeatureCollection)
 }
 
 function highlightStop(stopId) {
+  selectedStopForRoutes = null
+  setSelectedStopState(stopId)
+  setStopsDimmed(false)
   const feature = findStopFeature(stopId)
+  setSourceData('routes', emptyFeatureCollection)
   setSourceData('routes-path', emptyFeatureCollection)
   setSourceData('stops-highlight', emptyFeatureCollection)
   setSourceData('stops-highlight-selected', feature ? createFeatureCollection([feature]) : emptyFeatureCollection)
+}
+
+function highlightStopReachableRoutes(stop) {
+  selectedStopForRoutes = stop
+  setSelectedStopState(stop.stop_id)
+  setStopsDimmed(true)
+  const feature = findStopFeature(stop.stop_id)
+  const routes = reachableRouteFeatures(stop)
+
+  setSourceData('routes', createFeatureCollection(routes))
+  setSourceData('routes-path', emptyFeatureCollection)
+  setSourceData('stops-highlight', emptyFeatureCollection)
+  setSourceData('stops-highlight-selected', feature ? createFeatureCollection([feature]) : emptyFeatureCollection)
+
+  return routes
 }
 
 function getFocusPadding() {
@@ -176,9 +295,62 @@ function scheduleFocusOnCoordinates(coordinates, maxZoom) {
   })
 }
 
-function fitRouteBounds() {
-  const coordinates = busRoutesGeoJSON.features.flatMap((feature) => feature.geometry.coordinates)
+function fitStopBounds() {
+  const coordinates = busStopsGeoJSON.features.map((feature) => feature.geometry.coordinates)
   focusOnCoordinates(coordinates, 13.4, 0)
+}
+
+function routeColorForLine(line) {
+  const colorKey = Number(line.line_id) || String(line.service_no || line.line_code || line.line_name || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  return routePalette[Math.abs(colorKey) % routePalette.length]
+}
+
+function routeFeatureCoordinates(features) {
+  return features.flatMap((feature) => feature.geometry?.coordinates || [])
+}
+
+function isValidCoordinate(coordinate) {
+  return Array.isArray(coordinate)
+    && coordinate.length >= 2
+    && Number.isFinite(Number(coordinate[0]))
+    && Number.isFinite(Number(coordinate[1]))
+}
+
+function normalizeCoordinates(coordinates) {
+  return coordinates
+    .filter(isValidCoordinate)
+    .map((coordinate) => [Number(coordinate[0]), Number(coordinate[1])])
+}
+
+function interpolateCatmullRom(p0, p1, p2, p3, t) {
+  const t2 = t * t
+  const t3 = t2 * t
+
+  return [
+    0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+    0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
+  ]
+}
+
+function smoothRouteCoordinates(coordinates) {
+  const points = normalizeCoordinates(coordinates)
+  if (points.length < 3) return points
+
+  const smoothed = [points[0]]
+  const segmentSteps = 8
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const p0 = points[Math.max(0, index - 1)]
+    const p1 = points[index]
+    const p2 = points[index + 1]
+    const p3 = points[Math.min(points.length - 1, index + 2)]
+
+    for (let step = 1; step <= segmentSteps; step += 1) {
+      smoothed.push(interpolateCatmullRom(p0, p1, p2, p3, step / segmentSteps))
+    }
+  }
+
+  return smoothed
 }
 
 function addRouteSources() {
@@ -187,7 +359,7 @@ function addRouteSources() {
   map.addSource('routes', {
     type: 'geojson',
     promoteId: 'line_id',
-    data: busRoutesGeoJSON
+    data: emptyFeatureCollection
   })
 
   map.addSource('routes-path', {
@@ -207,9 +379,10 @@ function addRouteLayers() {
       'line-join': 'round'
     },
     paint: {
-      'line-color': routeBg,
-      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 7, 14, 10, 17, 13],
-      'line-opacity': 0.72
+      'line-color': '#f7fbff',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6.2, 17, 8],
+      'line-opacity': 0.98,
+      'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 0.08, 17, 0.18]
     }
   })
 
@@ -222,9 +395,10 @@ function addRouteLayers() {
       'line-join': 'round'
     },
     paint: {
-      'line-color': routeMuted,
-      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6, 17, 8],
-      'line-opacity': 0.74
+      'line-color': routeColorExpression,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.8, 14, 3, 17, 4.2],
+      'line-opacity': 1,
+      'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 0, 17, 0.08]
     }
   })
 
@@ -250,18 +424,18 @@ function addRouteLayers() {
     minzoom: 12,
     layout: {
       'symbol-placement': 'line',
-      'symbol-spacing': 120,
+      'symbol-spacing': 180,
       'text-field': '>',
-      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 12, 16, 16],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 13],
       'text-keep-upright': false,
       'text-allow-overlap': true,
       'text-ignore-placement': true
     },
     paint: {
-      'text-color': routeMuted,
+      'text-color': routeColorExpression,
       'text-halo-color': '#ffffff',
       'text-halo-width': 0.8,
-      'text-opacity': 0.55
+      'text-opacity': 0.5
     }
   })
 
@@ -274,9 +448,10 @@ function addRouteLayers() {
       'line-join': 'round'
     },
     paint: {
-      'line-color': routeBg,
-      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 11, 14, 15, 17, 20],
-      'line-opacity': 1
+      'line-color': '#f7fbff',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5.2, 14, 7.8, 17, 10.5],
+      'line-opacity': 1,
+      'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 0.08, 17, 0.16]
     }
   })
 
@@ -289,9 +464,10 @@ function addRouteLayers() {
       'line-join': 'round'
     },
     paint: {
-      'line-color': routeRed,
-      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 7, 14, 10, 17, 14],
-      'line-opacity': 1
+      'line-color': routeColorExpression,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.6, 14, 4.5, 17, 6.4],
+      'line-opacity': 1,
+      'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 0, 17, 0.02]
     }
   })
 
@@ -302,17 +478,18 @@ function addRouteLayers() {
     minzoom: 12,
     layout: {
       'symbol-placement': 'line',
-      'symbol-spacing': 90,
+      'symbol-spacing': 150,
       'text-field': '>',
-      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 14, 16, 18],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 11, 16, 14],
       'text-keep-upright': false,
       'text-allow-overlap': true,
       'text-ignore-placement': true
     },
     paint: {
-      'text-color': routeRed,
+      'text-color': routeColorExpression,
       'text-halo-color': '#ffffff',
-      'text-halo-width': 1.2
+      'text-halo-width': 1,
+      'text-opacity': 0.78
     }
   })
 }
@@ -322,6 +499,8 @@ function addStopSources() {
 
   map.addSource('stops', {
     type: 'geojson',
+    tolerance: 10,
+    buffer: 0,
     promoteId: 'stop_id',
     data: busStopsGeoJSON
   })
@@ -344,36 +523,94 @@ function addStopLayers() {
     id: 'stops-hit',
     type: 'circle',
     source: 'stops',
+    minzoom: 12,
     paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 15, 14, 21, 17, 28],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 12, 14, 17, 17, 23],
       'circle-color': '#000000',
       'circle-opacity': 0.01
     }
   })
 
   map.addLayer({
+    id: 'stops-hub',
+    type: 'circle',
+    source: 'stops',
+    minzoom: 9,
+    maxzoom: 12,
+    filter: ['>=', ['to-number', ['get', 'service_count']], 3],
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 2, 10.5, 2.8, 12, 3.4],
+      'circle-color': stopFill,
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 9, 0.4, 11, 0.7],
+      'circle-opacity': 0.82
+    }
+  })
+  map.addLayer({
     id: 'stops',
     type: 'circle',
     source: 'stops',
+    minzoom: 9,
+    maxzoom: 15,
     paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 7, 14, 10, 17, 13],
-      'circle-color': stopFill,
-      'circle-stroke-color': stopMutedStroke,
-      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 14, 3.5, 17, 4],
-      'circle-opacity': 0.98
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 0.6, 11, 1, 13, 2, 14, 3.5, 15, ['case', ['boolean', ['feature-state', 'selected'], false], 7, 5]],
+      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', stopFill],
+      'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], stopStroke, '#ffffff'],
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 9, 0, 12, 0.5, 15, 1.5],
+      'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0, 12, 0.35, 15, 0.85],
+      'circle-opacity': stopsOpacityByZoom
     }
   })
 
+  map.addLayer({
+    id: 'stops-detail',
+    type: 'circle',
+    source: 'stops',
+    minzoom: 13.5,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 2, 15, ['case', ['boolean', ['feature-state', 'selected'], false], 9, 5], 17, ['case', ['boolean', ['feature-state', 'selected'], false], 12, 7]],
+      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', stopFill],
+      'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], stopStroke, '#ffffff'],
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 14, 1, 15, 2, 17, 3],
+      'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, 0.62, 17, 0.9],
+      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, 0.95]
+    }
+  })
+  map.addLayer({
+    id: 'stop-labels',
+    type: 'symbol',
+    source: 'stops',
+    minzoom: 15,
+    layout: {
+      'text-field': ['step', ['zoom'], ['get', 'station_code'], 16, ['format', ['get', 'station_code'], { 'font-scale': 0.8 }, '\n', {}, ['get', 'stop_name'], { 'font-scale': 1 }]],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 15, 10, 17, 13],
+      'text-anchor': 'left',
+      'text-offset': [0.8, 0],
+      'text-max-width': 14,
+      'text-optional': true,
+      'text-padding': 2,
+      'text-allow-overlap': false,
+      'text-ignore-placement': false
+    },
+    paint: {
+      'text-color': '#1f2937',
+      'text-halo-color': '#ffffff',
+      'text-halo-width': 1.5,
+      'text-halo-blur': 0.5,
+      'text-opacity': stopLabelsOpacityByZoom
+    }
+  })
   map.addLayer({
     id: 'stops-highlight',
     type: 'circle',
     source: 'stops-highlight',
     paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 9, 14, 13, 17, 17],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10.5, 0.9, 11.5, 1.4, 13, 2, 15, 3.1, 17, 4.4],
       'circle-color': stopFill,
-      'circle-stroke-color': stopStroke,
-      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 5, 17, 6],
-      'circle-opacity': 1
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10.5, 0, 14, 0.4, 17, 0.75],
+      'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 10.5, 0, 14, 0.34, 17, 0.62],
+      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 10.5, 0.82, 14, 0.9, 17, 0.90]
     }
   })
 
@@ -382,10 +619,10 @@ function addStopLayers() {
     type: 'circle',
     source: 'stops-highlight-selected',
     paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 14, 14, 20, 17, 26],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10.5, 4.5, 12, 6, 14, 8, 17, 11],
       'circle-color': 'rgba(255,255,255,0)',
       'circle-stroke-color': stopStroke,
-      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6, 17, 8],
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10.5, 1.2, 12, 1.8, 14, 2.5, 17, 3.4],
       'circle-opacity': 1
     }
   })
@@ -419,9 +656,10 @@ function bindStopLayerEvents() {
 
     if (!stop) return
 
-    highlightStop(stop.stop_id)
+    const routes = highlightStopReachableRoutes(stop)
+    const routeCoordinates = routeFeatureCoordinates(routes)
     emit('select-stop', stop)
-    scheduleFocusOnCoordinates([[stop.lng, stop.lat]], 15)
+    scheduleFocusOnCoordinates(routeCoordinates.length ? routeCoordinates : [[stop.lng, stop.lat]], routeCoordinates.length ? 13.6 : 15)
   })
 }
 
@@ -499,64 +737,66 @@ function stationToFeature(station) {
       station_code: station.station_code || station.bus_stop_code || '',
       road_name: station.road_name || station.address || '',
       line_ids: JSON.stringify(station.line_ids || []),
-      service_nos: JSON.stringify(station.service_nos || [])
+      service_nos: Array.isArray(station.service_nos) ? station.service_nos.join('|') : station.service_nos || '',
+      service_count: Array.isArray(station.service_nos) ? station.service_nos.length : Number(station.service_count) || 0
     }
   }
 }
 
-async function loadRealBusStops() {
-  try {
-    const linesResponse = await getLines({ page: 1, limit: 10 })
-    const visibleLines = (linesResponse?.data?.lines || [])
-      .filter((line) => !String(line.line_code || '').includes('{{'))
-      .filter((line) => !String(line.line_name || '').toLowerCase().includes('postman test'))
-      .slice(0, 9)
-
-    visibleLineIds = new Set(visibleLines.map((line) => Number(line.line_id)))
-
-    const stationResponses = visibleLines.length
-      ? await Promise.all(visibleLines.map((line) => getMapStations({ line_id: line.line_id })))
-      : [await getMapStations()]
-    const stationById = new Map()
-    stationResponses.forEach((response) => {
-      ;(response?.data?.stations || []).forEach((station) => {
-        const existing = stationById.get(station.station_id)
-        if (!existing) {
-          stationById.set(station.station_id, station)
-          return
-        }
-        existing.service_nos = [...new Set([...(existing.service_nos || []), ...(station.service_nos || [])])]
-      })
-    })
-    const stations = [...stationById.values()]
-    busStops = stations
-      .filter((station) => Number.isFinite(Number(station.longitude)) && Number.isFinite(Number(station.latitude)))
-      .map((station) => ({
-        stop_id: String(station.station_id),
-        stop_name: station.station_name,
-        station_code: station.station_code || station.bus_stop_code || '',
-        road_name: station.road_name || station.address || '',
-      line_ids: JSON.stringify(station.line_ids || []),
-      service_nos: JSON.stringify(station.service_nos || []),
-        lng: Number(station.longitude),
-        lat: Number(station.latitude),
-        passing_routes: station.service_nos || station.line_names || [],
-        line_ids: station.line_ids || [],
-        crowd_level: null,
-        predicted_eta_minutes: null
-      }))
-    busStopsGeoJSON = createFeatureCollection(stations.map(stationToFeature))
-    setSourceData('stops', busStopsGeoJSON)
-
-    await loadRealBusRoutes()
-  } catch (error) {
-    console.warn('真实地图站点加载失败。', error?.message)
-    emit('load-error', '地图站点加载失败，请检查后端和数据库。')
+function stationToStop(station) {
+  return {
+    stop_id: String(station.station_id),
+    stop_name: station.station_name,
+    station_code: station.station_code || station.bus_stop_code || '',
+    road_name: station.road_name || station.address || '',
+    line_ids: station.line_ids || [],
+    lng: Number(station.longitude),
+    lat: Number(station.latitude),
+    passing_routes: [station.service_nos, station.line_names, station.line_ids].flat().filter(Boolean),
+    crowd_level: null,
+    eta_minutes: null
   }
 }
 
+async function getCachedMapStations() {
+  if (mapDataCache.stops) return mapDataCache.stops
+  if (!mapDataCache.stopsPromise) {
+    mapDataCache.stopsPromise = getMapStations()
+      .then((response) => {
+        const stations = response?.data?.stations || response?.data?.items || []
+        const validStations = stations.filter((station) => Number.isFinite(Number(station.longitude)) && Number.isFinite(Number(station.latitude)))
+        const data = {
+          stops: validStations.map(stationToStop),
+          geojson: createFeatureCollection(validStations.map(stationToFeature))
+        }
+        mapDataCache.stops = data
+        return data
+      })
+      .finally(() => {
+        mapDataCache.stopsPromise = null
+      })
+  }
+  return mapDataCache.stopsPromise
+}
+async function loadRealBusStops() {
+  try {
+    const stopData = await getCachedMapStations()
+    busStops = stopData.stops
+    busStopsGeoJSON = stopData.geojson
+    setSourceData('stops', busStopsGeoJSON)
+    if (!isStopBoundsFitted) {
+      fitStopBounds()
+      isStopBoundsFitted = true
+    }
+
+    await loadRealBusRoutes()
+  } catch (error) {
+    console.warn('map stations load failed', error?.message)
+    emit('load-error', '地图站点加载失败，请检查后端和数据库。')
+  }
+}
 function lineToFeature(line) {
-  const coordinates = Array.isArray(line.path_coordinates) ? line.path_coordinates : []
+  const coordinates = smoothRouteCoordinates(Array.isArray(line.path_coordinates) ? line.path_coordinates : [])
   return {
     type: 'Feature',
     id: Number(line.line_id),
@@ -567,7 +807,8 @@ function lineToFeature(line) {
       service_no: line.service_no,
       start_station: line.start_station,
       end_station: line.end_station,
-      color: line.color
+      color: line.color,
+      display_color: routeColorForLine(line)
     },
     geometry: {
       type: 'LineString',
@@ -589,52 +830,65 @@ function mergeSegmentCoordinates(segments) {
     }, [])
 }
 
+async function getCachedMapRoutes() {
+  if (mapDataCache.routes) return mapDataCache.routes
+  if (!mapDataCache.routesPromise) {
+    mapDataCache.routesPromise = getMapLines()
+      .then(async (lineResponse) => {
+        const lines = lineResponse?.data?.lines || []
+        const needsSegmentFallback = lines.some((line) => !Array.isArray(line.path_coordinates) || line.path_coordinates.length < 2)
+        const segmentsByLine = new Map()
+
+        if (needsSegmentFallback) {
+          try {
+            const segmentResponse = await getRoadSegments()
+            const segments = segmentResponse?.data?.segments || []
+            segments.forEach((segment) => {
+              const key = Number(segment.line_id)
+              if (!segmentsByLine.has(key)) segmentsByLine.set(key, [])
+              segmentsByLine.get(key).push(segment)
+            })
+          } catch (error) {
+            console.warn('map road segments fallback failed', error?.message)
+          }
+        }
+
+        const selectedLines = (visibleLineIds.size
+          ? lines.filter((line) => visibleLineIds.has(Number(line.line_id)))
+          : lines
+        ).map((line) => {
+          if (Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2) return line
+          return { ...line, path_coordinates: mergeSegmentCoordinates(segmentsByLine.get(Number(line.line_id)) || []) }
+        })
+
+        const data = createFeatureCollection(
+          selectedLines
+            .filter((line) => Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2)
+            .map(lineToFeature)
+        )
+        mapDataCache.routes = data
+        return data
+      })
+      .finally(() => {
+        mapDataCache.routesPromise = null
+      })
+  }
+  return mapDataCache.routesPromise
+}
 async function loadRealBusRoutes() {
   if (busRoutesLoaded) return
 
   try {
-    const [lineResponse, segmentResponse] = await Promise.all([
-      getMapLines(),
-      getRoadSegments()
-    ])
-    const lines = lineResponse?.data?.lines || []
-    const segments = segmentResponse?.data?.segments || []
-    const segmentsByLine = new Map()
-    segments.forEach((segment) => {
-      const key = Number(segment.line_id)
-      if (!segmentsByLine.has(key)) segmentsByLine.set(key, [])
-      segmentsByLine.get(key).push(segment)
-    })
-
-    const selectedLines = (visibleLineIds.size
-      ? lines.filter((line) => visibleLineIds.has(Number(line.line_id)))
-      : lines.slice(0, 9)
-    ).map((line) => {
-      if (Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2) return line
-      return { ...line, path_coordinates: mergeSegmentCoordinates(segmentsByLine.get(Number(line.line_id)) || []) }
-    })
-
-    busRoutesGeoJSON = createFeatureCollection(
-      selectedLines
-        .filter((line) => Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2)
-        .map(lineToFeature)
-    )
-
+    busRoutesGeoJSON = await getCachedMapRoutes()
     busRoutesLoaded = true
 
-    if (map && map.getSource('routes')) {
-      setSourceData('routes', busRoutesGeoJSON)
-      if (!isRouteBoundsFitted && busRoutesGeoJSON.features.length) {
-        fitRouteBounds()
-        isRouteBoundsFitted = true
-      }
-    }
+    if (map && map.getSource('routes')) setSourceData('routes', emptyFeatureCollection)
+    if (selectedStopForRoutes) highlightStopReachableRoutes(selectedStopForRoutes)
   } catch (error) {
-    console.warn('真实地图线路或路段加载失败。', error?.message)
-    emit('load-error', '地图线路/路段加载失败，请检查后端和数据库。')
+    console.warn('map routes load failed', error?.message)
+    emit('load-error', '地图线路加载失败，请检查后端和数据库。')
   }
 }
-
 onMounted(() => {
   registerPmtilesProtocol()
 

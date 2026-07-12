@@ -3,32 +3,20 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
 from app.dependencies.auth import get_db, get_current_user
-from app.services.user_service import (
-    register_user,
-    login_user,
-    get_current_user as get_current_user_service,
-    update_user,
-    get_user_history,
-    get_user_favorites,
-    add_user_favorite,
-    delete_user_favorite,
-    send_register_email_code,
-)
+from app.services.user_service import register_user, login_user, get_current_user as get_current_user_service, update_user, get_user_history, get_user_favorites, add_user_favorite, delete_user_favorite
 from app.schemas.user_schema import (
     UserRegisterRequest,
     UserLoginRequest,
     UserUpdateRequest,
-    SendRegisterEmailCodeRequest,
     UserDTO,
     LoginResponse,
     ApiResponse,
     QueryHistoryResponse,
     UserFavoriteResponse,
     UserFavoriteRequest,
-    UserFavoriteDTO,
+    UserFavoriteDTO
 )
 from app.models.user import User
-from app.services.email_service import EmailServiceConfigError, EmailServiceError
 
 router = APIRouter(prefix="/users", tags=["User"])
 
@@ -46,6 +34,16 @@ def build_response(code: int, message: str, data=None) -> ApiResponse:
         trace_id=get_trace_id(),
         timestamp=get_timestamp()
     )
+
+
+# English messages raised by the user service are translated into Chinese here
+# so the frontend only needs to display ``detail.message`` as-is.
+_USER_ERROR_MESSAGES = {
+    "Username already exists": "该用户名已被占用，请更换后重试",
+    "Username or password error": "账号或密码错误，请重新输入",
+    "User account is disabled": "账号已被禁用，请联系管理员",
+    "Old password error": "原密码错误，请重新输入",
+}
 
 @router.post(
     "/register",
@@ -66,71 +64,14 @@ async def register(
         user = register_user(db, request)
         return build_response(0, "success", user.model_dump())
     except ValueError as e:
-        msg = str(e)
-        if "already exists" in msg:
+        if str(e) == "Username already exists":
             raise HTTPException(
                 status_code=409,
-                detail=build_response(40900, msg).model_dump()
-            )
-        if "already registered" in msg:
-            raise HTTPException(
-                status_code=409,
-                detail=build_response(40900, msg).model_dump()
+                detail=build_response(40900, _USER_ERROR_MESSAGES[str(e)]).model_dump()
             )
         raise HTTPException(
             status_code=400,
-            detail=build_response(40001, msg).model_dump()
-        )
-
-@router.post(
-    "/register/email-code",
-    response_model=ApiResponse,
-    status_code=200,
-    summary="Send Registration Email Verification Code",
-    responses={
-        200: {"description": "Verification code sent"},
-        400: {"description": "Bad request or email service not configured"},
-        409: {"description": "Email already registered"},
-        429: {"description": "Too many requests – rate limited"},
-        502: {"description": "Email service send failure"},
-    },
-)
-async def send_register_code(
-    request: SendRegisterEmailCodeRequest,
-    db: Session = Depends(get_db),
-):
-    try:
-        send_register_email_code(db, request.email)
-        return build_response(0, "Verification code sent")
-    except ValueError as exc:
-        msg = str(exc)
-        if "already registered" in msg:
-            raise HTTPException(
-                status_code=409,
-                detail=build_response(40900, msg).model_dump(),
-            )
-        if "wait" in msg.lower():
-            raise HTTPException(
-                status_code=429,
-                detail=build_response(42900, msg).model_dump(),
-            )
-        raise HTTPException(
-            status_code=400,
-            detail=build_response(40001, msg).model_dump(),
-        )
-    except EmailServiceConfigError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=build_response(
-                50300,
-                "Email service is not configured. "
-                "Please set QQ_MAIL_USERNAME and QQ_MAIL_AUTH_CODE.",
-            ).model_dump(),
-        )
-    except EmailServiceError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=build_response(50200, str(exc)).model_dump(),
+            detail=build_response(40001, _USER_ERROR_MESSAGES.get(str(e), str(e))).model_dump()
         )
 
 @router.post(
@@ -153,7 +94,7 @@ async def login(
     except ValueError as e:
         raise HTTPException(
             status_code=400,
-            detail=build_response(40002, str(e)).model_dump()
+            detail=build_response(40002, _USER_ERROR_MESSAGES.get(str(e), str(e))).model_dump()
         )
 
 @router.get(
@@ -195,7 +136,7 @@ async def update_me(
     except ValueError as e:
         raise HTTPException(
             status_code=400,
-            detail=build_response(40002, str(e)).model_dump()
+            detail=build_response(40002, _USER_ERROR_MESSAGES.get(str(e), str(e))).model_dump()
         )
 
 @router.get(

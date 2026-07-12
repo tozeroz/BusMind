@@ -19,7 +19,6 @@ from typing import Any, Iterable
 
 import pandas as pd
 
-
 BUS_PROPS = ("NextBus", "NextBus2", "NextBus3")
 
 LOAD_SCORE = {
@@ -157,10 +156,10 @@ def add_frequency_columns(df: pd.DataFrame, source_col: str, prefix: str) -> Non
 
 
 def haversine_km(
-    lat1: pd.Series,
-    lon1: pd.Series,
-    lat2: pd.Series,
-    lon2: pd.Series,
+        lat1: pd.Series,
+        lon1: pd.Series,
+        lat2: pd.Series,
+        lon2: pd.Series,
 ) -> pd.Series:
     radius_km = 6371.0
     lat1_rad = lat1.map(math.radians)
@@ -289,9 +288,9 @@ def build_bus_line(raw_dir: Path, processed_dir: Path) -> pd.DataFrame:
 
 
 def build_line_station(
-    raw_dir: Path,
-    processed_dir: Path,
-    lines: pd.DataFrame,
+        raw_dir: Path,
+        processed_dir: Path,
+        lines: pd.DataFrame,
 ) -> pd.DataFrame:
     routes = pd.DataFrame(read_lta_json_list(raw_dir / "api_response" / "BusRoutes_full.json"))
     df = routes.rename(
@@ -323,7 +322,7 @@ def build_line_station(
     df["line_id"] = df["line_id"].astype(int)
     df["station_id"] = df["station_id"].astype(int)
     df["line_station_id"] = (
-        df["line_id"].astype(str) + "_" + df["stop_sequence"].astype(str).str.zfill(3)
+            df["line_id"].astype(str) + "_" + df["stop_sequence"].astype(str).str.zfill(3)
     )
 
     columns = [
@@ -350,10 +349,10 @@ def build_line_station(
 
 
 def build_passenger_flow_trend(
-    raw_dir: Path,
-    processed_dir: Path,
-    stations: pd.DataFrame,
-    month: str | None,
+        raw_dir: Path,
+        processed_dir: Path,
+        stations: pd.DataFrame,
+        month: str | None,
 ) -> pd.DataFrame:
     stop_parent = raw_dir / "passenger_volume_stop"
     stop_month_dir = stop_parent / month if month else latest_month_dir(stop_parent)
@@ -423,10 +422,10 @@ def iter_arrival_records(arrival_root: Path) -> Iterable[dict[str, Any]]:
 
 
 def flatten_bus_arrival(
-    raw_dir: Path,
-    processed_dir: Path,
-    lines: pd.DataFrame,
-    stations: pd.DataFrame,
+        raw_dir: Path,
+        processed_dir: Path,
+        lines: pd.DataFrame,
+        stations: pd.DataFrame,
 ) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     for record in iter_arrival_records(raw_dir / "bus_arrival_samples"):
@@ -487,7 +486,7 @@ def flatten_bus_arrival(
     estimated_arrival = pd.to_datetime(df["estimated_arrival"], errors="coerce", utc=True)
     df["estimated_arrival"] = estimated_arrival.dt.tz_convert("Asia/Singapore").dt.tz_localize(None)
     df["predicted_eta_minutes"] = (
-        (df["estimated_arrival"] - df["query_time"]).dt.total_seconds() / 60
+            (df["estimated_arrival"] - df["query_time"]).dt.total_seconds() / 60
     ).round(2)
     df = df[df["predicted_eta_minutes"].notna() & (df["predicted_eta_minutes"] >= 0)].copy()
     df["duration_ms"] = (df["predicted_eta_minutes"] * 60 * 1000).round().astype("Int64")
@@ -534,13 +533,13 @@ def flatten_bus_arrival(
     valid_vehicle_coords = (df["vehicle_latitude"] > 0) & (df["vehicle_longitude"] > 0)
     df["vehicle_to_stop_distance_m"] = pd.NA
     df.loc[valid_vehicle_coords, "vehicle_to_stop_distance_m"] = (
-        haversine_km(
-            df.loc[valid_vehicle_coords, "vehicle_latitude"],
-            df.loc[valid_vehicle_coords, "vehicle_longitude"],
-            df.loc[valid_vehicle_coords, "station_latitude"],
-            df.loc[valid_vehicle_coords, "station_longitude"],
-        )
-        * 1000
+            haversine_km(
+                df.loc[valid_vehicle_coords, "vehicle_latitude"],
+                df.loc[valid_vehicle_coords, "vehicle_longitude"],
+                df.loc[valid_vehicle_coords, "station_latitude"],
+                df.loc[valid_vehicle_coords, "station_longitude"],
+            )
+            * 1000
     ).round(1)
     df["capacity"] = df["bus_type"].map(BUS_CAPACITY).fillna(80).astype(int)
     df["predicted_load_rate"] = df["predicted_load"].map(LOAD_RATE).fillna(0.45)
@@ -754,9 +753,9 @@ def build_direct_status_tables(arrival: pd.DataFrame, processed_dir: Path) -> tu
 
 
 def build_map_station(
-    stations: pd.DataFrame,
-    line_station: pd.DataFrame,
-    processed_dir: Path,
+        stations: pd.DataFrame,
+        line_station: pd.DataFrame,
+        processed_dir: Path,
 ) -> pd.DataFrame:
     grouped = (
         line_station.groupby("station_id")
@@ -789,10 +788,10 @@ def build_map_station(
 
 
 def build_map_road_segment(
-    line_station: pd.DataFrame,
-    stations: pd.DataFrame,
-    flow_trend: pd.DataFrame,
-    processed_dir: Path,
+        line_station: pd.DataFrame,
+        stations: pd.DataFrame,
+        flow_trend: pd.DataFrame,
+        processed_dir: Path,
 ) -> pd.DataFrame:
     station_coords = stations[["station_id", "station_name", "latitude", "longitude"]].copy()
     current = line_station.sort_values(["line_id", "stop_sequence"]).copy()
@@ -829,8 +828,8 @@ def build_map_road_segment(
         validate="many_to_one",
     )
     current["segment_distance_km"] = (
-        pd.to_numeric(current["end_route_distance_km"], errors="coerce")
-        - pd.to_numeric(current["route_distance_km"], errors="coerce")
+            pd.to_numeric(current["end_route_distance_km"], errors="coerce")
+            - pd.to_numeric(current["route_distance_km"], errors="coerce")
     )
     invalid_distance = current["segment_distance_km"].isna() | (current["segment_distance_km"] <= 0)
     current.loc[invalid_distance, "segment_distance_km"] = haversine_km(
@@ -850,13 +849,14 @@ def build_map_road_segment(
     current["flow_level"] = flow_level_from_series(current["avg_passenger_flow"])
     current["ride_time_minutes"] = (current["segment_distance_km"] / 18 * 60).clip(lower=1).round(1)
     current["avg_speed_kph"] = (
-        current["segment_distance_km"] / (current["ride_time_minutes"] / 60)
+            current["segment_distance_km"] / (current["ride_time_minutes"] / 60)
     ).replace([math.inf, -math.inf], pd.NA).fillna(18).round(1)
     current["delay_minutes"] = 0
     current["segment_id"] = (
-        current["line_id"].astype(str) + "_" + current["stop_sequence"].astype(str).str.zfill(3)
+            current["line_id"].astype(str) + "_" + current["stop_sequence"].astype(str).str.zfill(3)
     )
-    current["segment_name"] = current["start_station_name"].astype(str) + " - " + current["end_station_name"].astype(str)
+    current["segment_name"] = current["start_station_name"].astype(str) + " - " + current["end_station_name"].astype(
+        str)
     current["path_coordinates"] = current.apply(
         lambda row: json.dumps(
             [[row["start_lon"], row["start_lat"]], [row["end_lon"], row["end_lat"]]],
@@ -994,7 +994,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw-dir", type=Path, default=root / "data" / "raw" / "lta")
     parser.add_argument("--processed-dir", type=Path, default=root / "data" / "processed")
-    parser.add_argument("--month", default=None, help="Passenger Volume month such as 202605. Defaults to latest folder.")
+    parser.add_argument("--month", default=None,
+                        help="Passenger Volume month such as 202605. Defaults to latest folder.")
     return parser.parse_args()
 
 

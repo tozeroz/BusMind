@@ -16,9 +16,10 @@ import pandas as pd
 
 BUS_PROPS = ("NextBus", "NextBus2", "NextBus3")
 LOAD_SCORE_BY_CODE = {
-    "SEA": 95.0,
+    "SEA": 100.0,
     "SDA": 70.0,
     "LSD": 35.0,
+    "UNKNOWN": 60.0,
 }
 
 
@@ -482,17 +483,23 @@ def _line_congestion_lookup(
 def _build_synthetic_dynamic_features(frame: pd.DataFrame) -> pd.DataFrame:
     output = frame.copy()
     output["is_synthetic"] = False
+    output["walk_time_is_synthetic"] = False
+    output["transfer_count_is_synthetic"] = False
     for group_id, group in output.groupby("candidate_group_id"):
+        # 离线阶段还没有真实步行路径；同组无差异时生成可比较的步行负担。
         if group["walk_time_minutes"].nunique(dropna=False) <= 1:
             for index in group.index:
                 hashed = _stable_hash(f"walk|{group_id}|{output.at[index, 'route_id']}")
                 output.at[index, "walk_time_minutes"] = float([0.0, 3.0, 6.0, 9.0][hashed % 4])
                 output.at[index, "is_synthetic"] = True
+                output.at[index, "walk_time_is_synthetic"] = True
+        # 当前候选集多来自同站到站样本，先生成少量换乘差异打通排序训练。
         if group["transfer_count"].nunique(dropna=False) <= 1:
             for index in group.index:
                 hashed = _stable_hash(f"transfer|{group_id}|{output.at[index, 'route_id']}")
                 output.at[index, "transfer_count"] = int([0, 0, 1, 1, 2][hashed % 5])
                 output.at[index, "is_synthetic"] = True
+                output.at[index, "transfer_count_is_synthetic"] = True
     return output
 
 
@@ -541,6 +548,9 @@ def build_recommendation_feature_frame(
     global_remaining = float(remaining["remaining_distance_km"].median()) if not remaining.empty else 8.0
 
     missing_congestion = frame["congestion_score"].isna()
+    missing_frequency = frame["avg_service_frequency"].isna()
+    missing_remaining_distance = frame["remaining_distance_km"].isna()
+    missing_load_score = frame["load_score"].isna()
     frame["station_flow_mean"] = frame["station_flow_mean"].fillna(global_flow_mean)
     missing_flow_level = frame["station_flow_level"].isna()
     frame.loc[missing_flow_level, "station_flow_level"] = _flow_level(frame.loc[missing_flow_level, "station_flow_mean"])
@@ -557,6 +567,11 @@ def build_recommendation_feature_frame(
     frame.loc[missing_flow_level, "reliability_score"] -= 4.0
     frame.loc[missing_congestion, "reliability_score"] -= 6.0
     frame["reliability_score"] = frame["reliability_score"].clip(lower=50.0, upper=98.0)
+    frame["missing_congestion"] = missing_congestion.astype(bool)
+    frame["missing_frequency"] = missing_frequency.astype(bool)
+    frame["missing_remaining_distance"] = missing_remaining_distance.astype(bool)
+    frame["missing_load_score"] = missing_load_score.astype(bool)
+    frame["missing_flow_level"] = missing_flow_level.astype(bool)
 
     frame["route_id"] = (
         frame["candidate_group_id"]
@@ -589,6 +604,12 @@ def build_recommendation_feature_frame(
             "congestion_score",
             "reliability_score",
             "confidence",
+            "monitored",
+            "missing_congestion",
+            "missing_frequency",
+            "missing_remaining_distance",
+            "missing_load_score",
+            "missing_flow_level",
             "data_source",
         ]
     ].copy()
@@ -623,6 +644,175 @@ def _traffic_score(congestion_pressure: Any) -> float:
     return round(max(0.0, min(100.0, pressure)), 2)
 
 
+def _is_true(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes"}
+    return bool(value)
+
+
+def _degraded_fields(row: pd.Series) -> str:
+    # 记录哪些特征不是直接真实来源，后续 completeness_score 和数据审计都依赖它。
+    fields: list[str] = []
+    if _is_true(row.get("missing_remaining_distance")):
+        fields.append("ride_time_minutes")
+    if _is_true(row.get("walk_time_is_synthetic")):
+        fields.extend(["walk_time_minutes", "walk_distance_meters"])
+    if _is_true(row.get("transfer_count_is_synthetic")):
+        fields.append("transfer_count")
+    if _is_true(row.get("missing_load_score")):
+        fields.append("load_score")
+    if _is_true(row.get("missing_flow_level")):
+        fields.append("history_flow_score")
+    if _is_true(row.get("missing_congestion")):
+        fields.append("congestion_score")
+    if _is_true(row.get("missing_frequency")):
+        fields.append("avg_service_frequency_minutes")
+    if pd.isna(row.get("monitored")):
+        fields.append("monitored_score")
+    fields.append("data_freshness_seconds")
+    return "|".join(dict.fromkeys(fields))
+
+
+def _completeness_score(degraded_fields: Any) -> float:
+    # 每个降级字段扣 6 分，避免模拟样本和真实样本在可靠性上被同等看待。
+    fields = [item for item in str(degraded_fields or "").split("|") if item]
+    return round(max(55.0, 100.0 - len(fields) * 6.0), 2)
+
+
+def _feature_sources(row: pd.Series) -> str:
+    # feature_sources 必须覆盖 12 维特征，方便后端以后按同一契约组装 payload。
+    sources = {
+        "eta_minutes": "lta_realtime",
+        "ride_time_minutes": "rule_estimate",
+        "walk_time_minutes": "rule_estimate",
+        "walk_distance_meters": "rule_estimate",
+        "transfer_count": "rule_estimate",
+        "load_score": "default" if _is_true(row.get("missing_load_score")) else "lta_realtime",
+        "history_flow_score": "default" if _is_true(row.get("missing_flow_level")) else "historical",
+        "congestion_score": "default" if _is_true(row.get("missing_congestion")) else "historical",
+        "data_freshness_seconds": "default",
+        "monitored_score": "default" if pd.isna(row.get("monitored")) else "lta_realtime",
+        "completeness_score": "rule_estimate",
+        "avg_service_frequency_minutes": "default" if _is_true(row.get("missing_frequency")) else "database",
+    }
+    return "|".join(f"{field}:{source}" for field, source in sources.items())
+
+
+def _model_generated_feature_sources() -> str:
+    sources = {
+        "eta_minutes": "model",
+        "ride_time_minutes": "model",
+        "walk_time_minutes": "model",
+        "walk_distance_meters": "model",
+        "transfer_count": "model",
+        "load_score": "model",
+        "history_flow_score": "model",
+        "congestion_score": "model",
+        "data_freshness_seconds": "model",
+        "monitored_score": "model",
+        "completeness_score": "rule_estimate",
+        "avg_service_frequency_minutes": "model",
+    }
+    return "|".join(f"{field}:{source}" for field, source in sources.items())
+
+
+def _load_code_from_score(score: float) -> str:
+    if score >= 90:
+        return "SEA"
+    if score >= 55:
+        return "SDA"
+    return "LSD"
+
+
+def _clip(value: float, lower: float, upper: float) -> float:
+    return round(float(max(lower, min(upper, value))), 3)
+
+
+def expand_feature_frame_to_min_groups(
+    frame: pd.DataFrame,
+    *,
+    min_groups: int | None,
+    max_routes_per_group: int = 10,
+) -> pd.DataFrame:
+    if min_groups is None or min_groups <= 0:
+        return frame
+
+    current_groups = frame["candidate_group_id"].nunique()
+    if current_groups >= min_groups:
+        return frame
+
+    groups = [(group_id, group.copy()) for group_id, group in frame.groupby("candidate_group_id")]
+    if not groups:
+        return frame
+
+    rows: list[pd.DataFrame] = [frame]
+    needed = min_groups - current_groups
+    generated_sources = _model_generated_feature_sources()
+    generated_degraded = (
+        "eta_minutes|ride_time_minutes|walk_time_minutes|walk_distance_meters|"
+        "transfer_count|load_score|history_flow_score|congestion_score|"
+        "data_freshness_seconds|monitored_score|avg_service_frequency_minutes"
+    )
+
+    for offset in range(needed):
+        source_group_id, source_group = groups[offset % len(groups)]
+        group = source_group.sort_values(["eta_minutes", "route_id"]).head(max_routes_per_group).copy()
+        new_group_id = f"synthetic_od_{offset + 1:05d}"
+        group["candidate_group_id"] = new_group_id
+        group["is_synthetic"] = True
+        group["feature_sources"] = generated_sources
+        group["degraded_fields"] = generated_degraded
+        group["completeness_score"] = _completeness_score(generated_degraded)
+
+        for index in group.index:
+            token = f"{source_group_id}|{offset}|{group.at[index, 'route_id']}"
+            h = _stable_hash(token)
+            eta_factor = 0.75 + (h % 51) / 100.0
+            ride_factor = 0.85 + ((h // 7) % 31) / 100.0
+            walk_shift = [0.0, 2.0, 4.0, 6.0, 8.0][(h // 11) % 5]
+            transfer_shift = [-1, 0, 0, 1][(h // 13) % 4]
+            freshness = [60.0, 90.0, 120.0, 180.0, 300.0][(h // 17) % 5]
+
+            group.at[index, "eta_minutes"] = _clip(float(group.at[index, "eta_minutes"]) * eta_factor, 0.0, 60.0)
+            group.at[index, "ride_time_minutes"] = _clip(
+                float(group.at[index, "ride_time_minutes"]) * ride_factor,
+                3.0,
+                150.0,
+            )
+            group.at[index, "walk_time_minutes"] = _clip(
+                float(group.at[index, "walk_time_minutes"]) + walk_shift,
+                0.0,
+                35.0,
+            )
+            group.at[index, "walk_distance_meters"] = _clip(float(group.at[index, "walk_time_minutes"]) * 80.0, 0.0, 2800.0)
+            group.at[index, "transfer_count"] = int(max(0, min(3, int(group.at[index, "transfer_count"]) + transfer_shift)))
+            load_score = _clip(float(group.at[index, "load_score"]) + [-20.0, 0.0, 15.0][(h // 19) % 3], 35.0, 100.0)
+            group.at[index, "load_score"] = load_score
+            group.at[index, "load_code"] = _load_code_from_score(load_score)
+            group.at[index, "history_flow_score"] = _clip(
+                float(group.at[index, "history_flow_score"]) + [-20.0, -10.0, 0.0, 10.0, 20.0][(h // 23) % 5],
+                20.0,
+                100.0,
+            )
+            group.at[index, "congestion_score"] = _clip(
+                float(group.at[index, "congestion_score"]) + [-15.0, -7.5, 0.0, 7.5, 15.0][(h // 29) % 5],
+                0.0,
+                100.0,
+            )
+            group.at[index, "data_freshness_seconds"] = freshness
+            group.at[index, "monitored_score"] = [75.0, 100.0][(h // 31) % 2]
+            group.at[index, "avg_service_frequency_minutes"] = _clip(
+                float(group.at[index, "avg_service_frequency_minutes"]) * (0.8 + ((h // 37) % 41) / 100.0),
+                3.0,
+                120.0,
+            )
+            group.at[index, "route_id"] = f"{new_group_id}|{group.at[index, 'service_nos']}|{index}"
+
+        rows.append(group)
+
+    return pd.concat(rows, ignore_index=True).sort_values(["candidate_group_id", "route_id"]).reset_index(drop=True)
+
+
 def build_model_feature_frame(
     *,
     processed_dir: Path | None = None,
@@ -641,20 +831,17 @@ def build_model_feature_frame(
     output["walk_distance_meters"] = (pd.to_numeric(output["walk_time_minutes"], errors="coerce").fillna(0.0) * 80.0).round(1)
     output["history_flow_score"] = output["station_flow_level"].map(_history_flow_score)
     output["congestion_score"] = output["congestion_score"].map(_traffic_score)
+    # 离线样本没有真实缓存写入时间，统一用默认 freshness，并在 degraded_fields 标记。
     output["data_freshness_seconds"] = 60.0
-    output["monitored_score"] = (pd.to_numeric(output["confidence"], errors="coerce").fillna(0.75) * 100.0).clip(0, 100)
-    output["completeness_score"] = output["is_synthetic"].map(lambda value: 85.0 if bool(value) else 100.0)
     output["avg_service_frequency_minutes"] = output["avg_service_frequency"]
     output["load_code"] = output["load_code"].fillna("UNKNOWN")
-    output["load_score"] = pd.to_numeric(output["load_score"], errors="coerce").fillna(60.0)
-    output["feature_sources"] = output["is_synthetic"].map(
-        lambda value: "eta:lta_realtime|load:lta_realtime|flow:historical|traffic:historical|walk:rule_estimate"
-        if bool(value)
-        else "eta:lta_realtime|load:lta_realtime|flow:historical|traffic:historical|walk:default"
-    )
-    output["degraded_fields"] = output["is_synthetic"].map(
-        lambda value: "walk_time_minutes|transfer_count" if bool(value) else ""
-    )
+    output["load_score"] = pd.to_numeric(output["load_score"], errors="coerce")
+    output["load_score"] = output["load_score"].fillna(output["load_code"].map(LOAD_SCORE_BY_CODE)).fillna(60.0)
+    monitored = pd.to_numeric(output["monitored"], errors="coerce")
+    output["monitored_score"] = np.where(monitored >= 1, 100.0, 75.0)
+    output["degraded_fields"] = output.apply(_degraded_fields, axis=1)
+    output["completeness_score"] = output["degraded_fields"].map(_completeness_score)
+    output["feature_sources"] = output.apply(_feature_sources, axis=1)
     columns = [
         "candidate_group_id",
         "route_id",
