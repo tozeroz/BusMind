@@ -13,7 +13,7 @@
     <dl class="sidebar-facts">
       <div>
         <dt>预计到站</dt>
-        <dd>{{ stop.eta_minutes }} 分钟</dd>
+        <dd>{{ formatEtaDisplay(stop) }}</dd>
       </div>
       <div>
         <dt>拥挤程度</dt>
@@ -34,6 +34,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { formatEtaDisplay } from '@/utils/eta'
 
 const props = defineProps({
   stop: {

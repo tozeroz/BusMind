@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, Path
 
 from app.api.v1.dependencies import get_simulation_service
 from app.core.api_response import ApiResponse, success_response
+from app.dependencies.auth import get_current_admin_user
+from app.models.user import User
 from app.schemas.simulation import (
     LtaBusArrivalRefreshRequest,
     PredictionResultUpdateRequest,
@@ -19,6 +21,7 @@ async def update_vehicle_status(
     request: VehicleStatusUpdateRequest,
     vehicle_id: int = Path(gt=0),
     service: SimulationService = Depends(get_simulation_service),
+    _admin: User = Depends(get_current_admin_user),
 ) -> ApiResponse:
     result = await service.update_vehicle_status(vehicle_id, request)
     return success_response(result, "req_sim_vehicle")
@@ -28,6 +31,7 @@ async def update_vehicle_status(
 async def update_prediction_result(
     request: PredictionResultUpdateRequest,
     service: SimulationService = Depends(get_simulation_service),
+    _admin: User = Depends(get_current_admin_user),
 ) -> ApiResponse:
     result = service.update_prediction_result(request)
     return success_response(result, "req_sim_prediction")
@@ -37,6 +41,7 @@ async def update_prediction_result(
 async def refresh_lta_bus_arrival(
     request: LtaBusArrivalRefreshRequest,
     service: SimulationService = Depends(get_simulation_service),
+    _admin: User = Depends(get_current_admin_user),
 ) -> ApiResponse:
     result = await service.refresh_bus_arrival_status_from_lta(request)
     return success_response(result, "req_lta_arrival")

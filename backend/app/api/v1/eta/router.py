@@ -12,7 +12,16 @@ from app.services.eta_service import EtaService
 router = APIRouter(tags=["ETA"])
 
 
-@router.get("/eta", response_model=ApiResponse)
+@router.get(
+    "/eta",
+    response_model=ApiResponse,
+    summary="查询 LTA 实时 ETA（预计到站时间）",
+    description=(
+        "基于 LTA Bus Arrival 实时数据（MySQL 缓存）返回指定车辆到目标站点的预计到站时间。"
+        "数据来源为 LTA 实时接口 + 仿真覆盖 + 规则兜底，非自研 ETA 预测模型。"
+        "响应字段 `predicted_eta_minutes` / `model_version` 为历史兼容命名，不代表 ML 预测。"
+    ),
+)
 async def get_eta(
     vehicle_id: Annotated[int, Query(gt=0)],
     target_station_id: Annotated[int, Query(gt=0)],

@@ -21,5 +21,16 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+    # QQ Mail SMTP settings for sending verification codes.
+    # QQ_MAIL_AUTH_CODE is an SMTP authorization code (not the QQ password).
+    # Obtain it from QQ Mail → Settings → Account → POP3/SMTP service.
+    QQ_MAIL_HOST: str = "smtp.qq.com"
+    QQ_MAIL_PORT: int = 465
+    QQ_MAIL_USERNAME: str = ""
+    QQ_MAIL_AUTH_CODE: str = ""
+    QQ_MAIL_FROM_NAME: str = "BusMind"
+    EMAIL_CODE_EXPIRE_MINUTES: int = 5
+    EMAIL_CODE_RESEND_SECONDS: int = 60
+
 
 settings = Settings()

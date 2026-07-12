@@ -16,6 +16,8 @@ from app.cache.cache_keys import (
 from app.core.api_response import ApiResponse, success_response
 from app.core.intelligence_exceptions import ModelUnavailableError
 from app.core.time_utils import now_local
+from app.dependencies.auth import get_current_admin_user
+from app.models.user import User
 from app.schemas.admin_refresh import (
     LtaBusArrivalAdminRefreshRequest,
     LtaRefreshAdminResult,
@@ -33,6 +35,7 @@ async def refresh_bus_arrival(
     collector: LtaCollectorService | None = Depends(get_lta_collector_service),
     sync_service: CacheSyncService = Depends(get_cache_sync_service),
     db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ) -> ApiResponse:
     if collector is None:
         raise ModelUnavailableError(50320, "未配置 LTA_ACCOUNT_KEY，无法调用 LTA Bus Arrival API")
@@ -75,6 +78,7 @@ async def refresh_traffic_speed_bands(
     collector: LtaCollectorService | None = Depends(get_lta_collector_service),
     sync_service: CacheSyncService = Depends(get_cache_sync_service),
     db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ) -> ApiResponse:
     if collector is None:
         raise ModelUnavailableError(50320, "未配置 LTA_ACCOUNT_KEY，无法调用 LTA Traffic Speed Bands API")

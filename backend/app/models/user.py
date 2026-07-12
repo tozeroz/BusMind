@@ -13,11 +13,26 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     nickname = Column(String(50), nullable=True)
+    email = Column(String(100), unique=True, nullable=True, index=True)
     role = Column(String(20), nullable=False, default="passenger", server_default=text("'passenger'"), index=True)
     status = Column(String(20), nullable=False, default="active", server_default=text("'active'"), index=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     last_login_at = Column(DateTime, nullable=True)
+
+
+class EmailVerificationCode(Base):
+    """ORM mapping for database table ``email_verification_code``."""
+
+    __tablename__ = "email_verification_code"
+
+    code_id = Column(BIGINT_COMPAT, primary_key=True, autoincrement=True)
+    email = Column(String(100), nullable=False, index=True)
+    code_hash = Column(String(255), nullable=False)
+    purpose = Column(String(30), nullable=False, default="register", server_default=text("'register'"), index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
 
 
 class QueryHistory(Base):
@@ -57,7 +72,7 @@ class QueryHistory(Base):
 
 # Re-export Base so legacy imports such as ``from app.models.user import Base``
 # continue to work while all models share the same metadata.
-__all__ = ["Base", "User", "QueryHistory", "UserFavorite"]
+__all__ = ["Base", "User", "EmailVerificationCode", "QueryHistory", "UserFavorite"]
 
 # Legacy import compatibility. Favorites are represented by reserved records in
 # user_query_history; this alias does not create an extra database table.

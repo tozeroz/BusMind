@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.dependencies.auth import create_access_token, get_password_hash, verify_password
-from app.models.user import QueryHistory, User
+from app.models.user import EmailVerificationCode, QueryHistory, User
 from app.schemas.user_schema import (
     LoginResponse,
     QueryHistoryDTO,
@@ -22,6 +23,11 @@ from app.schemas.user_schema import (
     UserRegisterRequest,
     UserUpdateRequest,
 )
+from app.services.email_service import (
+    EmailServiceConfigError,
+    EmailServiceError,
+    send_verification_code,
+)
 
 # The final database schema does not define a user_favorite table. To keep the
 # already-published favorite API working without changing any non-backend code,
@@ -29,11 +35,57 @@ from app.schemas.user_schema import (
 FAVORITE_QUERY_TYPE = "__favorite__"
 
 
+def send_register_email_code(db: Session, email: str) -> None:
+    """Send a registration verification code to *email*.
+
+    Raises:
+        ValueError: Email already registered or rate-limited.
+        EmailServiceConfigError: QQ Mail SMTP not configured.
+        EmailServiceError: SMTP send failed.
+    """
+    email = email.strip().lower()
+
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        raise ValueError("Email already registered")
+
+    rate_limit_window = settings.EMAIL_CODE_RESEND_SECONDS
+    recent = (
+        db.query(EmailVerificationCode)
+        .filter(
+            EmailVerificationCode.email == email,
+            EmailVerificationCode.purpose == "register",
+            EmailVerificationCode.created_at
+            >= datetime.now() - timedelta(seconds=rate_limit_window),
+        )
+        .first()
+    )
+    if recent:
+        raise ValueError(
+            f"Please wait {rate_limit_window} seconds before requesting another code"
+        )
+
+    plain_code = send_verification_code(email)
+
+    code_hash = hashlib.sha256(plain_code.encode()).hexdigest()
+    expires_at = datetime.now() + timedelta(minutes=settings.EMAIL_CODE_EXPIRE_MINUTES)
+
+    record = EmailVerificationCode(
+        email=email,
+        code_hash=code_hash,
+        purpose="register",
+        expires_at=expires_at,
+    )
+    db.add(record)
+    db.commit()
+
+
 def _user_dto(user: User) -> UserDTO:
     return UserDTO(
         user_id=user.user_id,
         username=user.username,
         nickname=user.nickname,
+        email=user.email,
         role=user.role,
         status=user.status,
         created_at=user.created_at,
@@ -70,14 +122,42 @@ def register_user(db: Session, request: UserRegisterRequest) -> UserDTO:
     if existing_user:
         raise ValueError("Username already exists")
 
+    email = request.email.strip().lower()
+    existing_email = db.query(User).filter(User.email == email).first()
+    if existing_email:
+        raise ValueError("Email already registered")
+
+    latest_code = (
+        db.query(EmailVerificationCode)
+        .filter(
+            EmailVerificationCode.email == email,
+            EmailVerificationCode.purpose == "register",
+            EmailVerificationCode.used_at.is_(None),
+        )
+        .order_by(EmailVerificationCode.created_at.desc())
+        .first()
+    )
+    if not latest_code:
+        raise ValueError("No verification code found for this email")
+    if latest_code.expires_at < datetime.now():
+        raise ValueError("Verification code has expired")
+
+    code_hash = hashlib.sha256(request.verification_code.encode()).hexdigest()
+    if latest_code.code_hash != code_hash:
+        raise ValueError("Invalid verification code")
+
     new_user = User(
         username=request.username,
         password_hash=get_password_hash(request.password),
         nickname=request.nickname or "",
-        role=request.role or "passenger",
+        email=email,
+        role="passenger",
         status="active",
     )
     db.add(new_user)
+
+    latest_code.used_at = datetime.now()
+
     db.commit()
     db.refresh(new_user)
     return _user_dto(new_user)
