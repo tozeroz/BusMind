@@ -240,19 +240,27 @@ class MySQLTransitGateway:
         )
 
     async def get_candidate_routes(
-        self,
-        start_station_id: int,
-        end_station_id: int,
-        max_transfer_count: int,
+            self,
+            start_station_id: int,
+            end_station_id: int,
+            max_transfer_count: int,
     ) -> list[CandidateRouteData]:
+        start_in_database = self.repository.get_station(start_station_id) is not None
+        end_in_database = self.repository.get_station(end_station_id) is not None
+
         await self.get_station(start_station_id)
         await self.get_station(end_station_id)
+
         records = self.repository.get_candidate_routes(
             start_station_id,
             end_station_id,
             max_transfer_count,
         )
+
         if not records:
+            if start_in_database and end_in_database:
+                return []
+
             return await self.fallback.get_candidate_routes(
                 start_station_id,
                 end_station_id,
