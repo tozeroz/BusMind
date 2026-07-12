@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{base_url}}/lines/stations/{{line_station_id}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "order_index": 2,
+      "direction": "forward",
+      "route_distance_km": 1.2
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404, 409, 422]); });
+    language: text/javascript
+order: 8000

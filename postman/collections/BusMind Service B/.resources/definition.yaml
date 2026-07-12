@@ -1,4 +1,0 @@
-$kind: collection
-description: 服务端工程师 B：ETA、客载状态预测、步行时长、出行体验推荐、DeepSeek AI 助手，以及车辆状态/预测结果/LTA Bus Arrival 更新接口。
-variables:
-  base_url: http://127.0.0.1:8000/api/v1

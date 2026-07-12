@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/history/eta/{{vehicle_id}}/{{station_id}}?line_id={{line_id}}"
+method: GET
+headers:
+  Accept: "application/json"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201, 400, 401, 404, 405, 409, 422, 503]); });
+      if (pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').includes('application/json')) { const j = pm.response.json(); pm.expect(j).to.have.property('code'); pm.expect(j).to.have.property('message'); }
+    language: text/javascript
+order: 4000

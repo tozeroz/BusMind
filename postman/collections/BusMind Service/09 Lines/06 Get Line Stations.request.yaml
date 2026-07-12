@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{base_url}}/lines/{{line_id}}/stations"
+method: GET
+headers:
+  Accept: application/json
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 422]); });
+    language: text/javascript
+order: 6000
