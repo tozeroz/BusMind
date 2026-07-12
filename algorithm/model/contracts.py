@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from algorithm.model.preprocessing import PreprocessingError, preprocess_route_payload
+
 
 CONTRACT_VERSION = "1.0.0"
 MODEL_NAME = "busmind-route-scorer"
@@ -160,9 +162,13 @@ class RouteFeatures:
         ]
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "RouteFeatures":
+    def from_dict(cls, payload: dict[str, Any], *, strict_backend: bool = False) -> "RouteFeatures":
         if not isinstance(payload, dict):
             raise _contract_error("routes[]", "each route must be an object")
+        try:
+            payload = preprocess_route_payload(payload, strict_backend=strict_backend)
+        except PreprocessingError as exc:
+            raise _contract_error("routes[]", str(exc)) from exc
         return cls(
             route_id=_coerce_str(payload.get("route_id"), "route_id"),
             service_nos=_coerce_service_nos(payload.get("service_nos")),
@@ -198,7 +204,7 @@ class ModelScoringRequest:
     routes: tuple[RouteFeatures, ...]
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "ModelScoringRequest":
+    def from_dict(cls, payload: dict[str, Any], *, strict_backend: bool = False) -> "ModelScoringRequest":
         if not isinstance(payload, dict):
             raise ModelContractError("payload must be an object")
         if "weights" in payload:
@@ -215,7 +221,7 @@ class ModelScoringRequest:
             contract_version=contract_version,
             request_id=_coerce_str(payload.get("request_id"), "request_id"),
             preference=normalize_preference(payload.get("preference", "balanced")),
-            routes=tuple(RouteFeatures.from_dict(route) for route in routes_raw),
+            routes=tuple(RouteFeatures.from_dict(route, strict_backend=strict_backend) for route in routes_raw),
         )
 
 
