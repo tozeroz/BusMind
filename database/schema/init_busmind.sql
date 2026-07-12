@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS user_account (
     username VARCHAR(50) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     nickname VARCHAR(50) NULL,
+    email VARCHAR(100) NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'passenger',
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS user_account (
     last_login_at DATETIME NULL,
     PRIMARY KEY (user_id),
     UNIQUE KEY uk_user_username (username),
+    UNIQUE KEY uk_user_email (email),
     KEY idx_user_role (role),
     KEY idx_user_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -397,5 +399,20 @@ GROUP BY
     s.road_name,
     s.longitude,
     s.latitude;
+
+-- Email verification code table for registration and other flows.
+CREATE TABLE IF NOT EXISTS email_verification_code (
+    code_id BIGINT NOT NULL AUTO_INCREMENT,
+    email VARCHAR(100) NOT NULL,
+    code_hash VARCHAR(255) NOT NULL,
+    purpose VARCHAR(30) NOT NULL DEFAULT 'register',
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (code_id),
+    KEY idx_email_verification_email (email),
+    KEY idx_email_verification_purpose (purpose),
+    KEY idx_email_verification_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

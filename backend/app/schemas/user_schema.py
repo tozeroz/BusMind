@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -13,8 +14,10 @@ class UserRegisterRequest(BaseModel):
                 {
                     "username": "testuser",
                     "password": "testpassword123",
+                    "password_confirm": "testpassword123",
+                    "email": "user@example.com",
+                    "verification_code": "123456",
                     "nickname": "Test User",
-                    "role": "passenger",
                 }
             ]
         }
@@ -22,8 +25,10 @@ class UserRegisterRequest(BaseModel):
 
     username: str
     password: str
+    password_confirm: str
+    email: str
+    verification_code: str
     nickname: Optional[str] = ""
-    role: Optional[str] = "passenger"
 
     @field_validator("username")
     @classmethod
@@ -39,6 +44,26 @@ class UserRegisterRequest(BaseModel):
             raise ValueError("Password must be 8-64 characters")
         return value
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("Email is required")
+        pattern = r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$'
+        if not re.match(pattern, value.strip()):
+            raise ValueError("Invalid email format")
+        return value.strip().lower()
+
+    @field_validator("verification_code")
+    @classmethod
+    def validate_verification_code(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("Verification code is required")
+        code = value.strip()
+        if len(code) != 6 or not code.isdigit():
+            raise ValueError("Verification code must be 6 digits")
+        return code
+
     @field_validator("nickname")
     @classmethod
     def validate_nickname(cls, value: Optional[str]) -> Optional[str]:
@@ -46,13 +71,27 @@ class UserRegisterRequest(BaseModel):
             raise ValueError("Nickname cannot exceed 50 characters")
         return value
 
-    @field_validator("role")
+    @model_validator(mode="after")
+    def validate_password_match(self):
+        if self.password != self.password_confirm:
+            raise ValueError("Passwords do not match")
+        return self
+
+
+class SendRegisterEmailCodeRequest(BaseModel):
+    """Request body for sending a registration verification code to an email."""
+
+    email: str
+
+    @field_validator("email")
     @classmethod
-    def validate_role(cls, value: Optional[str]) -> str:
-        normalized = value or "passenger"
-        if normalized not in {"passenger", "admin"}:
-            raise ValueError("Role must be passenger or admin")
-        return normalized
+    def validate_email(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("Email is required")
+        pattern = r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$'
+        if not re.match(pattern, value.strip()):
+            raise ValueError("Invalid email format")
+        return value.strip().lower()
 
 
 class UserLoginRequest(BaseModel):
@@ -86,6 +125,7 @@ class UserDTO(BaseModel):
     user_id: int
     username: str
     nickname: Optional[str] = None
+    email: Optional[str] = None
     role: str
     status: str = "active"
     created_at: datetime

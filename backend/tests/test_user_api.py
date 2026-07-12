@@ -1,10 +1,12 @@
 import pytest
+import hashlib
+from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from app.main import app
-from app.models.user import Base
+from app.models.user import Base, EmailVerificationCode
 from app.dependencies.auth import get_db
 
 engine = create_engine(
@@ -33,12 +35,30 @@ def client():
     Base.metadata.drop_all(bind=engine)
 
 
+def _seed_verification_code(email: str = "test@example.com", plain_code: str = "123456"):
+    db = TestingSessionLocal()
+    code_hash = hashlib.sha256(plain_code.encode()).hexdigest()
+    record = EmailVerificationCode(
+        email=email,
+        code_hash=code_hash,
+        purpose="register",
+        expires_at=datetime.now() + timedelta(minutes=5),
+    )
+    db.add(record)
+    db.commit()
+    db.close()
+
+
 @pytest.fixture(scope="module")
 def test_user():
+    _seed_verification_code()
     return {
         "username": "testuser",
         "password": "testpassword123",
-        "nickname": "Test User"
+        "password_confirm": "testpassword123",
+        "email": "test@example.com",
+        "verification_code": "123456",
+        "nickname": "Test User",
     }
 
 
@@ -48,6 +68,55 @@ def test_register_user(client, test_user):
     data = response.json()
     assert data["code"] == 0
     assert data["data"]["username"] == test_user["username"]
+    assert data["data"]["email"] == "test@example.com"
+
+
+def test_register_password_mismatch(client):
+    response = client.post(
+        "/api/v1/users/register",
+        json={
+            "username": "mismatch",
+            "password": "testpassword123",
+            "password_confirm": "different",
+            "email": "mismatch@example.com",
+            "verification_code": "123456",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_register_email_duplicate(client, test_user):
+    _seed_verification_code("test@example.com", "654321")
+    response = client.post(
+        "/api/v1/users/register",
+        json={
+            "username": "dupuser",
+            "password": "testpassword123",
+            "password_confirm": "testpassword123",
+            "email": "test@example.com",
+            "verification_code": "654321",
+        },
+    )
+    assert response.status_code == 409
+    data = response.json()
+    assert "already registered" in data["detail"]["message"]
+
+
+def test_register_bad_code(client):
+    _seed_verification_code("badcode@example.com", "999999")
+    response = client.post(
+        "/api/v1/users/register",
+        json={
+            "username": "badcode",
+            "password": "testpassword123",
+            "password_confirm": "testpassword123",
+            "email": "badcode@example.com",
+            "verification_code": "111111",
+        },
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert "Invalid verification code" in data["detail"]["message"]
 
 
 def _login_token(client, test_user):

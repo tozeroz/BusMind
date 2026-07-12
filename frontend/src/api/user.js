@@ -3,6 +3,7 @@ import request, { AUTH_TOKEN_KEY } from './request'
 export const AUTH_USER_KEY = 'busmind_current_user'
 
 export const registerUser = (data) => request.post('/users/register', data)
+export const sendRegisterEmailCode = (data) => request.post('/users/register/email-code', data)
 export const loginUser = (data) => request.post('/users/login', data)
 export const getCurrentUser = () => request.get('/users/me')
 export const updateCurrentUser = (data) => request.patch('/users/me', data)

@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.models.user import Base, User, UserFavorite, QueryHistory
+from app.models.user import Base, User, UserFavorite, QueryHistory, EmailVerificationCode
 from app.services.user_service import (
     register_user,
     login_user,
@@ -10,13 +10,17 @@ from app.services.user_service import (
     add_user_favorite,
     delete_user_favorite,
     get_user_history,
-    add_query_history
+    add_query_history,
+    send_register_email_code,
 )
 from app.schemas.user_schema import (
     UserRegisterRequest,
     UserLoginRequest,
-    UserFavoriteRequest
+    UserFavoriteRequest,
 )
+from app.services.email_service import EmailServiceConfigError
+from datetime import datetime, timedelta
+import hashlib
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_user_service.db"
 
@@ -32,16 +36,44 @@ def db_session():
     Base.metadata.drop_all(bind=engine)
 
 
-def test_register_and_login(db_session):
-    register_request = UserRegisterRequest(
-        username="testuser",
-        password="testpassword123",
-        nickname="Test User"
+def _create_verification_code(db, email: str, plain_code: str) -> EmailVerificationCode:
+    code_hash = hashlib.sha256(plain_code.encode()).hexdigest()
+    record = EmailVerificationCode(
+        email=email,
+        code_hash=code_hash,
+        purpose="register",
+        expires_at=datetime.now() + timedelta(minutes=5),
     )
+    db.add(record)
+    db.commit()
+    return record
+
+
+def _register_request(
+    username: str,
+    password: str = "testpassword123",
+    email: str = "test@example.com",
+    code: str = "123456",
+    nickname: str = "Test User",
+) -> UserRegisterRequest:
+    return UserRegisterRequest(
+        username=username,
+        password=password,
+        password_confirm=password,
+        email=email,
+        verification_code=code,
+        nickname=nickname,
+    )
+
+
+def test_register_and_login(db_session):
+    _create_verification_code(db_session, "test@example.com", "123456")
+    register_request = _register_request("testuser")
     
     user = register_user(db_session, register_request)
     assert user.username == "testuser"
     assert user.nickname == "Test User"
+    assert user.email == "test@example.com"
     
     login_request = UserLoginRequest(
         username="testuser",
@@ -53,12 +85,47 @@ def test_register_and_login(db_session):
     assert login_response.user.username == "testuser"
 
 
+def test_password_mismatch(db_session):
+    with pytest.raises(ValueError, match="Passwords do not match"):
+        UserRegisterRequest(
+            username="testuser",
+            password="testpassword123",
+            password_confirm="different",
+            email="test@example.com",
+            verification_code="123456",
+        )
+
+
+def test_verification_code_wrong(db_session):
+    _create_verification_code(db_session, "wrongcode@example.com", "654321")
+    register_request = _register_request("wrongcode", email="wrongcode@example.com", code="111111")
+    with pytest.raises(ValueError, match="Invalid verification code"):
+        register_user(db_session, register_request)
+
+
+def test_email_duplicate(db_session):
+    _create_verification_code(db_session, "dup@example.com", "123456")
+    _create_verification_code(db_session, "dup@example.com", "654321")
+    register_request = _register_request("userA", email="dup@example.com", code="123456")
+    register_user(db_session, register_request)
+    
+    register_request2 = _register_request("userB", email="dup@example.com", code="654321")
+    with pytest.raises(ValueError, match="Email already registered"):
+        register_user(db_session, register_request2)
+
+
+def test_register_success(db_session):
+    _create_verification_code(db_session, "success@example.com", "888888")
+    register_request = _register_request("newuser", email="success@example.com", code="888888")
+    user = register_user(db_session, register_request)
+    assert user.username == "newuser"
+    assert user.email == "success@example.com"
+    assert user.role == "passenger"
+
+
 def test_favorite_count(db_session):
-    register_request = UserRegisterRequest(
-        username="testuser2",
-        password="testpassword123",
-        nickname="Test User 2"
-    )
+    _create_verification_code(db_session, "test2@example.com", "123456")
+    register_request = _register_request("testuser2", email="test2@example.com")
     
     user = register_user(db_session, register_request)
     db_user = db_session.query(User).filter(User.user_id == user.user_id).first()
@@ -78,11 +145,8 @@ def test_favorite_count(db_session):
 
 
 def test_add_and_get_favorites(db_session):
-    register_request = UserRegisterRequest(
-        username="testuser3",
-        password="testpassword123",
-        nickname="Test User 3"
-    )
+    _create_verification_code(db_session, "test3@example.com", "123456")
+    register_request = _register_request("testuser3", email="test3@example.com")
     
     user = register_user(db_session, register_request)
     
@@ -108,11 +172,8 @@ def test_add_and_get_favorites(db_session):
 
 
 def test_delete_favorite(db_session):
-    register_request = UserRegisterRequest(
-        username="testuser4",
-        password="testpassword123",
-        nickname="Test User 4"
-    )
+    _create_verification_code(db_session, "test4@example.com", "123456")
+    register_request = _register_request("testuser4", email="test4@example.com")
     
     user = register_user(db_session, register_request)
     
@@ -134,11 +195,8 @@ def test_delete_favorite(db_session):
 
 
 def test_add_and_get_history(db_session):
-    register_request = UserRegisterRequest(
-        username="testuser5",
-        password="testpassword123",
-        nickname="Test User 5"
-    )
+    _create_verification_code(db_session, "test5@example.com", "123456")
+    register_request = _register_request("testuser5", email="test5@example.com")
     
     user = register_user(db_session, register_request)
     
@@ -150,11 +208,8 @@ def test_add_and_get_history(db_session):
 
 
 def test_duplicate_favorite(db_session):
-    register_request = UserRegisterRequest(
-        username="testuser6",
-        password="testpassword123",
-        nickname="Test User 6"
-    )
+    _create_verification_code(db_session, "test6@example.com", "123456")
+    register_request = _register_request("testuser6", email="test6@example.com")
     
     user = register_user(db_session, register_request)
     

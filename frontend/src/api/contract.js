@@ -64,6 +64,7 @@ export const API_OPERATION_CONTRACT = [
   { method: 'DELETE', path: '/api/v1/users/me/favorites/{favorite_id}', wrapper: 'deleteUserFavorite', status: 'connected', note: '个人中心', deprecated: false },
   { method: 'GET', path: '/api/v1/users/me/query-history', wrapper: 'getUserQueryHistory', status: 'connected', note: '个人中心', deprecated: false },
   { method: 'POST', path: '/api/v1/users/register', wrapper: 'registerUser', status: 'connected', note: '注册页', deprecated: false },
+  { method: 'POST', path: '/api/v1/users/register/email-code', wrapper: 'sendRegisterEmailCode', status: 'connected', note: '注册页邮箱验证码', deprecated: false },
   { method: 'GET', path: '/api/v1/vehicles', wrapper: 'getVehicles', status: 'connected', note: '车辆/管理端', deprecated: false },
   { method: 'POST', path: '/api/v1/vehicles', wrapper: 'createVehicle', status: 'connected', note: '管理端 CRUD', deprecated: false },
   { method: 'GET', path: '/api/v1/vehicles/line/{line_id}', wrapper: 'getVehiclesByLine', status: 'connected', note: '线路详情兜底', deprecated: false },
