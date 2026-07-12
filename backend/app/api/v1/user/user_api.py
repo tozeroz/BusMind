@@ -35,6 +35,16 @@ def build_response(code: int, message: str, data=None) -> ApiResponse:
         timestamp=get_timestamp()
     )
 
+
+# English messages raised by the user service are translated into Chinese here
+# so the frontend only needs to display ``detail.message`` as-is.
+_USER_ERROR_MESSAGES = {
+    "Username already exists": "该用户名已被占用，请更换后重试",
+    "Username or password error": "账号或密码错误，请重新输入",
+    "User account is disabled": "账号已被禁用，请联系管理员",
+    "Old password error": "原密码错误，请重新输入",
+}
+
 @router.post(
     "/register",
     response_model=ApiResponse,
@@ -57,11 +67,11 @@ async def register(
         if str(e) == "Username already exists":
             raise HTTPException(
                 status_code=409,
-                detail=build_response(40900, "Username already exists").model_dump()
+                detail=build_response(40900, _USER_ERROR_MESSAGES[str(e)]).model_dump()
             )
         raise HTTPException(
             status_code=400,
-            detail=build_response(40001, str(e)).model_dump()
+            detail=build_response(40001, _USER_ERROR_MESSAGES.get(str(e), str(e))).model_dump()
         )
 
 @router.post(
@@ -84,7 +94,7 @@ async def login(
     except ValueError as e:
         raise HTTPException(
             status_code=400,
-            detail=build_response(40002, str(e)).model_dump()
+            detail=build_response(40002, _USER_ERROR_MESSAGES.get(str(e), str(e))).model_dump()
         )
 
 @router.get(
@@ -126,7 +136,7 @@ async def update_me(
     except ValueError as e:
         raise HTTPException(
             status_code=400,
-            detail=build_response(40002, str(e)).model_dump()
+            detail=build_response(40002, _USER_ERROR_MESSAGES.get(str(e), str(e))).model_dump()
         )
 
 @router.get(

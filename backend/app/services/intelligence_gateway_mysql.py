@@ -21,6 +21,7 @@ from app.services.intelligence_gateway import (
     StationData,
     VehicleData,
 )
+from app.services.recommend_service.transit_graph import TransitGraphService
 
 
 _shared_demo_gateway = DemoIntelligenceGateway()
@@ -34,10 +35,12 @@ class MySQLTransitGateway:
         db: Session | TransitRepository,
         cache: CacheProvider | None = None,
         fallback: DemoIntelligenceGateway | None = None,
+        graph_service: TransitGraphService | None = None,
     ) -> None:
         self.repository = db if isinstance(db, TransitRepository) else TransitRepository(db)
         self.cache = cache or memory_cache_provider
         self.fallback = fallback or _shared_demo_gateway
+        self.graph_service = graph_service or TransitGraphService(self.repository)
 
     async def get_station(self, station_id: int) -> StationData:
         station = self.repository.get_station(station_id)
@@ -258,6 +261,15 @@ class MySQLTransitGateway:
         )
 
         if not records:
+            graph_results = await self._run_with_lock(
+                self.graph_service.find_candidates,
+                start_station_id,
+                end_station_id,
+                max_transfer_count,
+            )
+            if graph_results:
+                return graph_results
+
             if start_in_database and end_in_database:
                 return []
 
@@ -266,6 +278,7 @@ class MySQLTransitGateway:
                 end_station_id,
                 max_transfer_count,
             )
+
         return [
             CandidateRouteData(
                 route_id=record.route_id,
@@ -290,6 +303,17 @@ class MySQLTransitGateway:
             )
             for record in records
         ]
+
+    @staticmethod
+    async def _run_with_lock(func, /, *args):
+        """Run a sync graph call from the async gateway surface.
+
+        The graph builder/search runs purely in memory after snapshot build, so a
+        direct call yields the loop without blocking on the database. Kept as a
+        helper so future concurrency guards (asyncio.Lock, thread pool) can be
+        added without touching callers.
+        """
+        return func(*args)
 
     async def find_nearest_station(self, longitude: float, latitude: float) -> StationData:
         station = self.repository.find_nearest_station(longitude, latitude)
