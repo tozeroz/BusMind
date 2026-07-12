@@ -4,6 +4,7 @@ param(
     [string]$RawDir,
     [int]$MaxStops = 50,
     [int]$DelayMilliseconds = 300,
+    [string]$BusStopFile,
     [string[]]$BusStopCodes
 )
 
@@ -15,14 +16,36 @@ $raw = Get-LtaRawDir -RawDir $RawDir
 $headers = Get-LtaHeaders -AccountKey $key
 
 if (-not $BusStopCodes -or $BusStopCodes.Count -eq 0) {
-    $busStopsPath = Join-Path $raw "api_response\BusStops_full.json"
-    if (-not (Test-Path $busStopsPath)) {
-        throw "Missing $busStopsPath. Run fetch_lta_static.ps1 first or pass -BusStopCodes."
+    if ([string]::IsNullOrWhiteSpace($BusStopFile)) {
+        $defaultHotStopsPath = Join-Path $PSScriptRoot "hot_bus_stops.txt"
+        if (Test-Path $defaultHotStopsPath) {
+            $BusStopFile = $defaultHotStopsPath
+        }
     }
 
-    $BusStopCodes = (Read-JsonFile -Path $busStopsPath | Select-Object -First $MaxStops).BusStopCode
+    if (-not [string]::IsNullOrWhiteSpace($BusStopFile)) {
+        if (-not (Test-Path $BusStopFile)) {
+            throw "Missing BusStopFile $BusStopFile."
+        }
+
+        $BusStopCodes = Get-Content -Path $BusStopFile |
+            ForEach-Object { $_ -split "," } |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -First $MaxStops
+        Write-Host "Using hot bus stops from $BusStopFile"
+    } else {
+        $busStopsPath = Join-Path $raw "api_response\BusStops_full.json"
+        if (-not (Test-Path $busStopsPath)) {
+            throw "Missing $busStopsPath. Run fetch_lta_static.ps1 first, pass -BusStopCodes, or add hot_bus_stops.txt."
+        }
+
+        $BusStopCodes = (Read-JsonFile -Path $busStopsPath | Select-Object -First $MaxStops).BusStopCode
+        Write-Host "Using first $MaxStops stops from $busStopsPath"
+    }
 } else {
     $BusStopCodes = $BusStopCodes | Select-Object -First $MaxStops
+    Write-Host "Using bus stops from -BusStopCodes"
 }
 
 $sampleDay = Get-Date -Format "yyyy-MM-dd"

@@ -61,8 +61,11 @@ frontend/build/
 # Generated data and model artifacts
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/collect_lta_realtime_server.py
 !data/raw/collect_scripts/
 !data/raw/collect_scripts/**
+data/raw/collect_scripts/__pycache__/
+data/raw/collect_scripts/**/*.pyc*
 data/processed/*
 !data/processed/.gitkeep
 !data/processed/process_scripts/

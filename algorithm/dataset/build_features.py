@@ -14,6 +14,7 @@ from algorithm.dataset.recommendation_data import (
     default_dataset_dir,
     default_processed_dir,
     default_raw_dir,
+    expand_feature_frame_to_min_groups,
 )
 
 
@@ -24,6 +25,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=default_dataset_dir() / "features.csv")
     parser.add_argument("--month", default=None, help="Passenger volume month such as 202605")
     parser.add_argument("--max-groups", type=int, default=None, help="Optional cap for quick local verification")
+    parser.add_argument("--min-groups", type=int, default=None, help="Optionally expand with synthetic groups")
+    parser.add_argument("--max-routes-per-group", type=int, default=10, help="Route cap for synthetic expanded groups")
     return parser.parse_args()
 
 
@@ -34,6 +37,11 @@ def main() -> None:
         raw_dir=args.raw_dir,
         month=args.month,
         max_groups=args.max_groups,
+    )
+    dataset = expand_feature_frame_to_min_groups(
+        dataset,
+        min_groups=args.min_groups,
+        max_routes_per_group=args.max_routes_per_group,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     dataset.to_csv(args.output, index=False, encoding="utf-8-sig")
