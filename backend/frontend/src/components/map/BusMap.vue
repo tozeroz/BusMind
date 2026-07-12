@@ -543,7 +543,7 @@ async function loadRealBusStops() {
         passing_routes: station.service_nos || station.line_names || [],
         line_ids: station.line_ids || [],
         crowd_level: null,
-        predicted_eta_minutes: null
+        eta_minutes: null
       }))
     busStopsGeoJSON = createFeatureCollection(stations.map(stationToFeature))
     setSourceData('stops', busStopsGeoJSON)
