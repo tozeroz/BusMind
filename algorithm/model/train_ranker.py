@@ -58,8 +58,12 @@ def main() -> None:
     args = parse_args()
     features = pd.read_csv(args.features)
     labels = pd.read_csv(args.labels)
-    score_targets = labels.drop_duplicates("route_id")[["route_id", *SCORE_NAMES]]
-    dataset = features.merge(score_targets, on="route_id", how="inner", validate="one_to_one")
+
+    # route_id 在真实采样里可能不是全局唯一；训练分项评分时按候选集合内的线路去重对齐。
+    join_keys = ["candidate_group_id", "route_id"]
+    features = features.drop_duplicates(join_keys).copy()
+    score_targets = labels.drop_duplicates(join_keys)[[*join_keys, *SCORE_NAMES]]
+    dataset = features.merge(score_targets, on=join_keys, how="inner", validate="one_to_one")
     if dataset.empty:
         raise ValueError("No route rows matched between features and pseudo labels")
 
