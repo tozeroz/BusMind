@@ -1,22 +1,24 @@
 # BusMind前后端接口接入进度
 
-> 更新时间：2026-07-12（本轮接口补齐交付）  
-> 核对基线：`BusMind(4).zip` 当前代码、运行时 FastAPI OpenAPI v1.2.0、项目接口文档、前端接口需求说明、前端生产构建、隔离 SQLite HTTP 冒烟测试。  
-> 状态原则：API 文件存在不等于页面已接入；未取得浏览器 Network/交互记录的页面统一标记为“已接入待浏览器验收”，不虚报为“已验证”。
+> 更新时间：2026-07-12（最终接口核验、重复目录清理与完整项目交付）
+> 核对基线：本次上传的 `BusMind (2)(1).zip`、`tyy` 分支 HEAD、运行时 FastAPI OpenAPI v1.2.0、前端契约表、页面真实调用、Vue 单文件组件编译检查、隔离 SQLite HTTP 冒烟测试。
+> 状态原则：API 文件存在不等于页面已接入；只有页面源码中存在真实函数调用才标记为“已接入”。兼容、内部、暂缓、废弃接口不为凑数量强行加入业务页面。
 
 ## 1. 本轮结论
 
-- 运行时 OpenAPI 的 **72 个操作已逐项建立前端处理台账**：45 个页面已接入、11 个兼容接口已显式封装、12 个内部/按需接口已封装、1 个第一阶段暂缓、1 个已废弃、1 个仅返回方法提示、1 个根健康检查仅供后端部署使用。
-- 所有当前产品页面要求使用的正式接口已完成封装和页面调用；`frontend/src/api` 继续作为统一接口层。
-- 本轮不修改后端算法、数据库模型和他人业务实现，仅补齐前端接口层、页面调用、路由鉴权、响应适配、契约测试和文档。
-- `GET /history/passenger-flow/prediction` 按项目口径继续保留封装但不接页面；已废弃的 `POST /simulation/lta-bus-arrival/refresh` 仅保留兼容封装，不新增页面调用。
+- 运行时 OpenAPI 共 **72 个操作**，与 `frontend/src/api/contract.js` 的 72 条记录逐项一致，没有发现新增或遗漏操作。
+- 其中 **45 个产品页面操作已接入**，静态审计确认共有 61 个真实页面调用点；所有标记为 `connected` 的接口都在 Vue 页面/组件中实际执行。
+- 本轮没有发现仍需补接的产品页面接口，因此未改动后端业务、算法、数据库模型或其他成员负责的模块。
+- 其余操作均有明确边界：11 个旧路径兼容封装、12 个内部/按需封装、1 个第一阶段暂缓、1 个已废弃、1 个只返回方法提示、1 个后端根健康检查。它们不是漏接，不应为了“全调用”而强行放进业务页面。
+- 已删除上一轮误复制出的 `backend/frontend/` 不完整前端镜像，以及 `backend/docs/api/` 的三份完全重复文档；唯一有效前端为根目录 `frontend/`，唯一项目文档目录为根目录 `docs/`。
+- 已增强 `frontend/tests/api-contract.mjs`：除检查 72 个操作和封装函数外，还会检查所有 `connected` 接口必须存在页面调用，并阻止兼容、暂缓、废弃接口被现行页面误用。
 
 ## 2. 状态定义
 
-`已接入待浏览器验收`：页面已经真实 import 并调用后端接口，已通过构建/契约或 HTTP 冒烟测试，但尚无浏览器 Network 与人工交互记录。  
-`已封装按需调用`：接口封装和合约存在，当前页面没有明确触发场景。  
-`兼容封装`：旧路径仍由后端运行，为避免漏接已建立独立封装，但新页面继续使用正式主路径。  
-`暂不接入`：文档明确当前阶段不应放入页面。  
+`已接入待浏览器验收`：页面已经真实 import 并调用后端接口，已通过构建/契约或 HTTP 冒烟测试，但尚无浏览器 Network 与人工交互记录。
+`已封装按需调用`：接口封装和合约存在，当前页面没有明确触发场景。
+`兼容封装`：旧路径仍由后端运行，为避免漏接已建立独立封装，但新页面继续使用正式主路径。
+`暂不接入`：文档明确当前阶段不应放入页面。
 `已废弃`：后端 OpenAPI 已标记 deprecated，禁止新增调用。
 
 ## 3. 页面与模块接入进度
@@ -63,59 +65,46 @@
 
 | 验证项 | 结果 | 说明 |
 |---|---|---|
-| OpenAPI 操作映射 | 通过：72/72 有明确处理策略 | `npm run test:api-contract` |
-| 前端生产构建 | 通过：118 modules transformed | `npm run build`；仅有包体积 warning，不影响构建 |
-| Node 在线 HTTP 冒烟 | 通过：9 PASS、3 SKIP | 隔离空 SQLite；数据依赖项因无站点/车辆而跳过 |
-| 项目已有端到端接口冒烟 | 通过：ALL SMOKE TESTS PASSED | 注册、登录、用户、收藏、线路、车辆、历史、位置、地图、ETA、推荐、AI、LTA 共 20 个检查点 |
-| 管理端 CRUD 请求体冒烟 | 通过 | 隔离 SQLite 完成线路、站点、车辆、线路站序的创建、查询、修改和删除 |
-| 后端全量现有测试 | 76 passed、15 failed、5 errors 后停止 | 失败集中于默认 SQLite 未建表、异步测试插件/夹具缺失、1 个旧兼容测试返回模型假设；本轮未改后端 |
-| 后端重点测试组合 | 72 passed、8 failed | 8 个失败均因默认数据库没有 `bus_station`/`bus_vehicle` 表 |
+| 运行时 OpenAPI 核对 | 通过：72/72 | 直接导入 `app.main:app` 并读取 `app.openapi()` |
+| 前端契约与页面调用 | 通过：72/72；45 个 connected、61 个调用点 | `npm run test:api-contract`；同时检查禁用状态接口未被页面调用 |
+| Vue 单文件组件编译 | 通过：14/14 | 使用 `@vue/compiler-sfc` 逐个解析并编译 `<script>` 与 `<template>` |
+| 前端生产构建 | 本轮环境未复跑 | 上传包内 `node_modules` 是 Windows 依赖，当前 Linux 容器缺少 Rollup 对应原生可选模块，且无法从依赖源重新安装；本轮未改动 Vue 业务源码。请在目标机器执行 `npm install` 后运行 `npm run build` |
+| 项目端到端接口冒烟 | 通过：ALL SMOKE TESTS PASSED | 隔离 SQLite，覆盖注册、登录、用户、收藏、线路、车辆、历史、位置、地图、ETA、推荐、AI、LTA 共 20 个检查点 |
+| 精确重复文件审计 | 通过 | 排除依赖、虚拟环境、构建产物后，不再存在需要删除的“同名且内容相同”业务文件组 |
 | 差异格式检查 | 通过 | `git diff --check` 无空白错误 |
 | 浏览器 Network/人工交互 | 尚未执行 | 需要在有真实数据的本机环境按第 7 节验收 |
 
-## 6. 已新增或修改文件
+## 6. 本轮文件变更
 
-### 新增
+### 删除的完全重复目录
 
-- `frontend/src/api/response.js`
-- `frontend/src/api/health.js`
-- `frontend/src/api/compatibility.js`
-- `frontend/src/api/contract.js`
-- `frontend/tests/api-contract.mjs`
-- `frontend/tests/live-api-smoke.mjs`
-- `docs/api/BusMind前后端接口接入进度.md`
-- `docs/api/BusMind前后端接口接入进度.docx`
-- `docs/api/BusMind项目运行与接口验收说明.md`
+- `backend/frontend/`：上一轮误复制出的不完整前端镜像；项目入口、README、Vite 配置均只使用根目录 `frontend/`。
+- `backend/docs/api/`：其中三份文档与根目录 `docs/api/` 对应文件逐字节相同；统一保留根目录文档。
 
 ### 修改
 
-- `frontend/package.json`
-- `frontend/src/api/request.js`
-- `frontend/src/api/index.js`
-- `frontend/src/api/history.js`
-- `frontend/src/api/user.js`
-- `frontend/src/router/index.js`
-- `frontend/src/components/map/BusMap.vue`
-- `frontend/src/views/login/LoginView.vue`
-- `frontend/src/views/login/RegisterView.vue`
-- `frontend/src/views/home/HomeView.vue`
-- `frontend/src/views/ai-assistant/AiAssistantView.vue`
-- `frontend/src/views/line/LineListView.vue`
-- `frontend/src/views/line/LineDetailView.vue`
-- `frontend/src/views/vehicle/VehicleView.vue`
-- `frontend/src/views/recommend/PassengerFlowView.vue`
-- `frontend/src/views/profile/ProfileView.vue`
-- `frontend/src/views/admin/AdminView.vue`
+- `frontend/tests/api-contract.mjs`：新增“页面真实调用”与“禁止误用兼容/暂缓/废弃接口”检查。
+- `docs/api/BusMind前后端接口接入进度.md`
+- `docs/api/BusMind前后端接口接入进度.docx`
+- `README.md`：明确唯一前端和文档目录，防止再次产生镜像副本。
+
+> 未修改后端接口实现、算法、数据库模型、数据脚本和其他成员业务代码。
 
 ## 7. 项目使用与完整验收步骤
 
-### 7.1 合并本交付包
+### 7.1 解压完整项目包
 
-交付压缩包是补丁式目录树，只包含上节列出的新增/修改文件。将压缩包解压到原 BusMind 项目根目录并允许覆盖同名文件；不要把压缩包当作完整项目单独运行。
+交付压缩包是可独立使用的完整项目源码，不是补丁包。解压后进入最外层 `BusMind/` 目录即可。为避免跨平台污染和压缩包过大，交付包不包含 `.git/`、虚拟环境、`node_modules/`、`dist/`、缓存和 IDE 配置；这些目录都可按下文命令重新生成。
+
+目录约定：
+
+- 前端只使用 `frontend/`，不要再创建 `backend/frontend/`。
+- 项目文档只使用 `docs/`，不要再创建 `backend/docs/`。
+- 后端入口为 `backend/app/main.py`，启动目录为 `backend/`。
 
 ### 7.2 配置后端
 
-在项目根目录创建 `.env`，至少配置：
+在 `backend/` 目录创建 `.env`（即 `backend/.env`），至少配置：
 
 ```env
 DATABASE_URL=mysql+pymysql://busmind_dev:你的密码@127.0.0.1:3307/busmind?charset=utf8mb4
@@ -216,7 +205,23 @@ python backend/scripts/smoke_frontend_links.py
 - 页面不调用已废弃接口，不调用第一阶段明确暂缓的 Passenger Flow prediction。
 - 刷新页面、快速切换条件、空数据和后端断开时无白屏、无未处理 Promise 错误。
 
-## 8. 仍需项目环境或后端负责人处理的事项
+## 8. 最终接口与重复文件判定
+
+### 8.1 是否还有前后端接口没接
+
+没有发现仍需补接的产品页面接口。72 个运行时操作均已进入契约台账；45 个产品页面操作存在真实页面调用。以下状态不计为漏接：
+
+- `compatibility`：旧路径别名，仅用于兼容历史客户端，新页面继续使用正式路径。
+- `encapsulated`：内部仿真、辅助查询或暂无明确产品触发场景的按需能力，已有统一封装。
+- `deferred`：Passenger Flow prediction 按第一阶段口径暂不进入页面。
+- `deprecated`：已废弃路径，禁止新增页面调用。
+- `unsupported/backend_only`：方法提示或部署健康检查，不属于业务页面。
+
+### 8.2 重复文件清理结果
+
+已删除 29 个重复文件组成的两个冗余目录树：`backend/frontend/` 和 `backend/docs/api/`。重新按“文件名相同 + SHA-256 内容相同”审计后，业务源码和项目文档中不再有需要合并的重复组。仍保留的同内容文件只有以下合理类型：不同 Python 包必须各自存在的 `__init__.py`、用于保留空目录的 `.gitkeep`、以及 Postman 各集合自身需要的 `definition.yaml`。
+
+## 9. 仍需项目环境或后端负责人处理的事项
 
 1. 默认 SQLite 配置 `AUTO_CREATE_TABLES=false` 且没有业务表，会导致部分接口 500；需要初始化数据库或使用已导入数据的 MySQL。
 2. 后端 OpenAPI 当前仍接受 `low_load` 而不接受正式业务值 `comfort`；本轮前端已做兼容，但后端最终应支持 `comfort -> low_load` 映射。
