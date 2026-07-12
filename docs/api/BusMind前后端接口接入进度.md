@@ -16,7 +16,7 @@
 | 收藏/历史 | ProfileView | favorites/history 方法 | `/users/me/favorites`,`/query-history` | 已接入待测试 | 是 | 是（目标 pytest 通过） | 否 | 缺浏览器交互记录 | 验证增删收藏、分页和空列表 | 待分配 | 后端目标测试通过；待页面 Network |
 | 地图站点/线路 | HomeView/BusMap | `getMapStations`,`getMapLines`,`getRoadSegments` | `/map/*` | 已接入待测试 | 是 | 是：stations/lines/path_coordinates | 否 | 默认数据库零表导致 500；尚未浏览器验图 | 初始化真实数据后检查点线、空数据、重复加载 | 待分配 | 隔离库 HTTP 200 非空；前端构建通过 |
 | 位置搜索 | HomeView | `searchLocations`,`getNearbyLocations` | `/locations/search`,`/nearby` | 已接入待测试 | 是（页面已构造 keyword/坐标） | 静态核查一致，未复测 | 否 | 依赖真实站点数据和定位权限 | 复测关键词、坐标、无结果、权限拒绝 | 待分配 | 代码静态核查；本轮非重点未 HTTP 复测 |
-| 路线推荐 | HomeView | `recommendRoutes` | `POST /recommend-routes` | 存在问题 | balanced 可用；comfort 仍 422 | 是：items 适配完整 | 否 | 正式偏好 comfort 与 OpenAPI 冲突；依赖线路数据 | 后端增加 comfort 兼容后做浏览器验收 | 待分配 | balanced/low_load 200；comfort 422 已复现 |
+| 路线推荐 | HomeView | `recommendRoutes` | `POST /recommend-routes` | 已接入待测试 | 是：`balanced`、`comfort`、`low_load` 均可用 | 是：items 适配完整 | 否 | 仍依赖线路数据与浏览器交互验收 | 浏览器验证推荐结果展示与正式 `comfort` 口径 | 待分配 | `balanced`/`low_load`/`comfort` HTTP 200 已验证 |
 | 首页 AI | HomeView | `askAiTravel` | `POST /ai/travel` | 存在问题 | qa/question 一致；context 字段不一致 | answer 可读；related_routes 常为空 | 否 | 页面传 visible_routes，后端只识别 items/data.items | 传原始推荐 items 或改 suggest+站点 ID | 待分配 | QA fallback 200 已验证；页面待修改 |
 | 独立 AI | AiAssistantView | `sendAiMessage` | `POST /ai/travel` | 已接入待测试 | 是 | 是：answer/reminders/fallback | 有初始静态会话 | 路由已注册；无 Key 时为本地 fallback 200 | 浏览器验证问答、fallback 和 422 | 待分配 | HTTP 200 fallback=true、422 已验证 |
 | 线路列表 | LineListView | `getLines` | `GET /lines` | 存在问题 | 是：page/limit | lines 字段一致；total 被前端减 1 | 否 | 默认数据库零表 500；页面 total 算法错误 | 初始化数据并移除 total - 1 | 待分配 | HTTP 200 非空、422 已验证；待页面修复 |
@@ -26,9 +26,9 @@
 | 实时 Load | Home/Line/Vehicle | `predictPassengerLoad` | `POST /passenger-load-prediction` | 存在问题 | 封装一致 | 页面已兼容主要枚举，未复测 | 否 | 路径/Schema仍称 prediction，业务口径为 LTA 实时客载 | 明确版本化命名并保兼容 | 待分配 | 本轮非重点未 HTTP 复测 |
 | 历史 Passenger Flow | Home/PassengerFlowView/AdminView | `getPassengerFlowTrend` | `GET /history/passenger-flow` | 已接入待测试 | 是 | 是：items/summary | 否 | 默认库无历史数据 | 导入数据后验证时间范围、粒度和图表 | 待分配 | 页面静态核查；隔离库确认有数据可存 |
 | Passenger Flow prediction | PassengerFlowView | `getPassengerFlowPrediction` | `/history/passenger-flow/prediction` | 存在问题 | 是 | 静态核查一致 | 否 | 页面当前实际调用，但第一阶段口径要求暂不接入 | 产品确认后移除调用或调整定位 | 待分配 | 全仓搜索确认页面调用；本轮未 HTTP 复测 |
-| 后台基础 CRUD | AdminView | transit/vehicle 查询与 CRUD 封装 | `/lines`,`/stations`,`/vehicles` | 已接入待测试 | 查询一致 | 概览字段静态核查一致 | 否 | 写接口仍无 admin 鉴权；本轮未做破坏性 CRUD | 先加权限，再用测试库验证 CRUD | 待分配 | 概览代码静态核查；未做写操作 |
+| 后台基础 CRUD | AdminView | transit/vehicle 查询与 CRUD 封装 | `/lines`,`/stations`,`/vehicles` | 已接入待测试 | 查询一致 | 概览字段静态核查一致 | 否 | 写接口已要求 admin；本轮未做带 Token 的破坏性 CRUD | 使用 admin Token 在测试库验证 CRUD、401、403 | 待分配 | 概览代码静态核查；未做写操作 |
 | LTA 正式刷新 | AdminView | `refreshAdminLtaBusArrival`,`refreshAdminLtaTrafficSpeedBands` | `POST /admin/lta/*/refresh` | 存在问题 | 是 | 503 结构已验证 | 否 | 缺 LTA_ACCOUNT_KEY；真实刷新未验证 | 配置 Key 后在测试库复测 sync_to_db | 待分配 | 无 Key 返回 HTTP 503/code 50320 |
-| LTA 旧刷新 | 无 | `refreshLtaBusArrival` | `POST /simulation/lta-bus-arrival/refresh` | 已废弃 | 是 | 未复测 | 否 | OpenAPI deprecated，仍由 index 导出 | 停止新增使用，后续版本移除封装 | 待分配 | 全仓搜索无页面调用 |
+| LTA 旧刷新 | 无 | `refreshLtaBusArrival` | `POST /simulation/lta-bus-arrival/refresh` | 已废弃 | 是 | 未复测 | 否 | OpenAPI deprecated；`index.js` 已移除统一导出，仅保留直接引用兼容 | 停止新增使用，后续版本移除封装 | 待分配 | 全仓搜索无页面调用 |
 | 兼容 bus 路径 | 无 | `getBus*` 仍为主函数别名 | `/bus-lines`,`/bus-stations`,`/bus-vehicles` | 前端已封装未接入 | 部分：函数实际打主路径 | 未复测 | 否 | 函数名易让审计误判真实 URL | 文档继续按真实 URL 记录 | 待分配 | 代码静态核查 |
 
 ## 本轮联调交付
@@ -46,7 +46,7 @@
 ## 当前问题摘要
 
 1. P0：默认数据库没有表和可展示数据，线路与地图在默认启动下返回 500。
-2. P1：推荐正式偏好 `comfort` 返回 422，仅 `low_load` 可用。
+2. P1：推荐正式偏好 `comfort` 已可用并返回 200；仍需浏览器侧完成结果展示验收。
 3. P1：LineDetailView 错读 `data.vehicles`；LineListView 错减 total。
 4. P1：首页 AI 的 `context.visible_routes` 不被后端识别。
 5. P1：错误响应外壳和时间戳时区不统一。

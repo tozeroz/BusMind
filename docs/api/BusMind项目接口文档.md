@@ -5,8 +5,8 @@
 
 ## 2026-07-12 增量核对结论
 
-- 当前运行时 OpenAPI 共 **73 个操作**：`/`、`/api/v1/` 两个健康检查及 71 个业务操作，分布在 61 条路径上。
-- 正式主路径使用 `/lines`、`/stations`、`/vehicles`、`/locations` 等；`/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime` 是兼容路径。`POST /simulation/lta-bus-arrival/refresh` 在 OpenAPI 中明确 `deprecated: true`，正式替代入口为 `/admin/lta/bus-arrival/refresh`。所有后台刷新接口和线路/站点/车辆写操作（POST/PATCH/DELETE）均要求 admin 角色，非 admin 返回 403。
+- 当前运行时 OpenAPI 共 **73 个操作**：`/`、`/api/v1/` 两个健康检查及 71 个业务操作，分布在 59 条路径上。
+- 正式主路径使用 `/lines`、`/stations`、`/vehicles`、`/locations` 等；`/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime` 是兼容路径。`POST /simulation/lta-bus-arrival/refresh` 在 OpenAPI 中明确 `deprecated: true`，正式替代入口为 `/admin/lta/bus-arrival/refresh`。所有后台刷新接口和线路/站点/车辆写操作（POST/PATCH/DELETE）均要求 admin 角色；未登录返回 401，已登录但非 admin 返回 403。
 - ETA 的业务来源应解释为 **LTA Bus Arrival 实时数据**；Load 的业务来源应解释为 **LTA 实时客载字段**，正式接口为 `POST /realtime-passenger-load`（响应字段 `load_rate`/`load_level`/`onboard_count`），旧路径 `/passenger-load-prediction` 保留兼容。当前代码中 `predicted_*` 历史命名不代表项目训练了 ETA 或客载预测模型。
 - Passenger Flow 是历史客流分析能力，第一阶段不作为预测模型。`/history/passenger-flow/prediction` 和仿真预测写入接口仍在运行，保留但标为历史/兼容能力，不作为第一阶段核心算法宣传。
 - 核心算法口径统一为：**多源数据融合、多目标评分和个性化推荐**。
@@ -35,7 +35,7 @@
 
 |**统计项**|**数量**|**说明**|
 |---|---|---|
-|运行时路径|61|由 2026-07-12 代码 `@router` 装饰器逐条统计；同一路径可有多个 HTTP 方法。|
+|运行时路径|59|由 2026-07-12 运行时 `openapi.json` 统计；同一路径可有多个 HTTP 方法。|
 |运行时接口操作|73|GET/POST/PATCH/DELETE 操作总数，含两个健康检查。|
 |业务接口操作|71|不含 `GET /` 与 `GET /api/v1/`。|
 |兼容接口|见第五章|包含 `/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime`、部分 history 聚合/兼容路径。|
@@ -101,9 +101,9 @@
 |当前用户、收藏、查询历史|是|Authorization:   Bearer \<access\_token\>。|
 |线路、站点、车辆、地图、位置、历史查询|否|便于演示和前端联调。|
 |ETA、客载、步行、推荐、AI|否|当前代码未绑定用户；AI   可使用请求 context。|
-|线路/站点/车辆写接口|是（admin）|POST/PATCH/DELETE 操作要求 admin 角色；非 admin 返回 403。|
-|后台 LTA 采集刷新|是（admin）|写操作接口要求 admin 角色；非 admin 返回 403。|
-|仿真与预测更新|是（admin）|写操作接口要求 admin 角色；非 admin 返回 403。|
+|线路/站点/车辆写接口|是（admin）|POST/PATCH/DELETE 操作要求 admin 角色；未登录返回 401，已登录但非 admin 返回 403。|
+|后台 LTA 采集刷新|是（admin）|写操作接口要求 admin 角色；未登录返回 401，已登录但非 admin 返回 403。|
+|仿真与预测更新|是（admin）|写操作接口要求 admin 角色；未登录返回 401，已登录但非 admin 返回 403。|
 
 ## 2\.5 主要枚举
 
@@ -2007,7 +2007,7 @@
 |---|---|
 |**接口名称**|手动刷新 LTA 公交到站并可同步入库|
 |**模块**|后台 LTA 采集刷新|
-|**当前鉴权**|admin（Bearer Token）；非 admin 返回 403。|
+|**当前鉴权**|admin（Bearer Token）；未登录返回 401，已登录但非 admin 返回 403。|
 |**前端方法**|后端管理/无直接调用|
 |**数据来源/实现**|LtaCollectorService.refresh\_bus\_arrival\(\)；CacheSyncService.sync\_bus\_arrival\(\)。|
 
@@ -2044,7 +2044,7 @@
 |---|---|
 |**接口名称**|手动刷新 LTA 路况速度带并可同步入库|
 |**模块**|后台 LTA 采集刷新|
-|**当前鉴权**|admin（Bearer Token）；非 admin 返回 403。|
+|**当前鉴权**|admin（Bearer Token）；未登录返回 401，已登录但非 admin 返回 403。|
 |**前端方法**|后端管理/无直接调用|
 |**数据来源/实现**|LtaCollectorService.refresh\_traffic\_speed\_bands\(\)；CacheSyncService.sync\_traffic\_speed\_bands\(\)。|
 
@@ -2083,7 +2083,7 @@
 |---|---|
 |**接口名称**|刷新   LTA 公交到站数据（兼容旧入口，已废弃）|
 |**模块**|仿真与预测更新|
-|**当前鉴权**|admin（Bearer Token）；非 admin 返回 403。|
+|**当前鉴权**|admin（Bearer Token）；未登录返回 401，已登录但非 admin 返回 403。|
 |**前端方法**|refreshLtaBusArrival\(data\)|
 |**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新；实际转调 SimulationService.refresh\_bus\_arrival\_status\_from\_lta\(\)。|
 
@@ -2124,7 +2124,7 @@
 |---|---|
 |**接口名称**|写入/刷新预测结果|
 |**模块**|仿真与预测更新|
-|**当前鉴权**|admin（Bearer Token）；非 admin 返回 403。|
+|**当前鉴权**|admin（Bearer Token）；未登录返回 401，已登录但非 admin 返回 403。|
 |**前端方法**|updatePredictionResult\(data\)|
 |**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新。|
 
@@ -2176,7 +2176,7 @@
 |---|---|
 |**接口名称**|更新仿真车辆状态|
 |**模块**|仿真与预测更新|
-|**当前鉴权**|admin（Bearer Token）；非 admin 返回 403。|
+|**当前鉴权**|admin（Bearer Token）；未登录返回 401，已登录但非 admin 返回 403。|
 |**前端方法**|updateVehicleStatus\(vehicleId,   data\)|
 |**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新。|
 

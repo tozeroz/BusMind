@@ -19,7 +19,7 @@
 | RegisterView | `/register` | 无 | 提交后直接跳转 | 未接入 |
 | HomeView | `/home` | 无 | 地图、搜索、推荐、AI 全为本地数据 | 未接入 |
 | AdminView | `/admin` | 无 | `adminStats` 与表格均静态 | 未接入 |
-| AiAssistantView | `/ai` | `sendAiMessage` | QA 模式已验证（code=0, fallback=true）；catch 降级提示 | 已接入已验证 |
+| AiAssistantView | `/ai` | `sendAiMessage` | QA 模式已验证（code=0, fallback=true）；catch 降级提示 | 已接入待测试 |
 | LineListView | `/lines` | 无 | `mockData.lines` | 未接入 |
 | LineDetailView | `/lines/:id` | 无 | `mockData.lines/vehicles` | 未接入 |
 | VehicleView | `/vehicles` | 无 | `mockData.lines/vehicles` | 未接入 |
@@ -152,7 +152,7 @@
 | 当前 API 封装 | CRUD 已封装；正式 admin 刷新 `refreshAdminLtaBusArrival` / `refreshAdminLtaTrafficSpeedBands` 已封装在 `@/api/admin`；旧 simulation 刷新封装（`refreshLtaBusArrival` 等）已标注 @deprecated 并从 index.js 统一导出中移除 |
 | 是否实际调用 | 否 |
 | 是否仍使用 Mock | 是 |
-| 当前问题 | 后端管理写接口已要求 admin 角色（非 admin 返回 403），前端页面入口无额外鉴权门控；旧刷新函数指向废弃路径 |
+| 当前问题 | 后端管理写接口已要求 admin 角色（未登录返回 401，已登录但非 admin 返回 403），前端页面入口无额外鉴权门控；旧刷新函数指向废弃路径 |
 | 建议接入方式 | 正式 admin 刷新已在 `@/api/admin` 中，直接 import 即可；禁止新页面调用 `@/api/simulation` 已废弃路径 |
 
 ### 3.9 PassengerFlowView.vue
