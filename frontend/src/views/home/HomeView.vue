@@ -107,9 +107,23 @@
               <p><span>运行状态</span><strong>{{ selectedInfo.status }}</strong></p>
             </div>
           </template>
+
         </aside>
       </Transition>
 
+
+      <Transition name="side-card">
+        <aside v-if="isInfoPanelOpen" class="map-player-panel map-player-slot">
+          <div>
+            <p class="eyebrow">语音播报</p>
+            <strong>{{ selectedInfo.name || '\u51fa\u884c\u64ad\u653e\u5668' }}</strong>
+            <span>{{ panelMode === 'search' ? '\u5f85\u9009\u62e9\u7ad9\u70b9\u6216\u7ebf\u8def' : chartCaption }}</span>
+          </div>
+          <div class="player-control-row" aria-hidden="true">
+            <i></i><b></b><i></i>
+          </div>
+        </aside>
+      </Transition>
       <Transition name="side-card">
         <article v-if="panelMode !== 'search'" :class="['map-chart-card', `chart-${chartTone}`]">
           <div class="section-title">
@@ -119,8 +133,11 @@
             </div>
             <button class="ghost-button compact-ghost" type="button" @click="resetPanel">关闭</button>
           </div>
-          <div class="mini-chart">
-            <span v-for="(item, index) in selectedInfo.chart" :key="`${item}-${index}`" :style="{ height: `${item}%` }"></span>
+          <div class="map-passenger-info">
+            <p v-for="item in passengerInfoItems" :key="item.label" class="passenger-info-row">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
+            </p>
           </div>
           <p class="muted">{{ chartCaption }}</p>
         </article>
@@ -187,7 +204,7 @@ import { computed, reactive, ref } from 'vue'
 import BusMap from '@/components/map/BusMap.vue'
 import { askAiTravel } from '@/api/ai'
 import { getNearbyLocations, searchLocations } from '@/api/location'
-import { getEta, predictPassengerLoad, recommendRoutes } from '@/api/intelligence'
+import { getEta, recommendRoutes } from '@/api/intelligence'
 import { getPassengerFlowTrend } from '@/api/history'
 import { getRealtimeVehicles } from '@/api/vehicle'
 import { getApiErrorMessage, unwrapList } from '@/api/response'
@@ -197,7 +214,7 @@ const query = reactive({ start: '乌节站', end: '滨海湾' })
 const notice = ref('')
 const recommendation = ref(null)
 const panelMode = ref('search')
-const isInfoPanelOpen = ref(true)
+const isInfoPanelOpen = ref(false)
 const isAiChatOpen = ref(false)
 const aiInput = ref('去滨海湾，想坐最舒适的路线')
 const aiRecommendation = ref(null)
@@ -272,10 +289,27 @@ const chartTone = computed(() => {
 
 const chartCaption = computed(() => {
   if (selectedInfo.flowSource === 'backend') {
-    const summary = selectedInfo.flowSummary ? ` · 汇总：${selectedInfo.flowSummary}` : ''
-    return `数据来源：后端历史客流接口${summary}`
+    return `\u6570\u636e\u6765\u6e90\uff1a\u540e\u7aef\u5386\u53f2\u5ba2\u6d41\u63a5\u53e3${selectedInfo.flowSummary ? ` · ${selectedInfo.flowSummary}` : ''}`
   }
-  return '暂无后端客流数据，先显示本地估算。'
+  return '\u6682\u65e0\u540e\u7aef\u5ba2\u6d41\u6570\u636e\uff0c\u5148\u663e\u793a\u5730\u56fe\u7ad9\u70b9\u4fe1\u606f\u3002'
+})
+
+const passengerInfoItems = computed(() => {
+  if (panelMode.value === 'station') {
+    return [
+      { label: '\u4e0b\u4e00\u73ed\u8f66', value: selectedInfo.eta || '\u6682\u65e0\u5b9e\u65f6\u5230\u7ad9' },
+      { label: '\u5f53\u524d\u5ba2\u6d41', value: selectedInfo.crowd || '\u6682\u65e0\u5ba2\u6d41' },
+      { label: '\u7ad9\u70b9\u70ed\u5ea6', value: selectedInfo.status || '\u6570\u636e\u63a5\u5165\u4e2d' },
+      { label: '\u7ecf\u8fc7\u7ebf\u8def', value: selectedInfo.routes || '\u6682\u65e0\u7ebf\u8def\u5173\u8054' }
+    ]
+  }
+
+  return [
+    { label: '\u7ebf\u8def\u7f16\u53f7', value: selectedInfo.id || '--' },
+    { label: '\u9884\u8ba1\u5230\u8fbe', value: selectedInfo.eta || '\u6682\u65e0\u5230\u8fbe\u65f6\u95f4' },
+    { label: '\u5ba2\u6d41\u72b6\u6001', value: selectedInfo.crowd || '\u6682\u65e0\u5ba2\u6d41' },
+    { label: '\u8fd0\u884c\u72b6\u6001', value: selectedInfo.status || '\u8fd0\u884c\u4e2d' }
+  ]
 })
 
 const buildChartFromFlow = (items, maxValue) => {
@@ -294,20 +328,24 @@ const loadStationFlowChart = async (station) => {
     const response = await getPassengerFlowTrend({ station_id: stationId, granularity: 'hour' })
     const data = response?.data || {}
     const items = Array.isArray(data) ? data : (data.items || [])
-    const chart = buildChartFromFlow(items)
-    if (chart && chart.length) {
-      selectedInfo.chart = chart
-      selectedInfo.flowSource = 'backend'
-      const summary = data.summary || {}
-      selectedInfo.flowSummary = `总客流 ${summary.total_flow ?? '--'} · 主要等级 ${summary.dominant_flow_level || '--'}`
-    }
+    const summary = data.summary || {}
+    const chart = buildChartFromFlow(items, summary.total_flow)
+
+    if (String(selectedInfo.id) !== String(stationId)) return
+
+    if (chart && chart.length) selectedInfo.chart = chart
+    selectedInfo.flowSource = 'backend'
+
+    const totalFlow = summary.total_flow ?? items.reduce((sum, item) => sum + (Number(item.total_flow) || 0), 0)
+    const dominantLevel = summary.dominant_flow_level || items.find((item) => item.flow_level)?.flow_level
+    selectedInfo.crowd = dominantLevel ? loadLevelText(dominantLevel) : (totalFlow ? String(totalFlow) : selectedInfo.crowd)
+    selectedInfo.status = totalFlow ? `\u603b\u5ba2\u6d41 ${totalFlow}` : '\u5386\u53f2\u5ba2\u6d41\u5df2\u63a5\u5165'
+    selectedInfo.flowSummary = `\u603b\u5ba2\u6d41 ${totalFlow || '--'} · \u4e3b\u8981\u7b49\u7ea7 ${dominantLevel ? loadLevelText(dominantLevel) : '--'}`
   } catch (error) {
-    // 静默失败，保持本地默认图表
     selectedInfo.flowSource = 'local'
     selectedInfo.flowSummary = ''
   }
 }
-
 const loadStationRealtime = async (station) => {
   const stationId = Number(station?.station_id ?? station?.stop_id)
   const lineId = Number(station?.line_ids?.[0] ?? station?.line_id)
@@ -318,31 +356,13 @@ const loadStationRealtime = async (station) => {
     const vehicle = unwrapList(vehicleResponse, 'vehicles')[0]
     if (!vehicle?.vehicle_id) return
 
-    const loadPayload = {
-      line_id: lineId,
-      station_id: stationId,
-      vehicle_id: Number(vehicle.vehicle_id)
-    }
-    if (Number(vehicle.capacity) > 0) loadPayload.capacity = Number(vehicle.capacity)
-    if (Number(vehicle.onboard_count) >= 0) loadPayload.current_onboard_count = Number(vehicle.onboard_count)
-
-    const [etaOutcome, loadOutcome] = await Promise.allSettled([
-      getEta({ vehicle_id: Number(vehicle.vehicle_id), target_station_id: stationId, line_id: lineId }),
-      predictPassengerLoad(loadPayload)
-    ])
+    const etaOutcome = await getEta({ vehicle_id: Number(vehicle.vehicle_id), target_station_id: stationId, line_id: lineId })
     if (String(selectedInfo.id) !== String(stationId)) return
 
-    if (etaOutcome.status === 'fulfilled') {
-      const eta = etaOutcome.value?.data?.predicted_eta_minutes
-      if (Number.isFinite(Number(eta))) selectedInfo.eta = `约 ${Number(eta).toFixed(1)} 分钟`
-    }
-    if (loadOutcome.status === 'fulfilled') {
-      const load = loadOutcome.value?.data
-      selectedInfo.crowd = loadLevelText(load?.predicted_load_level)
-      selectedInfo.status = `实时客载率 ${Number.isFinite(Number(load?.predicted_load_rate)) ? `${(Number(load.predicted_load_rate) * 100).toFixed(0)}%` : '--'}`
-    }
+    const eta = etaOutcome?.data?.predicted_eta_minutes
+    if (Number.isFinite(Number(eta))) selectedInfo.eta = `\u7ea6 ${Number(eta).toFixed(1)} \u5206\u949f`
   } catch {
-    // 站点详情仍保留地图与历史客流数据，不使用虚构 ETA/客载。
+    // Keep station cards on map/history data when realtime ETA is unavailable.
   }
 }
 
@@ -514,10 +534,10 @@ const selectStation = (stop) => {
   openChartPanel('station')
   selectedInfo.id = stop.stop_id
   selectedInfo.name = stop.stop_name
-  selectedInfo.crowd = stop.crowd_level ? loadLevelText(stop.crowd_level) : '暂无实时客流'
-  selectedInfo.status = stop.crowd_level ? (stop.crowd_level === 'high' ? '较高' : '正常') : '站点数据已接入'
-  selectedInfo.eta = Number.isFinite(Number(stop.eta_minutes)) ? `约 ${stop.eta_minutes} 分钟` : '暂无实时到站'
-  selectedInfo.routes = stop.passing_routes?.join(' / ') || '暂无线路关联'
+  selectedInfo.crowd = stop.crowd_level ? loadLevelText(stop.crowd_level) : '\u6682\u65e0\u5b9e\u65f6\u5ba2\u6d41'
+  selectedInfo.status = '\u6b63\u5728\u8bfb\u53d6\u5386\u53f2\u5ba2\u6d41'
+  selectedInfo.eta = Number.isFinite(Number(stop.eta_minutes)) ? `\u7ea6 ${stop.eta_minutes} \u5206\u949f` : '\u6682\u65e0\u5b9e\u65f6\u5230\u7ad9'
+  selectedInfo.routes = stop.passing_routes?.join(' / ') || '\u6682\u65e0\u7ebf\u8def\u5173\u8054'
   selectedInfo.chart = stop.crowd_level === 'high' ? [68, 74, 82, 90, 76] : [34, 48, 56, 52, 44]
   selectedInfo.flowSource = 'local'
   selectedInfo.flowSummary = ''
