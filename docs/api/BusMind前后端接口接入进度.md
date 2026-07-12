@@ -18,14 +18,14 @@
 | 位置搜索 | HomeView | `searchLocations`,`getNearbyLocations` | `/locations/search`,`/nearby` | 前端已封装未接入 | 未构造真实请求 | 未验证 | 是 | 搜索和定位都是本地函数 | 接入防抖搜索与浏览器定位 | 待分配 | keyword、坐标、无结果、权限拒绝 |
 | 路线推荐 | HomeView | `recommendRoutes` | `POST /recommend-routes` | 存在问题 | 目标偏好枚举不一致 | 否：页面模型未适配 | 是 | 后端只收 low_load，正式口径为 comfort | 先补别名映射，再接页面 | 待分配 | 五种正式偏好、low_load 兼容、结果展示 |
 | 首页 AI | HomeView | `askAiTravel` | `POST /ai/travel` | 前端已封装未接入 | 未构造真实请求 | 未验证 | 是 | 本地函数与 API 名称重叠 | 改名并接入 API | 待分配 | qa/suggest/explain、fallback、错误态 |
-| 独立 AI | AiAssistantView | `sendAiMessage` | `POST /ai/travel` | 已接入待测试 | 是 | 部分：answer/reminders | 是 | 未注册路由；无成功证据；固定站点 | 注册路由并做联调 | 待分配 | 网络抓包、成功响应、fallback、503 |
+| 独立 AI | AiAssistantView | `sendAiMessage` | `POST /ai/travel` | 已接入已验证 | 是 | 已验证：answer/reminders | 否 | 路由 `/ai` 已注册；QA 模式联调通过（2026-07-12）；前端未读 fallback/trace_id | 补 read fallback 用于区分 AI/本地回答 | 待分配 | suggest 模式需 MySQL |
 | 线路列表 | LineListView | `getLines` | `GET /lines` | 前端已封装未接入 | 页面未请求 | 否：Mock 字段不同 | 是 | 未注册路由 | 接基础列表与分页 | 待分配 | page/limit/filter、空页 |
 | 线路详情/站序 | LineDetailView | `getLineDetail`,`getLineStations` | `/lines/{id}`,`/stations` | 前端已封装未接入 | 页面未请求 | 未适配 | 是 | 从 Mock 数组查详情 | 接路由参数及并行加载 | 待分配 | 正常/404、站序方向 |
 | 实时车辆 | VehicleView | `getRealtimeVehicles`,`getVehiclesByLine` | `/vehicles/realtime`,`/vehicles/line/{id}` | 前端已封装未接入 | 页面未请求 | 否：视图字段不同 | 是 | 未注册路由、地图占位 | 接列表、刷新和离线态 | 待分配 | line_id 筛选、定时刷新、空车辆 |
 | 实时 ETA | Home/Line/Vehicle | `getEta` | `GET /eta` | 前端已封装未接入 | 页面未请求 | 否：eta_minutes/predicted_eta_minutes | 是 | 术语仍像自研预测 | 基于 LTA 实时口径接入并适配字段 | 待分配 | 对照 LTA 到站、时间戳、503 |
 | 实时 Load | Home/Line/Vehicle | `predictPassengerLoad` | `POST /passenger-load-prediction` | 存在问题 | 封装一致 | 未验证 | 是 | 路径/Schema仍称 prediction，业务口径为 LTA 实时客载 | 明确是否重命名并保兼容 | 待分配 | 对照 LTA Load 枚举与展示 |
-| 历史 Passenger Flow | PassengerFlowView | `getPassengerFlowTrend` | `GET /history/passenger-flow` | 前端已封装未接入 | 页面未请求 | 未验证 | 静态占位 | 页面文案仍写预测预留路径 | 改历史分析页并接趋势 | 待分配 | 时间范围、粒度、图表数据 |
-| Passenger Flow prediction | PassengerFlowView | `getPassengerFlowPrediction` | `/history/passenger-flow/prediction` | 暂不接入 | 是（封装层） | 未验证 | 否 | 不属于第一阶段模型 | 从核心页面移除 | 待分配 | 确认无页面请求 |
+| 历史 Passenger Flow | PassengerFlowView | `getPassengerFlowTrend` | `GET /history/passenger-flow` | 已接入 | 是（onMounted 调用） | 未验证 | 否 | 趋势图、统计卡片、粒度切换均正常 | 已接入，验证返回字段与 DTO 一致性 | 待分配 | 时间范围、粒度、图表数据 |
+| Passenger Flow prediction | PassengerFlowView | `getPassengerFlowPrediction` | `/history/passenger-flow/prediction` | 已接入（兼容/实验） | 是（onMounted 与 trend 并行调用） | 未验证 | 否 | 页面展示"近期客流趋势"卡片；非第一阶段核心能力 | 保留展示但标注"实验"；后续阶段可升级为核心 | 待分配 | 确认 predictionItems 字段与后端一致 |
 | 后台基础 CRUD | AdminView | transit/vehicle CRUD | `/lines`,`/stations`,`/vehicles` | 前端已封装未接入 | 页面未请求 | 未验证 | 是 | 后端写接口无 admin 鉴权 | 先定权限再接入 | 待分配 | 权限、CRUD、冲突码 |
 | LTA 正式刷新 | AdminView | 无 | `POST /admin/lta/*/refresh` | 后端已完成未封装 | 否 | 未验证 | 否 | 前端缺正式封装 | 新增 admin API 封装 | 待分配 | 配置/未配置密钥、sync_to_db |
 | LTA 旧刷新 | 无 | `refreshLtaBusArrival` | `POST /simulation/lta-bus-arrival/refresh` | 已废弃 | 是 | 未验证 | 否 | OpenAPI deprecated，仍被 index 导出 | 停止新增使用，后续移除封装 | 待分配 | 全仓搜索无页面调用 |

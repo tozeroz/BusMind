@@ -19,11 +19,11 @@
 | RegisterView | `/register` | 无 | 提交后直接跳转 | 未接入 |
 | HomeView | `/home` | 无 | 地图、搜索、推荐、AI 全为本地数据 | 未接入 |
 | AdminView | `/admin` | 无 | `adminStats` 与表格均静态 | 未接入 |
-| AiAssistantView | `/ai` | `sendAiMessage` | 初始消息及失败降级为固定回答 | 已接入待测试，字段未验证 |
+| AiAssistantView | `/ai` | `sendAiMessage` | QA 模式已验证（code=0, fallback=true）；catch 降级提示 | 已接入已验证 |
 | LineListView | `/lines` | 无 | `mockData.lines` | 未接入 |
 | LineDetailView | `/lines/:id` | 无 | `mockData.lines/vehicles` | 未接入 |
 | VehicleView | `/vehicles` | 无 | `mockData.lines/vehicles` | 未接入 |
-| PassengerFlowView | `/passenger-flow` | 无 | 仅占位文案 | 暂不接入 |
+| PassengerFlowView | `/passenger-flow` | `getPassengerFlowTrend`、`getPassengerFlowPrediction`、`getLoadPredictionsByLine`、`getLoadPrediction` | 真实数据渲染（趋势图、统计卡片、预测卡片、客载卡片） | 已接入 |
 
 ## 三、按页面接入说明
 
@@ -87,9 +87,9 @@
 | 真正使用的返回字段 | `data.answer`、`data.reminders` |
 | 当前 API 封装 | `sendAiMessage`（`askAiTravel` 别名） |
 | 是否实际调用 | 是 |
-| 是否仍使用 Mock | 是；初始对话和 catch 固定回复 |
-| 当前问题 | 固定站点 ID；只验证了字段读取代码，未见成功联调证据；页面 `sider-note` 已显示正确路径 `POST /api/v1/ai/travel` |
-| 建议接入方式 | 由页面上下文提供站点；显示 `fallback/used_tools/related_routes/trace_id`；用真实响应做契约测试 |
+| 是否仍使用 Mock | 否；实际调用 `POST /api/v1/ai/travel`；`catch` 块展示错误信息作为降级提示 |
+| 当前问题 | 固定站点 ID（1→12）；不读取 `fallback`/`used_tools`/`related_routes`/`trace_id`；suggest 模式未验证（需 MySQL） |
+| 建议接入方式 | 已联调验证（2026-07-12）：QA 模式成功（code=0, fallback=true），参数校验错误（42200）正常；`answer`/`reminders` 字段正确读取。建议补读 `fallback` 用于区分 AI/本地回答，补读 `trace_id` 用于错误排查。 |
 
 ### 3.5 LineListView.vue
 
@@ -160,16 +160,16 @@
 | 项目 | 内容 |
 |---|---|
 | 页面文件 | `frontend/src/views/recommend/PassengerFlowView.vue` |
-| 页面功能 | 历史客流分析占位 |
-| 需要接口 | 第一阶段仅 `GET /history/passenger-flow`；预测接口暂不作为核心能力 |
-| 触发时机 | 页面加载、线路/站点/时间范围/粒度变化 |
-| 请求字段 | `line_id?,station_id?,start_date?,end_date?,granularity` |
-| 真正使用的返回字段 | 尚无；应以趋势 DTO 的时间桶、tap-in、tap-out、total-flow 字段为准 |
-| 当前 API 封装 | `getPassengerFlowTrend`；预测函数也已封装但暂不接入 |
-| 是否实际调用 | 否 |
-| 是否仍使用 Mock | 无数据 Mock；页面标题已统一为"历史分析优先"，预测功能标注为暂不接入 |
-| 当前问题 | 预测区域标题已改为"近期客流趋势"，不再突出自研预测 |
-| 建议接入方式 | 页面标题已改为"历史客流分析"；第一阶段只接趋势接口，预测功能标为暂不接入 |
+| 页面功能 | 历史客流分析（趋势图 + 统计卡片 + 近期客流记录 + 线路客载） |
+| 需要接口 | `GET /history/passenger-flow`（核心）、`GET /history/passenger-flow/prediction`（兼容/实验）、`GET /history/load/line/{line_id}`（线路客载）、`GET /history/load/{line_id}`（客载回退） |
+| 触发时机 | 页面加载（`onMounted`）、粒度切换（hour/day/week）、刷新按钮、线路选择 |
+| 请求字段 | `granularity`（hour/day/week），prediction 无参数，load 传 `line_id` |
+| 真正使用的返回字段 | trend: `items[].total_flow`、`summary（total_tap_in/total_tap_out/dominant_flow_level）`；prediction: `items[].predicted_flow/predict_time/crowd_level`；load: `predicted_onboard_count/predicted_load_level/predicted_load_rate` |
+| 当前 API 封装 | `getPassengerFlowTrend`、`getPassengerFlowPrediction`、`getLoadPredictionsByLine`、`getLoadPrediction` |
+| 是否实际调用 | 是，`onMounted` 时并行调用 trend + prediction，选择线路后调用 load |
+| 是否仍使用 Mock | 否，全部为真实 API 调用；无数据时展示空状态 |
+| 当前问题 | prediction 接口（兼容/实验）在第一阶段页面中直接展示，标题为"近期客流趋势"；客载区域需先选择线路才有数据 |
+| 建议接入方式 | 已接入完成；prediction 卡片保留展示但文案不强调"预测"；可将 prediction 区域折叠或加说明标签"近期客流（实验）" |
 
 ## 四、组件字段适配重点
 

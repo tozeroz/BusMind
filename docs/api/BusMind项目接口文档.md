@@ -5,7 +5,7 @@
 
 ## 2026-07-12 增量核对结论
 
-- 当前运行时 OpenAPI 共 **72 个操作**：`/`、`/api/v1/` 两个健康检查及 70 个业务操作。
+- 当前运行时 OpenAPI 共 **73 个操作**：`/`、`/api/v1/` 两个健康检查及 71 个业务操作，分布在 61 条路径上。
 - 正式主路径使用 `/lines`、`/stations`、`/vehicles`、`/locations` 等；`/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime` 是兼容路径。`POST /simulation/lta-bus-arrival/refresh` 在 OpenAPI 中明确 `deprecated: true`，正式替代入口为 `/admin/lta/bus-arrival/refresh`。所有后台刷新接口和线路/站点/车辆写操作（POST/PATCH/DELETE）均要求 admin 角色，非 admin 返回 403。
 - ETA 的业务来源应解释为 **LTA Bus Arrival 实时数据**；Load 的业务来源应解释为 **LTA 实时客载字段**，正式接口为 `POST /realtime-passenger-load`（响应字段 `load_rate`/`load_level`/`onboard_count`），旧路径 `/passenger-load-prediction` 保留兼容。当前代码中 `predicted_*` 历史命名不代表项目训练了 ETA 或客载预测模型。
 - Passenger Flow 是历史客流分析能力，第一阶段不作为预测模型。`/history/passenger-flow/prediction` 和仿真预测写入接口仍在运行，保留但标为历史/兼容能力，不作为第一阶段核心算法宣传。
@@ -35,9 +35,9 @@
 
 |**统计项**|**数量**|**说明**|
 |---|---|---|
-|运行时路径|60|由 2026-07-12 `app.openapi()` 统计；同一路径可有多个 HTTP 方法。|
-|运行时接口操作|72|GET/POST/PATCH/DELETE 操作总数，含两个健康检查。|
-|业务接口操作|70|不含 `GET /` 与 `GET /api/v1/`。|
+|运行时路径|61|由 2026-07-12 代码 `@router` 装饰器逐条统计；同一路径可有多个 HTTP 方法。|
+|运行时接口操作|73|GET/POST/PATCH/DELETE 操作总数，含两个健康检查。|
+|业务接口操作|71|不含 `GET /` 与 `GET /api/v1/`。|
 |兼容接口|见第五章|包含 `/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime`、部分 history 聚合/兼容路径。|
 |废弃接口|1|`POST /api/v1/simulation/lta-bus-arrival/refresh`。|
 
@@ -126,7 +126,7 @@
 
 # 三、接口总览
 
-下表是原有 62 项基线清单；2026-07-12 运行时 OpenAPI 已增至 72 个操作。新增/遗漏操作包括 `GET /api/v1/`、`GET /api/v1/stations/nearby`、`GET /api/v1/bus-lines/{line_id}/map`、`GET /api/v1/bus-lines/{line_id}/geometry`、`GET /api/v1/bus-stations/nearby`、`GET /api/v1/bus-vehicles/realtime`、`GET /api/v1/history/passenger-load`、`GET /api/v1/history/predictions`、`GET /api/v1/location/nearby`、`GET /api/v1/location/{station_id}`。这些运行中接口不得因旧表遗漏而视为不存在；状态见第五章和本节增量说明。
+下表是原有 62 项基线清单；2026-07-12 运行时 OpenAPI 已增至 73 个操作。新增/遗漏操作（`GET /api/v1/`、`GET /api/v1/bus-lines/{line_id}/map`、`GET /api/v1/bus-lines/{line_id}/geometry`、`GET /api/v1/bus-stations/nearby`、`GET /api/v1/bus-vehicles/realtime`、`GET /api/v1/stations/nearby`、`GET /api/v1/history/passenger-load`、`GET /api/v1/history/predictions`、`GET /api/v1/location/nearby`、`GET /api/v1/location/{station_id}`）已于 2026-07-12 全部补入下表（序号 63–72），状态见第五章。
 
 |**序号**|**模块**|**方法**|**路径**|**功能**|**鉴权**|**前端方法**|
 |---|---|---|---|---|---|---|
@@ -179,7 +179,7 @@
 |47|历史与预测查询|GET|/api/v1/history/load/line/\{line\_id\}|查询线路客载预测记录|无需鉴权（按当前代码）|getLoadPredictionsByLine\(lineId,   params\)|
 |48|历史与预测查询|GET|/api/v1/history/load/\{line\_id\}|查询最新客载预测|无需鉴权（按当前代码）|getLoadPrediction\(lineId,   params\)|
 |49|历史与预测查询|GET|/api/v1/history/passenger\-flow|查询历史客流趋势|无需鉴权（按当前代码）|getPassengerFlowTrend\(params\)|
-|50|历史与预测查询|GET|/api/v1/history/passenger\-flow/prediction|查询客流预测记录|无需鉴权（按当前代码）|getPassengerFlowPrediction\(params\)|
+|50|历史与预测查询（兼容/实验）|GET|/api/v1/history/passenger\-flow/prediction|查询客流预测记录（兼容/实验接口，非第一阶段核心能力）|无需鉴权（按当前代码）|getPassengerFlowPrediction\(params\)|
 |51|实时 ETA（LTA Bus Arrival）|GET|/api/v1/eta|基于 LTA 实时数据返回预计到站时间；字段 predicted_eta_minutes/model_version 为历史兼容命名|无需鉴权（按当前代码）|getEta\(params\)|
 |52|实时客载（正式）|POST|/api/v1/realtime-passenger-load|查询 LTA 实时客载状态（不含 predicted 前缀）|无需鉴权（按当前代码）|getRealtimePassengerLoad\(data\)|
 |52a|实时客载（兼容旧路径）|POST|/api/v1/passenger\-load\-prediction|同上，兼容旧路径，字段含 predicted 前缀|无需鉴权（按当前代码）|predictPassengerLoad\(data\)|
@@ -193,6 +193,16 @@
 |60|仿真与预测更新|POST|/api/v1/simulation/prediction\-results|写入/刷新预测结果|admin（Bearer Token）|updatePredictionResult\(data\)|
 |61|仿真与预测更新|PATCH|/api/v1/simulation/vehicle\-status/\{vehicle\_id\}|更新仿真车辆状态|admin（Bearer Token）|updateVehicleStatus\(vehicleId,   data\)|
 |62|健康检查|GET|/|服务健康检查|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|63|健康检查|GET|/api/v1/|API v1 健康检查|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|64|线路管理（兼容别名）|GET|/api/v1/bus\-lines/\{line\_id\}/map|线路地图数据|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|65|线路管理（兼容别名）|GET|/api/v1/bus\-lines/\{line\_id\}/geometry|线路几何数据 GeoJSON|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|66|站点管理（兼容别名）|GET|/api/v1/bus\-stations/nearby|查询附近站点（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|67|车辆管理（兼容别名）|GET|/api/v1/bus\-vehicles/realtime|查询实时车辆位置（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|68|站点管理（兼容）|GET|/api/v1/stations/nearby|附近站点（GET 不支持，返回 405 提示用 POST 或 /bus\-stations/nearby）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|69|历史与预测查询（兼容）|GET|/api/v1/history/passenger\-load|查询客载负载（兼容旧路径，聚合 load 查询）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|70|历史与预测查询（兼容）|GET|/api/v1/history/predictions|聚合预测查询（兼容，按 prediction\_type 聚合）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|71|位置搜索（兼容旧路径）|GET|/api/v1/location/nearby|查询附近站点（兼容旧路径）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|72|位置搜索（兼容旧路径）|GET|/api/v1/location/\{station\_id\}|查询站点详情（兼容旧路径）|无需鉴权（按当前代码）|后端兼容/无直接调用|
 
 
 
@@ -1529,9 +1539,9 @@
 
 
 
-## 4\.7 历史与预测查询
+## 4.7 历史与预测查询
 
-查询历史客流以及已写入的 ETA、车辆客载和客流预测记录。
+查询历史客流以及已写入的 ETA、车辆客载记录。`/history/passenger-flow/prediction` 为兼容/实验接口，**非第一阶段核心能力**，保留运行但不作为核心算法宣传。
 
 ### 4\.7\.1 GET /api/v1/history/eta/line/\{line\_id\}
 
@@ -1693,15 +1703,15 @@
 
 
 
-### 4\.7\.6 GET /api/v1/history/passenger\-flow/prediction
+### 4\.7\.6 GET /api/v1/history/passenger\-flow/prediction（兼容/实验，非第一阶段核心）
 
 |**项目**|**内容**|
 |---|---|
-|**接口名称**|查询客流预测记录|
+|**接口名称**|查询客流预测记录（兼容/实验接口）|
 |**模块**|历史与预测查询|
 |**当前鉴权**|无需鉴权（按当前代码）|
 |**前端方法**|getPassengerFlowPrediction\(params\)|
-|**数据来源/实现**|历史客流、ETA、客载预测记录表。|
+|**数据来源/实现**|历史客流预测记录表。**非第一阶段核心能力**，保留运行但不作为核心算法宣传。|
 
 
 
@@ -1944,6 +1954,17 @@
 |**当前鉴权**|无需鉴权（按当前代码）|
 |**前端方法**|askAiTravel\(data\)|
 |**数据来源/实现**|DeepSeek   可选；不可用时使用本地结构化回退。|
+
+**联调验证记录（2026-07-12）**
+
+| 场景 | 请求 | 响应 code | fallback | answer | reminders | trace_id |
+|---|---|---|---|---|---|---|
+| QA 成功（无 DeepSeek） | `{"mode":"qa","question":"高峰期出行有什么建议？"}` | 0 | `true` | 本地回退文案 | `[]` | `req_ai_…`（正常） |
+| QA 缺 question | `{"mode":"qa"}` | 42200 | — | — | — | `req_…`（正常） |
+| Suggest 缺站点 | `{"mode":"suggest"}` | 42200 | — | — | — | `req_…`（正常） |
+| Suggest 正常 | `{"mode":"suggest","question":"…","start_station_id":1,"end_station_id":12,"preference":"comfort"}` | — | — | — | — | 需 MySQL 运行 |
+
+**前端当前读取情况**：`AiAssistantView` 正确读取 `response.data?.answer` 和 `response.data?.reminders`；`catch` 块展示 `error.response?.data?.message`。不读取 `fallback`、`used_tools`、`related_routes`、`trace_id`。路由 `/ai` 已注册。
 
 
 
