@@ -26,6 +26,8 @@ docs/          接口文档、数据库文档和项目文档
 postman/       接口测试集合
 ```
 
+目录唯一性约定：前端只维护根目录 `frontend/`，项目文档只维护根目录 `docs/`。不要在 `backend/` 下复制前端或文档镜像，否则会造成重复修改和合并冲突。
+
 ## 环境准备
 
 需要提前安装：
@@ -34,7 +36,7 @@ postman/       接口测试集合
 - Node.js 18+ 或 20+
 - MySQL 8.x，若只看基础页面和部分接口，可先用默认 SQLite
 
-后端 `.env` 放在项目根目录：
+后端 `.env` 放在 `backend/` 目录（与启动命令的工作目录一致）：
 
 ```env
 DATABASE_URL=mysql+pymysql://busmind_dev:密码@127.0.0.1:3307/busmind?charset=utf8mb4
