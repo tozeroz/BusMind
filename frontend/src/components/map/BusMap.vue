@@ -748,7 +748,7 @@ async function loadRealBusStops() {
     await loadRealBusRoutes()
   } catch (error) {
     console.warn('map stations load failed', error?.message)
-    emit('load-error', '\u5730\u56fe\u7ad9\u70b9\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u540e\u7aef\u548c\u6570\u636e\u5e93\u3002')
+    emit('load-error', '地图站点加载失败，请检查后端和数据库。')
   }
 }
 function lineToFeature(line) {
@@ -823,7 +823,7 @@ async function loadRealBusRoutes() {
     if (selectedStopForRoutes) highlightStopReachableRoutes(selectedStopForRoutes)
   } catch (error) {
     console.warn('map routes load failed', error?.message)
-    emit('load-error', '\u5730\u56fe\u7ebf\u8def/\u8def\u6bb5\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u540e\u7aef\u548c\u6570\u636e\u5e93\u3002')
+    emit('load-error', '地图线路/路段加载失败，请检查后端和数据库。')
   }
 }
 

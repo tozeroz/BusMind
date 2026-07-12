@@ -19,7 +19,7 @@ export const saveCurrentUser = (user, storage = localStorage) => {
   if (user && typeof user === 'object') storage.setItem(AUTH_USER_KEY, JSON.stringify(user))
 }
 
-export const saveAuthSession = ({ accessToken, user, remember = true }) => {
+export const saveAuthSession = ({ accessToken, user, remember = false }) => {
   const storage = remember ? localStorage : sessionStorage
   clearAuthToken()
   saveAuthToken(accessToken, storage)
@@ -27,9 +27,7 @@ export const saveAuthSession = ({ accessToken, user, remember = true }) => {
 }
 
 export const getAuthToken = () =>
-  localStorage.getItem(AUTH_TOKEN_KEY)
-  || localStorage.getItem('access_token')
-  || sessionStorage.getItem(AUTH_TOKEN_KEY)
+  sessionStorage.getItem(AUTH_TOKEN_KEY)
   || sessionStorage.getItem('access_token')
   || ''
 

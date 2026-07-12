@@ -1095,6 +1095,93 @@ label {
   background: linear-gradient(180deg, #ffffff, rgba(246, 176, 170, 0.9));
 }
 
+
+.map-passenger-info {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.passenger-info-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.passenger-info-row span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+}
+
+.passenger-info-row strong {
+  min-width: 0;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.map-player-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(10, 28, 48, 0.22);
+}
+
+.map-player-slot strong,
+.map-player-slot span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-player-slot strong {
+  color: #fff;
+  font-size: 15px;
+}
+
+.map-player-slot span {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+}
+
+.player-control-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.player-control-row i,
+.player-control-row b {
+  display: block;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.player-control-row i {
+  width: 8px;
+  height: 8px;
+}
+
+.player-control-row b {
+  width: 28px;
+  height: 28px;
+  box-shadow: inset 9px 0 0 rgba(42, 78, 112, 0.88), inset -9px 0 0 rgba(42, 78, 112, 0.88);
+}
+
 .map-mini-toggle,
 .map-info-dock,
 .map-ai-card {
@@ -1155,7 +1242,10 @@ label {
   top: 22px;
   left: 22px;
   width: min(340px, calc(100% - 44px));
-  max-height: calc(100% - 44px);
+  height: min(560px, calc(100% - 210px));
+  min-height: 430px;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
   padding: 14px;
   transform-origin: top left;

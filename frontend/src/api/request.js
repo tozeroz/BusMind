@@ -12,8 +12,6 @@ const service = axios.create({
 
 service.interceptors.request.use((config) => {
   const token =
-    localStorage.getItem(AUTH_TOKEN_KEY) ||
-    localStorage.getItem('access_token') ||
     sessionStorage.getItem(AUTH_TOKEN_KEY) ||
     sessionStorage.getItem('access_token')
 
