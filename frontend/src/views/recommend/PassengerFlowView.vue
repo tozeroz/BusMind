@@ -4,7 +4,7 @@
       <div class="section-title">
         <div>
           <p class="eyebrow">客流数据</p>
-          <h2>历史客流与预测趋势</h2>
+          <h2>历史客流分析</h2>
           <p class="muted">Passenger Flow 表示站点或线路上下车客流，不等同于车辆客载。</p>
         </div>
         <div class="card-actions">
@@ -46,14 +46,14 @@
       </section>
 
       <section>
-        <h3>近期预测</h3>
+        <h3>近期客流趋势</h3>
         <div class="card-list compact">
           <article v-for="item in predictionItems.slice(0, 10)" :key="item.prediction_id" class="vehicle-card">
             <strong>{{ item.target_type }} {{ item.target_id }}</strong>
             <p>{{ timeLabel(item.predict_time) }} · 预计 {{ item.predicted_flow }} 人</p>
             <span class="level-tag" :class="crowdClass(levelText(item.crowd_level))">{{ levelText(item.crowd_level) }}</span>
           </article>
-          <p v-if="!predictionItems.length" class="muted">暂无预测记录。</p>
+          <p v-if="!predictionItems.length" class="muted">暂无近期客流记录。</p>
         </div>
       </section>
     </div>
@@ -62,7 +62,7 @@
       <div class="section-title">
         <div>
           <p class="eyebrow">线路客载</p>
-          <h3>线路车辆客载预测</h3>
+          <h3>线路车辆客载</h3>
           <p class="muted">Passenger Load 表示车辆内客载状态，与站点/线路客流 (Passenger Flow) 不同。</p>
         </div>
         <select v-model="loadLineId" class="compact-input" @change="loadLoadPredictions">
@@ -86,7 +86,7 @@
           <span class="level-tag" :class="crowdClass(loadLevelText(item.predicted_load_level))">{{ loadLevelText(item.predicted_load_level) }}</span>
           <span v-if="item.predicted_load_rate != null" class="muted">客载率 {{ formatPercent(item.predicted_load_rate) }}</span>
         </article>
-        <p v-if="!loadPredictionItems.length" class="muted">暂无客载预测记录。</p>
+        <p v-if="!loadPredictionItems.length" class="muted">暂无客载记录。</p>
       </div>
     </div>
   </section>
@@ -163,7 +163,7 @@ const loadLoadPredictions = async () => {
     }
   } catch (error) {
     loadPredictionItems.value = []
-    loadErrorMessage.value = error?.response?.data?.message || '线路客载预测加载失败'
+    loadErrorMessage.value = error?.response?.data?.message || '线路客载加载失败'
   }
 }
 

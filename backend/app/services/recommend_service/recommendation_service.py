@@ -337,7 +337,7 @@ class RecommendationService:
                 w_congestion=0.06,
                 w_reliability=0.08,
             )
-        if preference == Preference.LOW_LOAD:
+        if preference in (Preference.COMFORT, Preference.LOW_LOAD):
             return ExperienceWeights(
                 w_eta=0.12,
                 w_load=0.28,
@@ -378,7 +378,7 @@ class RecommendationService:
     ) -> list[RouteRecommendation]:
         if preference == Preference.FASTEST:
             return sorted(items, key=lambda item: (item.total_time_minutes, -item.experience_score))
-        if preference == Preference.LOW_LOAD:
+        if preference in (Preference.COMFORT, Preference.LOW_LOAD):
             return sorted(items, key=lambda item: (-item.predicted_load.load_score, item.total_time_minutes))
         if preference == Preference.LESS_WALKING:
             return sorted(items, key=lambda item: (item.walk_time_minutes, -item.experience_score))

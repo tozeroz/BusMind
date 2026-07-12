@@ -7,7 +7,8 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.dependencies.auth import get_db
+from app.dependencies.auth import get_current_admin_user, get_db
+from app.models.user import User
 from app.schemas.user_schema import ApiResponse
 from app.schemas.vehicle_schema import VehicleCreateRequest, VehicleUpdateRequest
 from app.services.vehicle_service import (
@@ -91,6 +92,7 @@ async def get_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
 async def create_vehicle_api(
     request: VehicleCreateRequest,
     db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     try:
         vehicle = create_vehicle(db, request)
@@ -110,6 +112,7 @@ async def update_vehicle_api(
     vehicle_id: int,
     request: VehicleUpdateRequest,
     db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     try:
         vehicle = update_vehicle(db, vehicle_id, request)
@@ -127,7 +130,11 @@ async def update_vehicle_api(
 
 
 @router.delete("/{vehicle_id}", response_model=ApiResponse, summary="Delete Vehicle")
-async def delete_vehicle_api(vehicle_id: int, db: Session = Depends(get_db)):
+async def delete_vehicle_api(
+    vehicle_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
+):
     if not delete_vehicle(db, vehicle_id):
         raise HTTPException(
             status_code=404,

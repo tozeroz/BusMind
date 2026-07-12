@@ -6,11 +6,11 @@
 ## 2026-07-12 增量核对结论
 
 - 当前运行时 OpenAPI 共 **72 个操作**：`/`、`/api/v1/` 两个健康检查及 70 个业务操作。
-- 正式主路径使用 `/lines`、`/stations`、`/vehicles`、`/locations` 等；`/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime` 是兼容路径。`POST /simulation/lta-bus-arrival/refresh` 在 OpenAPI 中明确 `deprecated: true`，正式替代入口为 `/admin/lta/bus-arrival/refresh`。
-- ETA 的业务来源应解释为 **LTA Bus Arrival 实时数据**；Load 的业务来源应解释为 **LTA 实时客载字段**。当前代码仍沿用 `predicted_eta_minutes`、`predicted_load_*`、`model_version` 等历史命名，这些是现行接口字段，不代表项目训练了 ETA 或客载预测模型。
+- 正式主路径使用 `/lines`、`/stations`、`/vehicles`、`/locations` 等；`/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime` 是兼容路径。`POST /simulation/lta-bus-arrival/refresh` 在 OpenAPI 中明确 `deprecated: true`，正式替代入口为 `/admin/lta/bus-arrival/refresh`。所有后台刷新接口和线路/站点/车辆写操作（POST/PATCH/DELETE）均要求 admin 角色，非 admin 返回 403。
+- ETA 的业务来源应解释为 **LTA Bus Arrival 实时数据**；Load 的业务来源应解释为 **LTA 实时客载字段**，正式接口为 `POST /realtime-passenger-load`（响应字段 `load_rate`/`load_level`/`onboard_count`），旧路径 `/passenger-load-prediction` 保留兼容。当前代码中 `predicted_*` 历史命名不代表项目训练了 ETA 或客载预测模型。
 - Passenger Flow 是历史客流分析能力，第一阶段不作为预测模型。`/history/passenger-flow/prediction` 和仿真预测写入接口仍在运行，保留但标为历史/兼容能力，不作为第一阶段核心算法宣传。
 - 核心算法口径统一为：**多源数据融合、多目标评分和个性化推荐**。
-- 正式推荐偏好目标为 `balanced`、`fastest`、`comfort`、`less_walking`、`less_transfer`，`low_load` 仅为兼容别名并应映射到 `comfort`。但当前运行时 OpenAPI 的 `Preference` 仍接受 `low_load`、不接受 `comfort`，且代码中未发现映射；在后端修复前，调用方只能按现行契约传 `low_load`。此项列入《接口文档冲突与待确认清单.md》。
+- 正式推荐偏好目标为 `balanced`、`fastest`、`comfort`、`less_walking`、`less_transfer`，`low_load` 作为兼容别名保留并映射到 `comfort`。当前运行时 OpenAPI 已同时接受 `comfort` 和 `low_load`，前端可直接使用正式值 `comfort`。
 - 统一响应字段是 `trace_id`，不是 `request_id`；分页参数以运行时 OpenAPI 的 `page`、`limit` 为准。
 
 # 目录
@@ -101,9 +101,9 @@
 |当前用户、收藏、查询历史|是|Authorization:   Bearer \<access\_token\>。|
 |线路、站点、车辆、地图、位置、历史查询|否|便于演示和前端联调。|
 |ETA、客载、步行、推荐、AI|否|当前代码未绑定用户；AI   可使用请求 context。|
-|线路/站点/车辆写接口|否|当前代码可直接调用；生产环境建议增加 admin 权限。|
-|后台 LTA 采集刷新|否|当前代码未绑定鉴权；建议仅内部或管理员调用。|
-|仿真与预测更新|否|建议部署时限制为内部服务或 admin。|
+|线路/站点/车辆写接口|是（admin）|POST/PATCH/DELETE 操作要求 admin 角色；非 admin 返回 403。|
+|后台 LTA 采集刷新|是（admin）|写操作接口要求 admin 角色；非 admin 返回 403。|
+|仿真与预测更新|是（admin）|写操作接口要求 admin 角色；非 admin 返回 403。|
 
 ## 2\.5 主要枚举
 
@@ -114,7 +114,7 @@
 |车辆   CRUD status|running   / stopped / maintenance|数据库车辆运行状态。|
 |仿真   VehicleRunStatus|normal   / delayed / offline|智能/仿真模块运行状态。|
 |LoadLevel|seats\_available   / standing\_available / limited\_standing|有座位 / 可站立 / 站立空间有限。|
-|preference（正式业务口径）|balanced / fastest / comfort / less\_walking / less\_transfer|正式推荐偏好；low\_load 只作为映射到 comfort 的兼容别名。当前 OpenAPI 尚未完成该迁移，仍枚举 low\_load 而非 comfort。|
+|preference（正式业务口径）|balanced / fastest / comfort / less\_walking / less\_transfer|正式推荐偏好；low\_load 作为兼容别名保留，与 comfort 行为一致。|
 |ai   mode|qa   / suggest / explain|问答   / 建议 / 路线解释。|
 |route\_mode|straight\_line   / map\_api|步行估算模式。|
 |prediction\_type|eta   / passenger\_load / passenger\_flow|写入的预测结果类别。|
@@ -174,23 +174,24 @@
 |42|位置搜索|GET|/api/v1/locations/nearby|按坐标查询附近站点|无需鉴权（按当前代码）|getNearbyLocations\(params\)|
 |43|位置搜索|GET|/api/v1/locations/search|搜索位置/站点|无需鉴权（按当前代码）|searchLocations\(params\)|
 |44|位置搜索|GET|/api/v1/locations/\{location\_id\}|查询位置/站点详情|无需鉴权（按当前代码）|getLocationDetail\(locationId\)|
-|45|历史与预测查询|GET|/api/v1/history/eta/line/\{line\_id\}|查询线路 ETA 预测记录|无需鉴权（按当前代码）|getEtaPredictionsByLine\(lineId,   params\)|
-|46|历史与预测查询|GET|/api/v1/history/eta/\{vehicle\_id\}/\{target\_station\_id\}|查询车辆到目标站的最新 ETA|无需鉴权（按当前代码）|getEtaPredictionForVehicle\(vehicleId,   targetStationId, params\)|
+|45|历史与预测查询|GET|/api/v1/history/eta/line/\{line\_id\}|查询线路 ETA 历史记录（LTA 实时数据）|无需鉴权（按当前代码）|getEtaPredictionsByLine\(lineId,   params\)|
+|46|历史与预测查询|GET|/api/v1/history/eta/\{vehicle\_id\}/\{target\_station\_id\}|查询车辆到目标站的最新 ETA（LTA 实时数据）|无需鉴权（按当前代码）|getEtaPredictionForVehicle\(vehicleId,   targetStationId, params\)|
 |47|历史与预测查询|GET|/api/v1/history/load/line/\{line\_id\}|查询线路客载预测记录|无需鉴权（按当前代码）|getLoadPredictionsByLine\(lineId,   params\)|
 |48|历史与预测查询|GET|/api/v1/history/load/\{line\_id\}|查询最新客载预测|无需鉴权（按当前代码）|getLoadPrediction\(lineId,   params\)|
 |49|历史与预测查询|GET|/api/v1/history/passenger\-flow|查询历史客流趋势|无需鉴权（按当前代码）|getPassengerFlowTrend\(params\)|
 |50|历史与预测查询|GET|/api/v1/history/passenger\-flow/prediction|查询客流预测记录|无需鉴权（按当前代码）|getPassengerFlowPrediction\(params\)|
-|51|实时 ETA（兼容字段仍含 predicted）|GET|/api/v1/eta|基于 LTA Bus Arrival 实时数据计算预计到站时间|无需鉴权（按当前代码）|getEta\(params\)|
-|52|实时客载（兼容路径仍含 prediction）|POST|/api/v1/passenger\-load\-prediction|读取/整理 LTA 实时客载状态|无需鉴权（按当前代码）|predictPassengerLoad\(data\)|
+|51|实时 ETA（LTA Bus Arrival）|GET|/api/v1/eta|基于 LTA 实时数据返回预计到站时间；字段 predicted_eta_minutes/model_version 为历史兼容命名|无需鉴权（按当前代码）|getEta\(params\)|
+|52|实时客载（正式）|POST|/api/v1/realtime-passenger-load|查询 LTA 实时客载状态（不含 predicted 前缀）|无需鉴权（按当前代码）|getRealtimePassengerLoad\(data\)|
+|52a|实时客载（兼容旧路径）|POST|/api/v1/passenger\-load\-prediction|同上，兼容旧路径，字段含 predicted 前缀|无需鉴权（按当前代码）|predictPassengerLoad\(data\)|
 |53|步行、体验评价与路线推荐|POST|/api/v1/recommend\-routes|生成公交出行推荐方案|无需鉴权（按当前代码）|recommendRoutes\(data\)|
 |54|步行、体验评价与路线推荐|POST|/api/v1/travel\-experience/evaluate|计算出行体验评分|无需鉴权（按当前代码）|evaluateTravelExperience\(data\)|
 |55|步行、体验评价与路线推荐|POST|/api/v1/walking\-time\-estimation|估算前往上车站的步行时间|无需鉴权（按当前代码）|estimateWalkingTime\(data\)|
 |56|AI   出行助手|POST|/api/v1/ai/travel|AI 出行问答、建议与路线解释|无需鉴权（按当前代码）|askAiTravel\(data\)|
-|57|后台 LTA 采集刷新|POST|/api/v1/admin/lta/bus\-arrival/refresh|手动刷新 LTA 公交到站并可同步入库|无需鉴权（按当前代码）|后端管理/无直接调用|
-|58|后台 LTA 采集刷新|POST|/api/v1/admin/lta/traffic\-speed\-bands/refresh|手动刷新 LTA 路况速度带并可同步入库|无需鉴权（按当前代码）|后端管理/无直接调用|
-|59|仿真与预测更新|POST|/api/v1/simulation/lta\-bus\-arrival/refresh|刷新   LTA 公交到站数据（兼容旧入口，已废弃）|无需鉴权（按当前代码）|refreshLtaBusArrival\(data\)|
-|60|仿真与预测更新|POST|/api/v1/simulation/prediction\-results|写入/刷新预测结果|无需鉴权（按当前代码）|updatePredictionResult\(data\)|
-|61|仿真与预测更新|PATCH|/api/v1/simulation/vehicle\-status/\{vehicle\_id\}|更新仿真车辆状态|无需鉴权（按当前代码）|updateVehicleStatus\(vehicleId,   data\)|
+|57|后台 LTA 采集刷新|POST|/api/v1/admin/lta/bus\-arrival/refresh|手动刷新 LTA 公交到站并可同步入库|admin（Bearer Token）|后端管理/无直接调用|
+|58|后台 LTA 采集刷新|POST|/api/v1/admin/lta/traffic\-speed\-bands/refresh|手动刷新 LTA 路况速度带并可同步入库|admin（Bearer Token）|后端管理/无直接调用|
+|59|仿真与预测更新|POST|/api/v1/simulation/lta\-bus\-arrival/refresh|刷新   LTA 公交到站数据（兼容旧入口，已废弃）|admin（Bearer Token）|refreshLtaBusArrival\(data\)|
+|60|仿真与预测更新|POST|/api/v1/simulation/prediction\-results|写入/刷新预测结果|admin（Bearer Token）|updatePredictionResult\(data\)|
+|61|仿真与预测更新|PATCH|/api/v1/simulation/vehicle\-status/\{vehicle\_id\}|更新仿真车辆状态|admin（Bearer Token）|updateVehicleStatus\(vehicleId,   data\)|
 |62|健康检查|GET|/|服务健康检查|无需鉴权（按当前代码）|后端兼容/无直接调用|
 
 
@@ -1536,11 +1537,11 @@
 
 |**项目**|**内容**|
 |---|---|
-|**接口名称**|查询线路 ETA 预测记录|
+|**接口名称**|查询线路 ETA 历史记录（LTA 实时数据）|
 |**模块**|历史与预测查询|
 |**当前鉴权**|无需鉴权（按当前代码）|
 |**前端方法**|getEtaPredictionsByLine\(lineId,   params\)|
-|**数据来源/实现**|历史客流、ETA、客载预测记录表。|
+|**数据来源/实现**|LTA Bus Arrival 实时数据的历史记录（MySQL 缓存）。字段含 predicted_eta_minutes 为历史兼容命名。|
 
 
 
@@ -1567,11 +1568,11 @@
 
 |**项目**|**内容**|
 |---|---|
-|**接口名称**|查询车辆到目标站的最新 ETA|
+|**接口名称**|查询车辆到目标站的最新 ETA（LTA 实时数据）|
 |**模块**|历史与预测查询|
 |**当前鉴权**|无需鉴权（按当前代码）|
 |**前端方法**|getEtaPredictionForVehicle\(vehicleId,   targetStationId, params\)|
-|**数据来源/实现**|历史客流、ETA、客载预测记录表。|
+|**数据来源/实现**|LTA Bus Arrival 实时数据的历史记录（MySQL 缓存）。|
 
 
 
@@ -1723,19 +1724,19 @@
 |**统一外壳**|ApiResponse|code、message、data、trace\_id、timestamp。|
 |**data**|PassengerFlowPredictionDTO\[\]|字段明细见“核心数据模型”。|
 
-## 4\.8 ETA 预测
+## 4\.8 实时 ETA（LTA Bus Arrival 实时数据）
 
-计算指定车辆到目标站点的预计到站时间。
+基于 LTA Bus Arrival 实时数据返回指定车辆到目标站点的预计到站时间。字段 `predicted_eta_minutes` / `model_version` 为历史兼容命名，不代表自研预测模型。
 
 ### 4\.8\.1 GET /api/v1/eta
 
 |**项目**|**内容**|
 |---|---|
-|**接口名称**|计算车辆预计到站时间|
-|**模块**|ETA   预测|
+|**接口名称**|查询 LTA 实时 ETA（预计到站时间）|
+|**模块**|实时 ETA（LTA Bus Arrival）|
 |**当前鉴权**|无需鉴权（按当前代码）|
 |**前端方法**|getEta\(params\)|
-|**数据来源/实现**|实时网关/仿真状态 \+ 规则或可选模型。|
+|**数据来源/实现**|LTA Bus Arrival 实时数据（MySQL 缓存）→ 仿真覆盖 → 规则兜底。非自研 ETA 预测模型。响应字段 `predicted_eta_minutes` / `model_version` 为历史兼容命名。|
 
 
 
@@ -1760,47 +1761,55 @@
 
 
 
-## 4\.9 实时车辆客载（兼容路径名仍为 passenger-load-prediction）
+## 4\.9 实时车辆客载（LTA 实时数据）
 
-根据线路、站点、车辆和时段等信息预测车辆客载。
+基于 LTA Bus Arrival 实时客载字段，返回指定线路/站点/车辆的当前客载状态。正式接口不含 `predicted` 前缀，旧路径保留兼容。
 
-### 4\.9\.1 POST /api/v1/passenger\-load\-prediction
+### 4\.9\.1 POST /api/v1/realtime-passenger-load（正式）
 
 |**项目**|**内容**|
 |---|---|
-|**接口名称**|预测车辆客载状态|
-|**模块**|车辆客载预测|
+|**接口名称**|查询 LTA 实时客载状态|
+|**模块**|车辆客载|
 |**当前鉴权**|无需鉴权（按当前代码）|
-|**前端方法**|predictPassengerLoad\(data\)|
-|**数据来源/实现**|实时网关/仿真状态 \+ 规则或可选模型。|
-
-
+|**前端方法**|getRealtimePassengerLoad\(data\)|
+|**数据来源/实现**|LTA 实时接口 → MySQL `bus_load_status` / `lta_arrival` 缓存；无可用的实时数据时回退到规则估算。非自研预测模型。|
 
 **请求参数**
 
 |**字段**|**位置**|**类型**|**必填**|**说明**|
 |---|---|---|---|---|
-|line\_id|Body|int|是|线路编号。   \> 0。|
-|station\_id|Body|int|是|站点编号。   \> 0。|
+|line\_id|Body|int|是|线路编号。 \> 0。|
+|station\_id|Body|int|是|站点编号。 \> 0。|
 |vehicle\_id|Body|int（可空）|否|车辆编号。|
-|target\_time|Body|datetime（可空）|否|客载预测目标时间；省略时使用当前时间。|
-|current\_onboard\_count|Body|int（可空）|否|预测输入中的当前车上人数。|
+|target\_time|Body|datetime（可空）|否|查询时间；省略时使用当前时间。|
+|current\_onboard\_count|Body|int（可空）|否|当前车上人数。|
 |capacity|Body|int（可空）|否|车辆核定容量。|
 |weather|Body|string（可空）|否|天气特征，最长 32 个字符。|
-
-
 
 **响应结构**
 
 |**响应项**|**类型/结构**|**说明**|
 |---|---|---|
-|**HTTP 状态**|200   / 422|OpenAPI 中声明的响应状态；业务成功 code=0。|
+|**HTTP 状态**|200 / 422|业务成功 code=0。|
 |**统一外壳**|ApiResponse|code、message、data、trace\_id、timestamp。|
-|**data**|PassengerLoadPredictionResult|字段明细见“核心数据模型”。|
+|**data**|RealtimePassengerLoadResult|字段：`line_id`、`station_id`、`vehicle_id`、`onboard_count`、`capacity`、`load_rate`、`load_level`、`load_score`、`confidence`、`query_time`、`feature_summary`、`model_version`。|
 
+### 4\.9\.2 POST /api/v1/passenger-load-prediction（兼容旧路径）
 
+|**项目**|**内容**|
+|---|---|
+|**接口名称**|查询客载状态（兼容旧路径）|
+|**模块**|车辆客载（兼容）|
+|**当前鉴权**|无需鉴权（按当前代码）|
+|**前端方法**|predictPassengerLoad\(data\)|
+|**数据来源/实现**|同 4.9.1，内部调用同一服务。响应字段保留 `predicted_*` 前缀以兼容旧调用方。|
 
-|**说明：**该接口预测车辆 Passenger Load，不是站点 Passenger Flow。|
+**请求参数**：同 4.9.1。
+
+**响应结构**：`data` 为 `PassengerLoadPredictionResult`，字段 `predicted_onboard_count`/`predicted_load_rate`/`predicted_load_level`/`predict_time` 对应正式接口的 `onboard_count`/`load_rate`/`load_level`/`query_time`。
+
+|**说明：**该接口查询车辆 Passenger Load（车内客载），不是站点 Passenger Flow（客流）。|
 |---|
 
 
@@ -1977,7 +1986,7 @@
 |---|---|
 |**接口名称**|手动刷新 LTA 公交到站并可同步入库|
 |**模块**|后台 LTA 采集刷新|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）；非 admin 返回 403。|
 |**前端方法**|后端管理/无直接调用|
 |**数据来源/实现**|LtaCollectorService.refresh\_bus\_arrival\(\)；CacheSyncService.sync\_bus\_arrival\(\)。|
 
@@ -2014,7 +2023,7 @@
 |---|---|
 |**接口名称**|手动刷新 LTA 路况速度带并可同步入库|
 |**模块**|后台 LTA 采集刷新|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）；非 admin 返回 403。|
 |**前端方法**|后端管理/无直接调用|
 |**数据来源/实现**|LtaCollectorService.refresh\_traffic\_speed\_bands\(\)；CacheSyncService.sync\_traffic\_speed\_bands\(\)。|
 
@@ -2053,7 +2062,7 @@
 |---|---|
 |**接口名称**|刷新   LTA 公交到站数据（兼容旧入口，已废弃）|
 |**模块**|仿真与预测更新|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）；非 admin 返回 403。|
 |**前端方法**|refreshLtaBusArrival\(data\)|
 |**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新；实际转调 SimulationService.refresh\_bus\_arrival\_status\_from\_lta\(\)。|
 
@@ -2094,7 +2103,7 @@
 |---|---|
 |**接口名称**|写入/刷新预测结果|
 |**模块**|仿真与预测更新|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）；非 admin 返回 403。|
 |**前端方法**|updatePredictionResult\(data\)|
 |**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新。|
 
@@ -2146,7 +2155,7 @@
 |---|---|
 |**接口名称**|更新仿真车辆状态|
 |**模块**|仿真与预测更新|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）；非 admin 返回 403。|
 |**前端方法**|updateVehicleStatus\(vehicleId,   data\)|
 |**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新。|
 
@@ -2736,16 +2745,16 @@
 
 ### EtaResult
 
-实时 ETA 计算结果。
+LTA 实时 ETA 计算结果（数据来源：LTA Bus Arrival 实时数据，非自研预测模型）。
 
 |**字段**|**中文含义**|**类型**|**必有**|**说明**|
 |---|---|---|---|---|
 |vehicle\_id|车辆编号|int|是|车辆编号。   \> 0。|
 |target\_station\_id|目标站编号|int|是|目标到站/上车站编号。 \> 0。|
-|predicted\_eta\_minutes|预计到站分钟|float|是|预计到站时间，单位分钟。 \>= 0。|
+|predicted\_eta\_minutes|预计到站分钟|float|是|预计到站时间，单位分钟。 \>= 0。字段名含 predicted 为历史兼容，实际来自 LTA 实时数据。|
 |arrival\_time|预计到站时间|datetime|是|预计到站时间点。|
-|factors|factors|object|是|factors   字段。|
-|model\_version|模型版本|string|是|模型或规则版本。|
+|factors|factors|object|是|ETA 计算因子（数据源、距离、速度、置信度等）。|
+|model\_version|数据版本|string|是|ETA 数据版本标识（历史兼容字段，非 ML 模型版本号；实际值如 eta_mysql_realtime_v1 / eta_rule_v1）。|
 
 
 
@@ -3052,6 +3061,3 @@ LTA 到站数据刷新结果。
 
 |POST /api/v1/admin/lta/traffic\-speed\-bands/refresh<br>Content\-Type: application/json<br>\{<br>    "sync\_to\_db": true<br>\}|
 |---|
-
-
-

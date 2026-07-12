@@ -16,6 +16,16 @@ from app.services.simulation_service.store import (
 
 
 class EtaService:
+    """ETA 服务：基于 LTA Bus Arrival 实时数据计算预计到站时间。
+
+    数据源优先级：
+    1. 仿真状态覆盖（SimulationStateStore）
+    2. LTA 实时数据（MySQL 缓存，通过 gateway.get_latest_eta_status）
+    3. 规则兜底（距离/速度/停站数估算）
+
+    非自研 ETA 预测模型。字段 predicted_eta_minutes / model_version 为历史兼容命名。
+    """
+
     def __init__(
         self,
         gateway: IntelligenceDataGateway,
@@ -160,4 +170,3 @@ class EtaService:
             if isinstance(value, (int, float)):
                 return float(value), str(result.get("model_version", "eta_external_model"))
         return None, ""
-

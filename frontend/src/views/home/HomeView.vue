@@ -189,6 +189,7 @@ import { askAiTravel } from '@/api/ai'
 import { getNearbyLocations, searchLocations } from '@/api/location'
 import { recommendRoutes } from '@/api/intelligence'
 import { getPassengerFlowTrend } from '@/api/history'
+import { formatEtaDisplay } from '@/utils/eta'
 
 const busMapRef = ref(null)
 const query = reactive({ start: '乌节站', end: '滨海湾' })
@@ -468,7 +469,7 @@ const selectStation = (stop) => {
   selectedInfo.name = stop.stop_name
   selectedInfo.crowd = stop.crowd_level ? loadLevelText(stop.crowd_level) : '暂无实时客流'
   selectedInfo.status = stop.crowd_level ? (stop.crowd_level === 'high' ? '较高' : '正常') : '站点数据已接入'
-  selectedInfo.eta = Number.isFinite(Number(stop.eta_minutes)) ? `约 ${stop.eta_minutes} 分钟` : '暂无实时到站'
+  selectedInfo.eta = formatEtaDisplay(stop)
   selectedInfo.routes = stop.passing_routes?.join(' / ') || '暂无线路关联'
   selectedInfo.chart = stop.crowd_level === 'high' ? [68, 74, 82, 90, 76] : [34, 48, 56, 52, 44]
   selectedInfo.flowSource = 'local'
@@ -486,7 +487,7 @@ const selectRoad = (route) => {
   selectedInfo.name = route.line_name || route.title
   selectedInfo.crowd = route.load || loadLevelText(route.crowd_level)
   selectedInfo.status = route.status || (selectedInfo.crowd === '拥挤' ? '建议关注' : '运行正常')
-  selectedInfo.eta = route.eta || route.eta_minutes ? `约 ${route.eta || route.eta_minutes} 分钟` : '约 8 分钟'
+  selectedInfo.eta = formatEtaDisplay(route)
   selectedInfo.routes = ''
   selectedInfo.chart = normalizeChart(route.chart)
 }

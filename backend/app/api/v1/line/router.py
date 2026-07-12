@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
 from typing import Optional
-from app.dependencies.auth import get_db
+from app.dependencies.auth import get_current_admin_user, get_db
+from app.models.user import User
 from app.services.bus_service import (
     get_line_list,
     get_line_by_id,
@@ -113,7 +114,8 @@ async def get_line(
 )
 async def create_line_api(
     request: BusLineCreateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     try:
         line = create_line(db, request)
@@ -142,7 +144,8 @@ async def create_line_api(
 async def update_line_api(
     line_id: int,
     request: BusLineUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     try:
         line = update_line(db, line_id, request)
@@ -170,7 +173,8 @@ async def update_line_api(
 )
 async def delete_line_api(
     line_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     success = delete_line(db, line_id)
     if not success:
@@ -210,7 +214,8 @@ async def list_line_stations(
 async def add_station_to_line(
     line_id: int,
     request: LineStationCreateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     try:
         request.line_id = line_id
@@ -240,7 +245,8 @@ async def add_station_to_line(
 async def update_line_station_api(
     line_station_id: str,
     request: LineStationUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     try:
         result = update_line_station(db, line_station_id, request)
@@ -268,7 +274,8 @@ async def update_line_station_api(
 )
 async def remove_station_from_line(
     line_station_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     success = remove_line_station(db, line_station_id)
     if not success:
@@ -494,7 +501,8 @@ async def get_station(
 )
 async def create_station_api(
     request: BusStationCreateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     try:
         station = create_station(db, request)
@@ -523,7 +531,8 @@ async def create_station_api(
 async def update_station_api(
     station_id: int,
     request: BusStationUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     try:
         station = update_station(db, station_id, request)
@@ -551,7 +560,8 @@ async def update_station_api(
 )
 async def delete_station_api(
     station_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin_user),
 ):
     success = delete_station(db, station_id)
     if not success:

@@ -4,11 +4,12 @@
 
 ## 一、统一说明
 
-- Axios 位于 `frontend/src/api/request.js`，实际默认 `baseURL` 是 `/api`；如后端统一前缀为 `/api/v1`，必须由环境变量或 Vite 代理补齐。旧文档所称默认 `/api/v1` 与代码不符。
+- Axios 位于 `frontend/src/api/request.js`，默认 `baseURL` 为 `/api/v1`（通过 `VITE_API_BASE_URL` 环境变量或硬编码兜底）。
 - 响应拦截器返回 `response.data`，所以页面拿到统一外壳，业务数据仍在 `response.data`。
 - 当前统一追踪字段为 `trace_id`。页面尚未读取或展示该字段。
 - API 封装存在只说明“前端已封装”；只有 Vue 页面实际 import 并执行函数，才算“页面实际调用”。
-- 推荐正式偏好为 `balanced`、`fastest`、`comfort`、`less_walking`、`less_transfer`；`low_load` 仅作兼容别名。当前后端尚只接受 `low_load`，接入前需先完成兼容映射。
+- 推荐正式偏好为 `balanced`、`fastest`、`comfort`、`less_walking`、`less_transfer`；`low_load` 仅作兼容别名。当前运行时 OpenAPI 已同时接受 `comfort` 和 `low_load`，前端可直接使用正式值 `comfort`。
+- **ETA 字段适配层**：`src/utils/eta.js` 提供 `getEtaMinutes(item)` 和 `formatEtaDisplay(item)`，统一从 `predicted_eta_minutes` / `eta_minutes` / `eta` / `total_time_minutes` 中提取 ETA 分钟数。页面应通过适配层访问 ETA，避免直接硬编码字段名。BusMap 的 mock 数据已使用 `predicted_eta_minutes` 作为规范字段名。**注意**：ETA 数据来源为 LTA Bus Arrival 实时数据（MySQL 缓存），非自研 ETA 预测模型；字段 `predicted_eta_minutes` / `model_version` 为历史兼容命名。
 
 ## 二、页面总览
 
@@ -18,11 +19,11 @@
 | RegisterView | `/register` | 无 | 提交后直接跳转 | 未接入 |
 | HomeView | `/home` | 无 | 地图、搜索、推荐、AI 全为本地数据 | 未接入 |
 | AdminView | `/admin` | 无 | `adminStats` 与表格均静态 | 未接入 |
-| AiAssistantView | 未注册 | `sendAiMessage` | 初始消息及失败降级为固定回答 | 已接入待测试，字段未验证 |
-| LineListView | 未注册 | 无 | `mockData.lines` | 未接入 |
-| LineDetailView | 未注册 | 无 | `mockData.lines/vehicles` | 未接入 |
-| VehicleView | 未注册 | 无 | `mockData.lines/vehicles` | 未接入 |
-| PassengerFlowView | 未注册 | 无 | 仅占位文案 | 暂不接入 |
+| AiAssistantView | `/ai` | `sendAiMessage` | 初始消息及失败降级为固定回答 | 已接入待测试，字段未验证 |
+| LineListView | `/lines` | 无 | `mockData.lines` | 未接入 |
+| LineDetailView | `/lines/:id` | 无 | `mockData.lines/vehicles` | 未接入 |
+| VehicleView | `/vehicles` | 无 | `mockData.lines/vehicles` | 未接入 |
+| PassengerFlowView | `/passenger-flow` | 无 | 仅占位文案 | 暂不接入 |
 
 ## 三、按页面接入说明
 
@@ -87,8 +88,8 @@
 | 当前 API 封装 | `sendAiMessage`（`askAiTravel` 别名） |
 | 是否实际调用 | 是 |
 | 是否仍使用 Mock | 是；初始对话和 catch 固定回复 |
-| 当前问题 | 页面未注册路由；固定站点 ID；只验证了字段读取代码，未见成功联调证据；页面文字仍写错误路径 `/api/ai/chat` |
-| 建议接入方式 | 注册路由；由页面上下文提供站点；显示 `fallback/used_tools/related_routes/trace_id`；用真实响应做契约测试 |
+| 当前问题 | 固定站点 ID；只验证了字段读取代码，未见成功联调证据；页面 `sider-note` 已显示正确路径 `POST /api/v1/ai/travel` |
+| 建议接入方式 | 由页面上下文提供站点；显示 `fallback/used_tools/related_routes/trace_id`；用真实响应做契约测试 |
 
 ### 3.5 LineListView.vue
 
@@ -103,7 +104,7 @@
 | 当前 API 封装 | `getLines(params)` |
 | 是否实际调用 | 否 |
 | 是否仍使用 Mock | 是 |
-| 当前问题 | 页面未注册路由；`eta/crowd` 不属于线路基础列表稳定字段 |
+| 当前问题 | `eta/crowd` 不属于线路基础列表稳定字段 |
 | 建议接入方式 | 基础列表先接 `/lines`；ETA/Load 按选中线路或可见项异步补充，勿把实时口径写成预测模型 |
 
 ### 3.6 LineDetailView.vue
@@ -119,7 +120,7 @@
 | 当前 API 封装 | `getLineDetail`、`getLineStations`、`getVehiclesByLine`、`getEta` |
 | 是否实际调用 | 否 |
 | 是否仍使用 Mock | 是 |
-| 当前问题 | 页面未注册；只从 Mock 数组查详情；实时字段与基础车辆字段混杂 |
+| 当前问题 | 只从 Mock 数组查详情；实时字段与基础车辆字段混杂 |
 | 建议接入方式 | 并行加载基础详情、站序、车辆；ETA/Load 单独刷新并在适配层转换 |
 
 ### 3.7 VehicleView.vue
@@ -135,7 +136,7 @@
 | 当前 API 封装 | `getLines`、`getRealtimeVehicles`、`getVehiclesByLine`、`getEta` |
 | 是否实际调用 | 否 |
 | 是否仍使用 Mock | 是 |
-| 当前问题 | 未注册路由；地图仅占位；`speed_kmh` 与仿真 `speed_kph` 需区分 |
+| 当前问题 | 地图仅占位；`speed_kmh` 与仿真 `speed_kph` 需区分 |
 | 建议接入方式 | 线路和车辆分别加载；用 LTA 实时 ETA/Load 更新卡片；设置刷新间隔和离线态 |
 
 ### 3.8 AdminView.vue
@@ -148,11 +149,11 @@
 | 触发时机 | 页面加载、筛选、保存、删除、手动刷新 |
 | 请求字段 | 各 CRUD Schema；刷新 `bus_stop_code,service_no?,sync_to_db` 或 `sync_to_db` |
 | 真正使用的返回字段 | 当前仅静态统计和表格文本 |
-| 当前 API 封装 | CRUD 已封装；正式 admin 刷新未封装；仅有已废弃 simulation 刷新封装 |
+| 当前 API 封装 | CRUD 已封装；正式 admin 刷新 `refreshAdminLtaBusArrival` / `refreshAdminLtaTrafficSpeedBands` 已封装在 `@/api/admin`；旧 simulation 刷新封装（`refreshLtaBusArrival` 等）已标注 @deprecated 并从 index.js 统一导出中移除 |
 | 是否实际调用 | 否 |
 | 是否仍使用 Mock | 是 |
-| 当前问题 | 后端管理写接口当前无 admin 鉴权；页面入口可直接进入；旧刷新函数指向废弃路径 |
-| 建议接入方式 | 先补权限策略；新增 admin API 文件；禁止新页面调用已废弃 simulation 刷新路径 |
+| 当前问题 | 后端管理写接口已要求 admin 角色（非 admin 返回 403），前端页面入口无额外鉴权门控；旧刷新函数指向废弃路径 |
+| 建议接入方式 | 正式 admin 刷新已在 `@/api/admin` 中，直接 import 即可；禁止新页面调用 `@/api/simulation` 已废弃路径 |
 
 ### 3.9 PassengerFlowView.vue
 
@@ -166,19 +167,19 @@
 | 真正使用的返回字段 | 尚无；应以趋势 DTO 的时间桶、tap-in、tap-out、total-flow 字段为准 |
 | 当前 API 封装 | `getPassengerFlowTrend`；预测函数也已封装但暂不接入 |
 | 是否实际调用 | 否 |
-| 是否仍使用 Mock | 无数据 Mock，但只有静态占位和错误的预留路径文案 |
-| 当前问题 | 页面未注册；把 Passenger Flow 写成“预测”容易造成口径错误 |
-| 建议接入方式 | 页面标题改为历史客流分析；第一阶段只接趋势接口，预测功能标为暂不接入 |
+| 是否仍使用 Mock | 无数据 Mock；页面标题已统一为"历史分析优先"，预测功能标注为暂不接入 |
+| 当前问题 | 预测区域标题已改为"近期客流趋势"，不再突出自研预测 |
+| 建议接入方式 | 页面标题已改为"历史客流分析"；第一阶段只接趋势接口，预测功能标为暂不接入 |
 
 ## 四、组件字段适配重点
 
 | 组件视图字段 | 当前后端字段 | 处理 |
 |---|---|---|
-| `eta` / `eta_minutes` | `predicted_eta_minutes` | 适配层临时映射；业务文案称实时 ETA，不称自研预测 |
+| `eta` / `eta_minutes` | `predicted_eta_minutes` | 适配层映射；`predicted_eta_minutes` 为历史兼容命名，实际来自 LTA Bus Arrival 实时数据，非自研预测模型。业务文案统一称"实时 ETA"。 |
 | `load` / `crowd` | `predicted_load.predicted_load_level` 或 LTA 客载枚举 | 映射为舒适/可站立/拥挤文案 |
 | `score` | `experience_score` | 直接映射并保留数值范围 |
 | `id` | `route_id` / `line_id` / `vehicle_id` | 不可用一个通用 `id` 猜测类型 |
-| `request_id` | `trace_id` | 统一使用 `trace_id` |
+| `request_id` | `trace_id` | 统一使用 `trace_id`。注意：`request_id` 仅存在于推荐模型服务内部协议，非 BusMind API 统一外壳。前端页面应读取 `trace_id` 用于错误排查。 |
 
 ## 五、替换 Mock 与联调检查清单
 

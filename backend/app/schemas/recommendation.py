@@ -11,6 +11,7 @@ from app.schemas.passenger_load import LoadLevel
 
 class Preference(StrEnum):
     BALANCED = "balanced"
+    COMFORT = "comfort"
     LOW_LOAD = "low_load"
     LESS_WALKING = "less_walking"
     LESS_TRANSFER = "less_transfer"

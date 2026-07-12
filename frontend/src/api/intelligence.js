@@ -4,6 +4,8 @@ export const getEta = (params) => request.get('/eta', { params })
 
 export const predictPassengerLoad = (data) => request.post('/passenger-load-prediction', data)
 
+export const getRealtimePassengerLoad = (data) => request.post('/realtime-passenger-load', data)
+
 export const estimateWalkingTime = (data) => request.post('/walking-time-estimation', data)
 
 export const evaluateTravelExperience = (data) =>
