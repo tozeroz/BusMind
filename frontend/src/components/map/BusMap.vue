@@ -38,6 +38,14 @@ const emptyFeatureCollection = {
   features: []
 }
 
+const mapDataCache = globalThis.__busmindMapDataCache || {
+  stops: null,
+  routes: null,
+  stopsPromise: null,
+  routesPromise: null
+}
+globalThis.__busmindMapDataCache = mapDataCache
+
 const routeRed = '#e11d2e'
 const routeMuted = '#4f8fc0'
 const routePalette = ['#FDE14E', '#FDE14E', '#F58329', '#BE9106', '#D6CB00', '#5d9eb7', '#8cb6c6', '#72c0cf', '#5798d0']
@@ -108,15 +116,31 @@ function routeStopFeatures(routeCoordinates) {
 }
 
 function normalizeRouteValues(routes) {
-  const values = Array.isArray(routes)
-    ? routes
-    : String(routes || '')
+  const normalizeItems = (value) => {
+    if (Array.isArray(value)) return value.flatMap((item) => normalizeItems(item))
+    if (value === undefined || value === null) return []
+
+    const text = String(value).trim()
+    if (!text) return []
+
+    if (text.startsWith('[') && text.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(text)
+        return normalizeItems(parsed)
+      } catch {
+        // Fall through to delimiter splitting for loosely formatted arrays.
+      }
+    }
+
+    return text
+      .replace(/[\[\]"']/g, '')
       .split(/[|,\/]/)
       .map((item) => item.trim())
+      .filter(Boolean)
+  }
 
-  return new Set(values.filter(Boolean).map((item) => String(item).toLowerCase()))
+  return new Set(normalizeItems(routes).map((item) => String(item).toLowerCase()))
 }
-
 function routeFeatureMatchesValues(feature, values) {
   if (!values.size) return false
 
@@ -137,7 +161,7 @@ function routeFeatureContainsStop(feature, stop) {
 }
 
 function reachableRouteFeatures(stop) {
-  const routeValues = normalizeRouteValues(stop.passing_routes)
+  const routeValues = normalizeRouteValues([...(stop.passing_routes || []), ...(stop.line_ids || [])])
   const matchedByRoute = busRoutesGeoJSON.features.filter((feature) => routeFeatureMatchesValues(feature, routeValues))
 
   if (matchedByRoute.length) return matchedByRoute
@@ -719,26 +743,46 @@ function stationToFeature(station) {
   }
 }
 
+function stationToStop(station) {
+  return {
+    stop_id: String(station.station_id),
+    stop_name: station.station_name,
+    station_code: station.station_code || station.bus_stop_code || '',
+    road_name: station.road_name || station.address || '',
+    line_ids: station.line_ids || [],
+    lng: Number(station.longitude),
+    lat: Number(station.latitude),
+    passing_routes: [station.service_nos, station.line_names, station.line_ids].flat().filter(Boolean),
+    crowd_level: null,
+    eta_minutes: null
+  }
+}
+
+async function getCachedMapStations() {
+  if (mapDataCache.stops) return mapDataCache.stops
+  if (!mapDataCache.stopsPromise) {
+    mapDataCache.stopsPromise = getMapStations()
+      .then((response) => {
+        const stations = response?.data?.stations || response?.data?.items || []
+        const validStations = stations.filter((station) => Number.isFinite(Number(station.longitude)) && Number.isFinite(Number(station.latitude)))
+        const data = {
+          stops: validStations.map(stationToStop),
+          geojson: createFeatureCollection(validStations.map(stationToFeature))
+        }
+        mapDataCache.stops = data
+        return data
+      })
+      .finally(() => {
+        mapDataCache.stopsPromise = null
+      })
+  }
+  return mapDataCache.stopsPromise
+}
 async function loadRealBusStops() {
   try {
-    const response = await getMapStations()
-    const stations = response?.data?.stations || response?.data?.items || []
-
-    busStops = stations
-      .filter((station) => Number.isFinite(Number(station.longitude)) && Number.isFinite(Number(station.latitude)))
-      .map((station) => ({
-        stop_id: String(station.station_id),
-        stop_name: station.station_name,
-        station_code: station.station_code || station.bus_stop_code || '',
-        road_name: station.road_name || station.address || '',
-        line_ids: station.line_ids || [],
-        lng: Number(station.longitude),
-        lat: Number(station.latitude),
-        passing_routes: station.service_nos || station.line_names || [],
-        crowd_level: null,
-        eta_minutes: null
-      }))
-    busStopsGeoJSON = createFeatureCollection(stations.map(stationToFeature))
+    const stopData = await getCachedMapStations()
+    busStops = stopData.stops
+    busStopsGeoJSON = stopData.geojson
     setSourceData('stops', busStopsGeoJSON)
     if (!isStopBoundsFitted) {
       fitStopBounds()
@@ -786,47 +830,65 @@ function mergeSegmentCoordinates(segments) {
     }, [])
 }
 
+async function getCachedMapRoutes() {
+  if (mapDataCache.routes) return mapDataCache.routes
+  if (!mapDataCache.routesPromise) {
+    mapDataCache.routesPromise = getMapLines()
+      .then(async (lineResponse) => {
+        const lines = lineResponse?.data?.lines || []
+        const needsSegmentFallback = lines.some((line) => !Array.isArray(line.path_coordinates) || line.path_coordinates.length < 2)
+        const segmentsByLine = new Map()
+
+        if (needsSegmentFallback) {
+          try {
+            const segmentResponse = await getRoadSegments()
+            const segments = segmentResponse?.data?.segments || []
+            segments.forEach((segment) => {
+              const key = Number(segment.line_id)
+              if (!segmentsByLine.has(key)) segmentsByLine.set(key, [])
+              segmentsByLine.get(key).push(segment)
+            })
+          } catch (error) {
+            console.warn('map road segments fallback failed', error?.message)
+          }
+        }
+
+        const selectedLines = (visibleLineIds.size
+          ? lines.filter((line) => visibleLineIds.has(Number(line.line_id)))
+          : lines
+        ).map((line) => {
+          if (Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2) return line
+          return { ...line, path_coordinates: mergeSegmentCoordinates(segmentsByLine.get(Number(line.line_id)) || []) }
+        })
+
+        const data = createFeatureCollection(
+          selectedLines
+            .filter((line) => Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2)
+            .map(lineToFeature)
+        )
+        mapDataCache.routes = data
+        return data
+      })
+      .finally(() => {
+        mapDataCache.routesPromise = null
+      })
+  }
+  return mapDataCache.routesPromise
+}
 async function loadRealBusRoutes() {
   if (busRoutesLoaded) return
 
   try {
-    const [lineResponse, segmentResponse] = await Promise.all([
-      getMapLines(),
-      getRoadSegments()
-    ])
-    const lines = lineResponse?.data?.lines || []
-    const segments = segmentResponse?.data?.segments || []
-    const segmentsByLine = new Map()
-    segments.forEach((segment) => {
-      const key = Number(segment.line_id)
-      if (!segmentsByLine.has(key)) segmentsByLine.set(key, [])
-      segmentsByLine.get(key).push(segment)
-    })
-
-    const selectedLines = (visibleLineIds.size
-      ? lines.filter((line) => visibleLineIds.has(Number(line.line_id)))
-      : lines
-    ).map((line) => {
-      if (Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2) return line
-      return { ...line, path_coordinates: mergeSegmentCoordinates(segmentsByLine.get(Number(line.line_id)) || []) }
-    })
-
-    busRoutesGeoJSON = createFeatureCollection(
-      selectedLines
-        .filter((line) => Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2)
-        .map(lineToFeature)
-    )
-
+    busRoutesGeoJSON = await getCachedMapRoutes()
     busRoutesLoaded = true
 
     if (map && map.getSource('routes')) setSourceData('routes', emptyFeatureCollection)
     if (selectedStopForRoutes) highlightStopReachableRoutes(selectedStopForRoutes)
   } catch (error) {
     console.warn('map routes load failed', error?.message)
-    emit('load-error', '地图线路/路段加载失败，请检查后端和数据库。')
+    emit('load-error', '地图线路加载失败，请检查后端和数据库。')
   }
 }
-
 onMounted(() => {
   registerPmtilesProtocol()
 

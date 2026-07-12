@@ -1126,12 +1126,24 @@ label {
   overflow-wrap: anywhere;
 }
 
+
+.map-player-panel {
+  position: absolute;
+  left: 22px;
+  top: min(604px, calc(100% - 166px));
+  z-index: 12;
+  width: min(340px, calc(100% - 44px));
+  min-height: 128px;
+  color: #fff;
+  backdrop-filter: blur(24px);
+  box-shadow: var(--shadow);
+}
 .map-player-slot {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  margin-top: auto;
+  margin-top: 0;
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 8px;
   padding: 12px;

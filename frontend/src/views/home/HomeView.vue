@@ -108,19 +108,22 @@
             </div>
           </template>
 
-          <div class="map-player-slot">
-            <div>
-              <p class="eyebrow">语音播报</p>
-              <strong>{{ selectedInfo.name || '\u51fa\u884c\u64ad\u653e\u5668' }}</strong>
-              <span>{{ panelMode === 'search' ? '\u5f85\u9009\u62e9\u7ad9\u70b9\u6216\u7ebf\u8def' : chartCaption }}</span>
-            </div>
-            <div class="player-control-row" aria-hidden="true">
-              <i></i><b></b><i></i>
-            </div>
-          </div>
         </aside>
       </Transition>
 
+
+      <Transition name="side-card">
+        <aside v-if="isInfoPanelOpen" class="map-player-panel map-player-slot">
+          <div>
+            <p class="eyebrow">语音播报</p>
+            <strong>{{ selectedInfo.name || '\u51fa\u884c\u64ad\u653e\u5668' }}</strong>
+            <span>{{ panelMode === 'search' ? '\u5f85\u9009\u62e9\u7ad9\u70b9\u6216\u7ebf\u8def' : chartCaption }}</span>
+          </div>
+          <div class="player-control-row" aria-hidden="true">
+            <i></i><b></b><i></i>
+          </div>
+        </aside>
+      </Transition>
       <Transition name="side-card">
         <article v-if="panelMode !== 'search'" :class="['map-chart-card', `chart-${chartTone}`]">
           <div class="section-title">

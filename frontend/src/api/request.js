@@ -5,9 +5,11 @@ export const AUTH_TOKEN_KEY = 'busmind_access_token'
 
 const env = import.meta.env || {}
 
+const defaultApiBaseUrl = env.DEV ? 'http://127.0.0.1:8000/api/v1' : '/api/v1'
+
 const service = axios.create({
-  baseURL: env.VITE_API_BASE_URL || '/api/v1',
-  timeout: Number(env.VITE_API_TIMEOUT || 8000)
+  baseURL: env.VITE_API_BASE_URL || defaultApiBaseUrl,
+  timeout: Number(env.VITE_API_TIMEOUT || 20000)
 })
 
 service.interceptors.request.use((config) => {
