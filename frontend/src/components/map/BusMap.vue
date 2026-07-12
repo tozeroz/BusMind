@@ -54,10 +54,10 @@ const routeBg = '#ffffff'
 const stopFill = '#e11d2e'
 const stopStroke = '#e11d2e'
 const stopMutedStroke = '#e11d2e'
-const stopsOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 9, 0.65, 13.5, 0.95, 15, 0]
-const stopsDimmedOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 9, 0.045, 13.5, 0.09, 15, 0]
-const stopLabelsOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 15, 0, 15.6, 0.38, 16.4, 0.88]
-const stopLabelsDimmedOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 15, 0, 16, 0.1, 17, 0.2]
+const stopsOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 9, 1, 15, 1]
+const stopsDimmedOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 9, 0.3, 15, 0.3]
+const stopLabelsOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 15, 1, 16, 1, 17, 1]
+const stopLabelsDimmedOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 15, 0.3, 16, 0.3, 17, 0.3]
 
 function getSource(sourceId) {
   return map && map.getSource(sourceId)
@@ -381,7 +381,7 @@ function addRouteLayers() {
     paint: {
       'line-color': '#f7fbff',
       'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6.2, 17, 8],
-      'line-opacity': 0.98,
+      'line-opacity': 1,
       'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 0.08, 17, 0.18]
     }
   })
@@ -435,7 +435,7 @@ function addRouteLayers() {
       'text-color': routeColorExpression,
       'text-halo-color': '#ffffff',
       'text-halo-width': 0.8,
-      'text-opacity': 0.5
+      'text-opacity': 1
     }
   })
 
@@ -489,7 +489,7 @@ function addRouteLayers() {
       'text-color': routeColorExpression,
       'text-halo-color': '#ffffff',
       'text-halo-width': 1,
-      'text-opacity': 0.78
+      'text-opacity': 1
     }
   })
 }
@@ -573,7 +573,7 @@ function addStopLayers() {
       'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], stopStroke, '#ffffff'],
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 14, 1, 15, 2, 17, 3],
       'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, 0.62, 17, 0.9],
-      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, 0.95]
+      'circle-opacity': 1
     }
   })
   map.addLayer({
@@ -583,7 +583,7 @@ function addStopLayers() {
     minzoom: 15,
     layout: {
       'text-field': ['step', ['zoom'], ['get', 'station_code'], 16, ['format', ['get', 'station_code'], { 'font-scale': 0.8 }, '\n', {}, ['get', 'stop_name'], { 'font-scale': 1 }]],
-      'text-size': ['interpolate', ['linear'], ['zoom'], 15, 10, 17, 13],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 15, 14, 17, 17],
       'text-anchor': 'left',
       'text-offset': [0.8, 0],
       'text-max-width': 14,
