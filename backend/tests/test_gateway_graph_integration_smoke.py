@@ -1,9 +1,7 @@
-"""Smoke test: MySQLTransitGateway delegates to TransitGraphService when
-repository.get_candidate_routes returns empty.
+"""Smoke test: MySQLTransitGateway uses TransitGraphService as its route source.
 
-This avoids needing a real MySQL connection. We mock the TransitRepository
-and BusStation so the gateway thinks both endpoints exist, while forcing the
-candidate-route query to return an empty list.
+This avoids needing a real MySQL connection. We mock the TransitRepository,
+BusStation and first-line vehicle lookup while using a static graph snapshot.
 """
 
 from __future__ import annotations
@@ -39,8 +37,12 @@ class FakeRepository:
         return self._stations.get(station_id)
 
     def get_candidate_routes(self, start, end, max_transfer_count, limit=5):
-        # Force empty so the gateway must fall through to the graph.
-        return []
+        raise AssertionError("legacy repository candidate search must not be called")
+
+    def get_latest_vehicle_for_line(self, line_id):
+        if line_id == 1:
+            return type("Vehicle", (), {"vehicle_id": 901})()
+        return None
 
     @property
     def db(self):
@@ -105,12 +107,14 @@ async def main() -> None:
     ])
     graph_service = make_static_graph_service()
     gateway = MySQLTransitGateway(db=repo, graph_service=graph_service)
+    gateway.repository = repo
 
     results = await gateway.get_candidate_routes(101, 108, max_transfer_count=2)
     assert results, "expected at least one candidate from graph search"
     best = min(results, key=lambda c: c.transfer_count)
     assert best.transfer_count == 2, f"expected min 2 transfers, got {best.transfer_count}"
     assert best.line_ids == (1, 2, 3), f"unexpected line_ids {best.line_ids}"
+    assert best.vehicle_id == 901, f"expected first-line vehicle 901, got {best.vehicle_id}"
     print(f"[PASS] gateway delegates to graph: best has {best.transfer_count} transfers via {best.line_ids}")
     print(f"[PASS] gateway returned {len(results)} candidates total")
 

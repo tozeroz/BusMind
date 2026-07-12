@@ -58,6 +58,7 @@ export const API_OPERATION_CONTRACT = [
   { method: 'POST', path: '/api/v1/travel-experience/evaluate', wrapper: 'evaluateTravelExperience', status: 'encapsulated', note: '推荐能力独立封装', deprecated: false },
   { method: 'POST', path: '/api/v1/users/login', wrapper: 'loginUser', status: 'connected', note: '登录页', deprecated: false },
   { method: 'GET', path: '/api/v1/users/me', wrapper: 'getCurrentUser', status: 'connected', note: '登录/个人中心', deprecated: false },
+  { method: 'POST', path: '/api/v1/users/me/refresh-arrivals', wrapper: 'triggerArrivalRefresh', status: 'connected', note: '进入首页后台刷新到站数据', deprecated: false },
   { method: 'PATCH', path: '/api/v1/users/me', wrapper: 'updateCurrentUser', status: 'connected', note: '个人中心', deprecated: false },
   { method: 'GET', path: '/api/v1/users/me/favorites', wrapper: 'getUserFavorites', status: 'connected', note: '个人中心', deprecated: false },
   { method: 'POST', path: '/api/v1/users/me/favorites', wrapper: 'addUserFavorite', status: 'connected', note: '个人中心', deprecated: false },

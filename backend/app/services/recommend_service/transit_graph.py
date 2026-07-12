@@ -93,7 +93,7 @@ class TransitGraphBuilder:
                     LineStation.station_id,
                     LineStation.line_name,
                     BusLine.line_name.label("parent_line_name"),
-                    BusLine.service_no,
+                    BusLine.line_code,
                     BusLine.status,
                 )
                 .join(BusLine, BusLine.line_id == LineStation.line_id)

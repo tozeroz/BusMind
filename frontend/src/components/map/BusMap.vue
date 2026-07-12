@@ -13,7 +13,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { getMapLines, getMapStations, getRoadSegments } from '@/api/map'
 import { createProtomapsStyle } from '@/map/map-style'
 
-const emit = defineEmits(['select-stop', 'select-route', 'load-error'])
+const emit = defineEmits(['select-stop', 'select-route', 'load-error', 'initial-data-loaded'])
 
 const mapContainer = ref(null)
 let map = null
@@ -29,6 +29,7 @@ let busRoutesGeoJSON = {
 }
 let visibleLineIds = new Set()
 let busRoutesLoaded = false
+let routesLoadPromise = null
 let isStopBoundsFitted = false
 let selectedStopForRoutes = null
 let selectedStopFeatureId = null
@@ -58,6 +59,30 @@ const stopsOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 9, 1, 15, 1]
 const stopsDimmedOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 9, 0.3, 15, 0.3]
 const stopLabelsOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 15, 1, 16, 1, 17, 1]
 const stopLabelsDimmedOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 15, 0.3, 16, 0.3, 17, 0.3]
+
+function isRetryableError(error) {
+  // Network-level failures (no response received) are worth retrying.
+  if (!error?.response) return true
+  // 5xx may be transient (overload, gateway hiccup). 4xx is a caller mistake —
+  // retrying just multiplies the noise and the server load.
+  const status = error.response.status
+  return status >= 500 && status < 600
+}
+
+async function runWithRetry(fn, attempts = 3, delayMs = 400) {
+  let lastError = null
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fn()
+    } catch (error) {
+      lastError = error
+      if (attempt >= attempts) break
+      if (!isRetryableError(error)) break
+      await new Promise((resolve) => setTimeout(resolve, delayMs * attempt))
+    }
+  }
+  throw lastError
+}
 
 function getSource(sourceId) {
   return map && map.getSource(sourceId)
@@ -184,7 +209,7 @@ function clearSelection() {
   selectedStopForRoutes = null
   setSelectedStopState(null)
   setStopsDimmed(false)
-  setSourceData('routes', emptyFeatureCollection)
+  setSourceData('routes', busRoutesGeoJSON)
   setSourceData('routes-path', emptyFeatureCollection)
   setSourceData('stops-highlight', emptyFeatureCollection)
   setSourceData('stops-highlight-selected', emptyFeatureCollection)
@@ -359,7 +384,7 @@ function addRouteSources() {
   map.addSource('routes', {
     type: 'geojson',
     promoteId: 'line_id',
-    data: emptyFeatureCollection
+    data: busRoutesGeoJSON
   })
 
   map.addSource('routes-path', {
@@ -761,10 +786,11 @@ function stationToStop(station) {
 async function getCachedMapStations() {
   if (mapDataCache.stops) return mapDataCache.stops
   if (!mapDataCache.stopsPromise) {
-    mapDataCache.stopsPromise = getMapStations()
+    mapDataCache.stopsPromise = runWithRetry(() => getMapStations())
       .then((response) => {
         const stations = response?.data?.stations || response?.data?.items || []
         const validStations = stations.filter((station) => Number.isFinite(Number(station.longitude)) && Number.isFinite(Number(station.latitude)))
+        if (!validStations.length) return null
         const data = {
           stops: validStations.map(stationToStop),
           geojson: createFeatureCollection(validStations.map(stationToFeature))
@@ -781,6 +807,7 @@ async function getCachedMapStations() {
 async function loadRealBusStops() {
   try {
     const stopData = await getCachedMapStations()
+    if (!stopData) return
     busStops = stopData.stops
     busStopsGeoJSON = stopData.geojson
     setSourceData('stops', busStopsGeoJSON)
@@ -788,8 +815,6 @@ async function loadRealBusStops() {
       fitStopBounds()
       isStopBoundsFitted = true
     }
-
-    await loadRealBusRoutes()
   } catch (error) {
     console.warn('map stations load failed', error?.message)
     emit('load-error', '地图站点加载失败，请检查后端和数据库。')
@@ -830,44 +855,67 @@ function mergeSegmentCoordinates(segments) {
     }, [])
 }
 
-async function getCachedMapRoutes() {
-  if (mapDataCache.routes) return mapDataCache.routes
-  if (!mapDataCache.routesPromise) {
-    mapDataCache.routesPromise = getMapLines()
-      .then(async (lineResponse) => {
-        const lines = lineResponse?.data?.lines || []
-        const needsSegmentFallback = lines.some((line) => !Array.isArray(line.path_coordinates) || line.path_coordinates.length < 2)
-        const segmentsByLine = new Map()
+async function loadRouteGeometryFallback(lines) {
+  try {
+    const segmentResponse = await runWithRetry(() => getRoadSegments(), 2)
+    const segments = segmentResponse?.data?.segments || []
+    const segmentsByLine = new Map()
 
-        if (needsSegmentFallback) {
-          try {
-            const segmentResponse = await getRoadSegments()
-            const segments = segmentResponse?.data?.segments || []
-            segments.forEach((segment) => {
-              const key = Number(segment.line_id)
-              if (!segmentsByLine.has(key)) segmentsByLine.set(key, [])
-              segmentsByLine.get(key).push(segment)
-            })
-          } catch (error) {
-            console.warn('map road segments fallback failed', error?.message)
-          }
-        }
+    segments.forEach((segment) => {
+      const key = Number(segment.line_id)
+      if (!segmentsByLine.has(key)) segmentsByLine.set(key, [])
+      segmentsByLine.get(key).push(segment)
+    })
 
-        const selectedLines = (visibleLineIds.size
-          ? lines.filter((line) => visibleLineIds.has(Number(line.line_id)))
-          : lines
-        ).map((line) => {
+    const data = createFeatureCollection(
+      lines
+        .map((line) => {
           if (Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2) return line
           return { ...line, path_coordinates: mergeSegmentCoordinates(segmentsByLine.get(Number(line.line_id)) || []) }
         })
+        .filter((line) => Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2)
+        .map(lineToFeature)
+    )
 
-        const data = createFeatureCollection(
-          selectedLines
-            .filter((line) => Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2)
-            .map(lineToFeature)
+    if (!data.features.length) return null
+
+    mapDataCache.routes = data
+    busRoutesGeoJSON = data
+    if (selectedStopForRoutes) {
+      highlightStopReachableRoutes(selectedStopForRoutes)
+    } else {
+      setSourceData('routes', busRoutesGeoJSON)
+    }
+    return data
+  } catch (error) {
+    console.warn('map road segments fallback failed', error?.message)
+    return null
+  }
+}
+
+async function getCachedMapRoutes() {
+  if (mapDataCache.routes) return mapDataCache.routes
+  if (!mapDataCache.routesPromise) {
+    mapDataCache.routesPromise = runWithRetry(() => getMapLines())
+      .then((lineResponse) => {
+        const lines = lineResponse?.data?.lines || []
+        const selectedLines = visibleLineIds.size
+          ? lines.filter((line) => visibleLineIds.has(Number(line.line_id)))
+          : lines
+        const completeLines = selectedLines.filter(
+          (line) => Array.isArray(line.path_coordinates) && line.path_coordinates.length >= 2
         )
-        mapDataCache.routes = data
-        return data
+        const data = createFeatureCollection(completeLines.map(lineToFeature))
+        const hasIncompleteLines = completeLines.length < selectedLines.length
+
+        if (data.features.length) {
+          mapDataCache.routes = data
+          if (hasIncompleteLines) void loadRouteGeometryFallback(selectedLines)
+          return data
+        }
+
+        if (hasIncompleteLines) return loadRouteGeometryFallback(selectedLines)
+        return null
       })
       .finally(() => {
         mapDataCache.routesPromise = null
@@ -877,17 +925,29 @@ async function getCachedMapRoutes() {
 }
 async function loadRealBusRoutes() {
   if (busRoutesLoaded) return
+  if (routesLoadPromise) return routesLoadPromise
 
-  try {
-    busRoutesGeoJSON = await getCachedMapRoutes()
-    busRoutesLoaded = true
+  routesLoadPromise = (async () => {
+    try {
+      const data = await getCachedMapRoutes()
+      if (!data) return
+      busRoutesGeoJSON = data
+      busRoutesLoaded = true
 
-    if (map && map.getSource('routes')) setSourceData('routes', emptyFeatureCollection)
-    if (selectedStopForRoutes) highlightStopReachableRoutes(selectedStopForRoutes)
-  } catch (error) {
-    console.warn('map routes load failed', error?.message)
-    emit('load-error', '地图线路加载失败，请检查后端和数据库。')
-  }
+      if (selectedStopForRoutes) {
+        highlightStopReachableRoutes(selectedStopForRoutes)
+      } else if (map && map.getSource('routes')) {
+        setSourceData('routes', busRoutesGeoJSON)
+      }
+    } catch (error) {
+      console.warn('map routes load failed', error?.message)
+      emit('load-error', '地图线路加载失败，请检查后端和数据库。')
+    } finally {
+      routesLoadPromise = null
+    }
+  })()
+
+  return routesLoadPromise
 }
 onMounted(() => {
   registerPmtilesProtocol()
@@ -901,6 +961,15 @@ onMounted(() => {
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 
+  const initialDataPromise = Promise.allSettled([
+    loadRealBusStops(),
+    loadRealBusRoutes()
+  ])
+
+  initialDataPromise.then(() => {
+    if (map) emit('initial-data-loaded')
+  })
+
   map.on('load', () => {
     addRouteSources()
     addStopSources()
@@ -908,7 +977,17 @@ onMounted(() => {
     addStopLayers()
     bindRouteLayerEvents()
     bindStopLayerEvents()
-    loadRealBusStops()
+
+    if (busStopsGeoJSON.features.length) setSourceData('stops', busStopsGeoJSON)
+    if (!isStopBoundsFitted && busStopsGeoJSON.features.length) {
+      fitStopBounds()
+      isStopBoundsFitted = true
+    }
+    if (busRoutesGeoJSON.features.length && map.getSource('routes') && !selectedStopForRoutes) {
+      setSourceData('routes', busRoutesGeoJSON)
+    } else if (busRoutesGeoJSON.features.length && selectedStopForRoutes) {
+      highlightStopReachableRoutes(selectedStopForRoutes)
+    }
   })
 })
 
@@ -928,10 +1007,25 @@ onBeforeUnmount(() => {
   }
 })
 
+async function reloadMapData() {
+  mapDataCache.stops = null
+  mapDataCache.routes = null
+  mapDataCache.stopsPromise = null
+  mapDataCache.routesPromise = null
+  routesLoadPromise = null
+  busRoutesLoaded = false
+  isStopBoundsFitted = false
+  await Promise.allSettled([
+    loadRealBusStops(),
+    loadRealBusRoutes()
+  ])
+}
+
 defineExpose({
   clearSelection,
   focusRouteById,
-  focusStopByName
+  focusStopByName,
+  reloadMapData
 })
 </script>
 

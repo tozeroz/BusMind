@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -211,6 +212,8 @@ class BusArrivalRefreshScheduler:
         )
         self.lta_client = lta_client
         self._task: asyncio.Task[None] | None = None
+        self._refresh_task: asyncio.Task[None] | None = None
+        self._last_triggered_at: float | None = None
         self._stop_event = asyncio.Event()
 
     @property
@@ -238,6 +241,14 @@ class BusArrivalRefreshScheduler:
         )
 
     async def stop(self) -> None:
+        if self._refresh_task is not None and not self._refresh_task.done():
+            self._refresh_task.cancel()
+            try:
+                await self._refresh_task
+            except asyncio.CancelledError:
+                pass
+            finally:
+                self._refresh_task = None
         if self._task is None:
             return
         self._stop_event.set()
@@ -250,6 +261,43 @@ class BusArrivalRefreshScheduler:
             logger.exception("BusArrivalRefreshScheduler raised during shutdown")
         finally:
             self._task = None
+
+    def trigger_once(self, *, cooldown_seconds: float = 60.0) -> str:
+        """Schedule one refresh without delaying the caller.
+
+        Returns a small status string so API callers can distinguish a newly
+        queued refresh from a disabled, already-running, or rate-limited one.
+        """
+
+        if not self.enabled:
+            return "disabled"
+        if self._refresh_task is not None and not self._refresh_task.done():
+            return "already_running"
+
+        now = time.monotonic()
+        if (
+            self._last_triggered_at is not None
+            and now - self._last_triggered_at < cooldown_seconds
+        ):
+            return "cooldown"
+
+        self._last_triggered_at = now
+        self._refresh_task = asyncio.create_task(
+            self._run_once(), name="bus-arrival-refresh-on-demand"
+        )
+        return "started"
+
+    async def _run_once(self) -> None:
+        assert self.lta_client is not None
+        try:
+            await self._tick(
+                LtaCollectorService(self.lta_client),
+                CacheSyncService(),
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("On-demand bus-arrival refresh failed")
 
     async def _run(self) -> None:
         assert self.lta_client is not None
@@ -272,12 +320,18 @@ class BusArrivalRefreshScheduler:
         collector: LtaCollectorService,
         sync: CacheSyncService,
     ) -> None:
-        with SessionLocal() as db:
-            jobs = build_refresh_jobs(
-                db,
-                max_lines=self.max_lines,
-                stops_per_line=self.stops_per_line,
-            )
+        # SQLAlchemy's synchronous driver can wait on a database connection.
+        # Keep it off FastAPI's event loop so one slow refresh cannot freeze
+        # login, health checks, or unrelated API requests.
+        def _load_jobs() -> list[RefreshJob]:
+            with SessionLocal() as db:
+                return build_refresh_jobs(
+                    db,
+                    max_lines=self.max_lines,
+                    stops_per_line=self.stops_per_line,
+                )
+
+        jobs = await asyncio.to_thread(_load_jobs)
         if not jobs:
             return
 
@@ -298,11 +352,15 @@ class BusArrivalRefreshScheduler:
                         ),
                         timeout=self.per_job_deadline_seconds,
                     )
-                    with SessionLocal() as sync_db:
-                        result = sync.sync_bus_arrival(
-                            sync_db, job.bus_stop_code, job.service_no
-                        )
-                        sync_db.commit()
+                    def _sync_result():
+                        with SessionLocal() as sync_db:
+                            result = sync.sync_bus_arrival(
+                                sync_db, job.bus_stop_code, job.service_no
+                            )
+                            sync_db.commit()
+                            return result
+
+                    result = await asyncio.to_thread(_sync_result)
                     return ("ok", result.processed, result.skipped)
                 except Exception:
                     logger.warning(

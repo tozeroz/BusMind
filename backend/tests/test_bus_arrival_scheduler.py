@@ -203,3 +203,31 @@ def test_scheduler_disabled_when_client_missing():
     assert scheduler.enabled is False
     # start() must be a safe no-op and not raise.
     asyncio.run(scheduler.start())
+
+
+def test_trigger_once_is_non_blocking_and_deduplicated():
+    scheduler = BusArrivalRefreshScheduler(lta_client=object(), interval_seconds=1)
+    release = asyncio.Event()
+
+    async def fake_run_once() -> None:
+        await release.wait()
+
+    scheduler._run_once = fake_run_once
+
+    async def _drive() -> None:
+        assert scheduler.trigger_once(cooldown_seconds=60) == "started"
+        assert scheduler.trigger_once(cooldown_seconds=60) == "already_running"
+        release.set()
+        await scheduler._refresh_task
+        assert scheduler.trigger_once(cooldown_seconds=60) == "cooldown"
+
+    asyncio.run(_drive())
+
+
+def test_trigger_once_is_disabled_without_lta_client():
+    scheduler = BusArrivalRefreshScheduler(lta_client=None, interval_seconds=1)
+
+    async def _drive() -> None:
+        assert scheduler.trigger_once() == "disabled"
+
+    asyncio.run(_drive())
