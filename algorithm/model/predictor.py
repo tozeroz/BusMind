@@ -11,15 +11,12 @@ from typing import Any
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-import pandas as pd
-
-from algorithm.dataset.recommendation_data import default_dataset_dir
 from algorithm.model.contracts import CONTRACT_VERSION
 from algorithm.model.scorer import score_routes
 
 
 def predict_recommendation(payload: dict[str, Any]) -> dict[str, Any]:
-    return score_routes(payload)
+    return score_routes(payload, strict_backend=True)
 
 
 def predict(payload: dict[str, Any]) -> dict[str, Any]:
@@ -27,6 +24,8 @@ def predict(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _parse_args() -> argparse.Namespace:
+    from algorithm.dataset.recommendation_data import default_dataset_dir
+
     parser = argparse.ArgumentParser(description="Run a small recommendation-model smoke test.")
     parser.add_argument("--features", type=Path, default=default_dataset_dir() / "features.csv")
     parser.add_argument("--preference", default="balanced")
@@ -45,7 +44,7 @@ def _sources(value: object) -> dict[str, str]:
     return output
 
 
-def _route_payload(group: pd.DataFrame) -> list[dict[str, object]]:
+def _route_payload(group: Any) -> list[dict[str, object]]:
     routes = []
     for row in group.to_dict("records"):
         routes.append(
@@ -73,6 +72,8 @@ def _route_payload(group: pd.DataFrame) -> list[dict[str, object]]:
 
 
 def _build_payload_from_features(args: argparse.Namespace) -> dict[str, Any]:
+    import pandas as pd
+
     features = pd.read_csv(args.features)
     if features.empty:
         raise ValueError(f"No feature rows found in {args.features}")
@@ -98,7 +99,7 @@ def _build_payload_from_features(args: argparse.Namespace) -> dict[str, Any]:
 def main() -> None:
     args = _parse_args()
     payload = _build_payload_from_features(args)
-    result = predict_recommendation(payload)
+    result = score_routes(payload, strict_backend=False)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

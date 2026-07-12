@@ -134,6 +134,6 @@ def score_routes_typed(request: ModelScoringRequest) -> dict[str, Any]:
     }
 
 
-def score_routes(payload: dict[str, Any]) -> dict[str, Any]:
-    request = ModelScoringRequest.from_dict(payload)
+def score_routes(payload: dict[str, Any], *, strict_backend: bool = False) -> dict[str, Any]:
+    request = ModelScoringRequest.from_dict(payload, strict_backend=strict_backend)
     return score_routes_typed(request)
