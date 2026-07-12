@@ -170,7 +170,7 @@ def build_markdown(results: list[CheckResult], base_url: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="检查登录注册、线路、地图、AI 和推荐重点接口")
-    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--base-url", default="http://127.0.0.1:8001")
     parser.add_argument("--timeout", type=float, default=15.0)
     parser.add_argument("--report", type=Path, help="可选 Markdown 报告输出路径")
     args = parser.parse_args()

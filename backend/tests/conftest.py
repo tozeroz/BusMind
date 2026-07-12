@@ -10,13 +10,18 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.v1.dependencies import get_ai_service, get_recommendation_service
+from app.api.v1.dependencies import (
+    get_ai_service,
+    get_recommendation_service,
+    get_transit_gateway,
+)
 from app.api.v1.intelligence_router import router
 from app.core.exception_handlers import register_intelligence_exception_handlers
 from app.services.ai_service import AiTravelService
 from app.services.intelligence_gateway import (
     DemoIntelligenceGateway,
     configure_intelligence_gateway,
+    get_intelligence_gateway,
 )
 from app.services.simulation_service import simulation_state_store
 
@@ -43,6 +48,7 @@ def app() -> FastAPI:
     application = FastAPI()
     register_intelligence_exception_handlers(application)
     application.include_router(router, prefix="/api/v1")
+    application.dependency_overrides[get_transit_gateway] = get_intelligence_gateway
     return application
 
 
