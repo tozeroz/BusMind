@@ -1,3 +1,9 @@
+/**
+ * 文件：src/styles/index.css
+ * 用途：定义 BusMind 前端应用的展示样式。
+ * 存放内容：全局样式、共享组件规则、响应式布局和过渡动画。
+ * 实现功能：提供一致的视觉表现，不包含业务逻辑。
+ */
 :root {
   --panel: rgba(255, 255, 255, 0.24);
   --panel-strong: rgba(255, 255, 255, 0.34);
@@ -621,7 +627,7 @@ label {
   padding: 24px;
   background:
     radial-gradient(rgba(0, 0, 0, 0.04) 0, rgba(0, 0, 0, 0.44) 100%),
-    url("frontend/public/background/busmind-bg.jpg") center / cover fixed no-repeat;
+    url("/background/busmind-bg.jpg") center / cover fixed no-repeat;
 }
 
 .auth-logo-panel {
