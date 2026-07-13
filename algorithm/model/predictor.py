@@ -16,7 +16,7 @@ from algorithm.dataset.scripts.recommendation_feature_contract import (
     read_frozen_features,
 )
 from algorithm.model.contracts import CONTRACT_VERSION
-from algorithm.model.scorer import score_routes
+from algorithm.model.register import score_routes
 
 
 def predict_recommendation(payload: dict[str, Any]) -> dict[str, Any]:

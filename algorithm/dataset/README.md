@@ -31,8 +31,8 @@ data/raw/lta
   -> algorithm/dataset/features.csv
   -> algorithm/dataset/scripts/build_labels.py
   -> algorithm/dataset/pseudo_labels.csv
-  -> algorithm/model/train_ranker.py
-  -> algorithm/model/artifacts/route_scorer_v1.json
+  -> algorithm/model/linear_scoring/train.py
+  -> algorithm/model/linear_scoring/artifacts/linear_route_scoring.json
 ```
 
 ## 文件说明
@@ -141,7 +141,7 @@ avg_service_frequency_minutes
 python .\algorithm\dataset\scripts\build_features.py --groups 20 --output D:\SummerTraining\.tmp\frozen_features_20.csv
 python .\algorithm\dataset\scripts\summarize_features.py --input D:\SummerTraining\.tmp\frozen_features_20.csv
 python .\algorithm\dataset\scripts\build_labels.py --input D:\SummerTraining\.tmp\frozen_features_20.csv --output D:\SummerTraining\.tmp\frozen_labels_20.csv
-python .\algorithm\model\train_ranker.py --features D:\SummerTraining\.tmp\frozen_features_20.csv --labels D:\SummerTraining\.tmp\frozen_labels_20.csv --output D:\SummerTraining\.tmp\route_scorer_test.json
+python .\algorithm\model\linear_scoring\train.py --features D:\SummerTraining\.tmp\frozen_features_20.csv --labels D:\SummerTraining\.tmp\frozen_labels_20.csv --output D:\SummerTraining\.tmp\linear_route_scoring_test.json
 ```
 
 如需绕开热门站筛选，临时加 `--ignore-hot-stops`。如需调整换乘 OD 占比，可调 `--transfer-pair-ratio`；脚本还会用 `--candidate-search-multiplier` 先多搜候选，再保留 `--max-candidates` 条，以尽量让同一 OD 内同时出现直达和换乘路线。
@@ -189,13 +189,13 @@ recommend_score
 is_synthetic
 ```
 
-其中 `time_score`、`comfort_score`、`walk_score`、`transfer_score`、`reliability_score` 是当前 `train_ranker.py` 的训练目标；`rank_position`、`label_gain`、`soft_label`、`score_margin`、`label_confidence` 用于后续升级排序损失或样本权重。
+其中 `time_score`、`comfort_score`、`walk_score`、`transfer_score`、`reliability_score` 是当前 `linear_scoring/train.py` 的训练目标；`rank_position`、`label_gain`、`soft_label`、`score_margin`、`label_confidence` 用于后续升级排序损失或样本权重。
 
-生成正式 v1 数据集：
+生成正式数据集：
 
 ```powershell
 python .\algorithm\dataset\scripts\build_features.py --groups 1000
 python .\algorithm\dataset\scripts\summarize_features.py --output .\algorithm\dataset\features_summary.md
 python .\algorithm\dataset\scripts\build_labels.py
-python .\algorithm\model\train_ranker.py
+python .\algorithm\model\linear_scoring\train.py
 ```

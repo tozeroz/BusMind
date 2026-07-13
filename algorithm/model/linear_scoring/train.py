@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 
 if __package__ in {None, ""}:
-    sys.path.append(str(Path(__file__).resolve().parents[2]))
+    sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 import numpy as np
 import pandas as pd
@@ -16,23 +16,15 @@ import pandas as pd
 from algorithm.dataset.scripts.recommendation_data import default_dataset_dir
 from algorithm.dataset.scripts.recommendation_feature_contract import numeric_feature_frame, read_frozen_features
 from algorithm.model.contracts import MODEL_VERSION, NUMERIC_FEATURE_NAMES
-from algorithm.model.scorer import ARTIFACT_DIR
-
-
-SCORE_NAMES = (
-    "time_score",
-    "comfort_score",
-    "walk_score",
-    "transfer_score",
-    "reliability_score",
-)
+from algorithm.model.linear_scoring.model import ARTIFACT_DIR
+from algorithm.model.utils.score_mixing import SCORE_NAMES
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--features", type=Path, default=default_dataset_dir() / "features.csv")
     parser.add_argument("--labels", type=Path, default=default_dataset_dir() / "pseudo_labels.csv")
-    parser.add_argument("--output", type=Path, default=ARTIFACT_DIR / "route_scorer_v1.json")
+    parser.add_argument("--output", type=Path, default=ARTIFACT_DIR / "linear_route_scoring.json")
     parser.add_argument("--ridge", type=float, default=0.03)
     return parser.parse_args()
 
