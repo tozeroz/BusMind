@@ -26,12 +26,37 @@ from algorithm.dataset.scripts.recommendation_data import (
     default_raw_dir,
     line_congestion_lookup,
     load_bundle,
+    stop_code_to_station_id,
     station_flow_hourly_lookup,
 )
 from algorithm.dataset.scripts.recommendation_feature_contract import FROZEN_FEATURE_COLUMNS, dump_json
 from algorithm.routing.transit_graph import GraphNode, RideEdge, TransitGraphSearch, TransitGraphSnapshot
 
+
+def _default_hot_stops_file() -> Path:
+    return default_raw_dir().parent / "collect_scripts" / "hot_bus_stops.txt"
+
+
 def parse_args() -> argparse.Namespace:
+    """
+    groups 20
+    生成 20 个候选路线组。一个 group 大致对应一个 OD，也就是一组“起点站 -> 终点站”的候选路线。训练排序模型时，同一 group 里的路线互相比较。
+
+    max-attempts 1000
+    最多尝试 1000 个 OD。如果找到 20 个满足条件的 group 就提前结束；如果尝试 1000 次还不够，也会停止。这个防止脚本一直搜下去。
+
+    max-transfer 1
+    候选路线最多允许 1 次换乘。
+    设成 1 比默认 2 快很多，因为搜索空间小很多。后面正式数据可以再考虑是否放回 2。
+
+    max-candidates 5
+    每个 OD 最多保留 5 条候选路线。
+    比如同一个起终点找到 10 条路线，也只取前 5 条。
+
+    min-candidates 2
+    一个 OD 至少要找到 2 条候选路线，才会成为一个 group。因为排序训练需要“同组内可比较”，只有 1 条路线没法排序。
+    """
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw-dir", type=Path, default=default_raw_dir())
     parser.add_argument("--processed-dir", type=Path, default=default_processed_dir())
@@ -41,10 +66,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-attempts", type=int, default=20000)
     parser.add_argument("--max-transfer", type=int, default=2)
     parser.add_argument("--max-candidates", type=int, default=10)
+    parser.add_argument("--candidate-search-multiplier", type=int, default=10)
     parser.add_argument("--min-candidates", type=int, default=2)
     parser.add_argument("--pair-pool-size", type=int, default=5000)
+    parser.add_argument(
+        "--transfer-pair-ratio",
+        type=float,
+        default=0.35,
+        help="Approximate share of OD pairs that should require a transfer when a hot-stop filter is available.",
+    )
     parser.add_argument("--progress-every", type=int, default=50)
-    parser.add_argument("--attempt-progress-every", type=int, default=500)
+    parser.add_argument("--attempt-progress-every", type=int, default=50)
+    parser.add_argument(
+        "--hot-stops-file",
+        type=Path,
+        default=_default_hot_stops_file(),
+        help="Bus stop code file used to restrict OD generation. Existing default is used automatically.",
+    )
+    parser.add_argument("--ignore-hot-stops", action="store_true", help="Build OD pairs from all processed stations.")
+    parser.add_argument("--slow-search-seconds", type=float, default=5.0)
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
 
@@ -66,37 +106,128 @@ def _clean_line_station(line_station: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def _candidate_od_pairs_from_processed(bundle: Any, rng: random.Random, pair_pool_size: int) -> list[tuple[int, int]]:
+def _load_hot_station_ids(path: Path | None) -> set[int]:
+    if path is None or not path.exists():
+        return set()
+    station_ids: set[int] = set()
+    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
+        text = raw_line.strip()
+        if not text or text.startswith("#"):
+            continue
+        station_id = stop_code_to_station_id(text.split()[0])
+        if station_id is not None:
+            station_ids.add(station_id)
+    return station_ids
+
+
+def _candidate_od_pairs_from_processed(
+    bundle: Any,
+    rng: random.Random,
+    pair_pool_size: int,
+    station_filter: set[int] | None = None,
+    transfer_pair_ratio: float = 0.35,
+) -> list[tuple[int, int]]:
     line_station = _clean_line_station(bundle.line_station)
     order_col = _order_column(line_station)
     pair_lines: dict[tuple[int, int], set[int]] = defaultdict(set)
     fallback_pair_counts: dict[tuple[int, int], int] = {}
+    allowed_stations = station_filter or set()
+    line_sequences: dict[int, list[int]] = {}
+    station_to_lines: dict[int, set[int]] = defaultdict(set)
+    hot_positions_by_line: dict[int, list[tuple[int, int]]] = {}
 
     for line_id, group in line_station.groupby("line_id"):
-        stations = group.sort_values(order_col)["station_id"].drop_duplicates().to_list()
+        line_id = int(line_id)
+        stations = [int(station_id) for station_id in group.sort_values(order_col)["station_id"].drop_duplicates().to_list()]
         if len(stations) < 2:
             continue
+        line_sequences[line_id] = stations
+        for station_id in stations:
+            station_to_lines[station_id].add(line_id)
+        if allowed_stations:
+            eligible = [
+                (index, int(station_id))
+                for index, station_id in enumerate(stations)
+                if int(station_id) in allowed_stations
+            ]
+        else:
+            eligible = [(index, int(station_id)) for index, station_id in enumerate(stations)]
+        if len(eligible) < 2:
+            continue
+        hot_positions_by_line[line_id] = eligible
 
         # 优先采样同一个 OD 被多条线路覆盖的情况，天然更容易形成多候选路线组。
-        for left in range(len(stations) - 1):
-            for right in range(left + 1, len(stations)):
-                pair_lines[(int(stations[left]), int(stations[right]))].add(int(line_id))
+        for left in range(len(eligible) - 1):
+            for right in range(left + 1, len(eligible)):
+                pair_lines[(eligible[left][1], eligible[right][1])].add(line_id)
 
         # 兜底保留一些单线路 OD，避免多线路 OD 不足时完全没有样本。
-        sample_count = min(40, max(8, len(stations) // 3))
+        sample_count = min(40, max(8, len(eligible) // 3))
         for _ in range(sample_count):
-            left = rng.randrange(0, len(stations) - 1)
-            right = rng.randrange(left + 1, len(stations))
-            pair = (int(stations[left]), int(stations[right]))
+            left, right = sorted(rng.sample(range(len(eligible)), 2))
+            pair = (eligible[left][1], eligible[right][1])
             fallback_pair_counts[pair] = fallback_pair_counts.get(pair, 0) + 1
+
+    transfer_pairs: set[tuple[int, int]] = set()
+    if allowed_stations and transfer_pair_ratio > 0:
+        for first_line_id, stations in line_sequences.items():
+            hot_starts = hot_positions_by_line.get(first_line_id, ())
+            if not hot_starts:
+                continue
+            for start_index, start_station_id in hot_starts:
+                downstream_stations = stations[start_index + 1 :]
+                for transfer_station_id in downstream_stations:
+                    for second_line_id in station_to_lines.get(transfer_station_id, ()):
+                        if second_line_id == first_line_id:
+                            continue
+                        second_hot_positions = hot_positions_by_line.get(second_line_id, ())
+                        if not second_hot_positions:
+                            continue
+                        try:
+                            transfer_index = line_sequences[second_line_id].index(transfer_station_id)
+                        except ValueError:
+                            continue
+                        for end_index, end_station_id in second_hot_positions:
+                            if end_index <= transfer_index or end_station_id == start_station_id:
+                                continue
+                            pair = (start_station_id, end_station_id)
+                            if pair not in pair_lines:
+                                transfer_pairs.add(pair)
 
     multi_line_pairs = [(pair, len(lines)) for pair, lines in pair_lines.items() if len(lines) >= 2]
     rng.shuffle(multi_line_pairs)
     multi_line_pairs.sort(key=lambda item: item[1], reverse=True)
+    transfer_pair_list = list(transfer_pairs)
+    rng.shuffle(transfer_pair_list)
 
     output: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()
-    for pair, _line_count in multi_line_pairs:
+    transfer_count = 0
+    direct_index = 0
+    transfer_index = 0
+    transfer_pair_ratio = max(0.0, min(1.0, float(transfer_pair_ratio)))
+
+    while len(output) < pair_pool_size and (
+        direct_index < len(multi_line_pairs) or transfer_index < len(transfer_pair_list)
+    ):
+        target_transfer_count = round((len(output) + 1) * transfer_pair_ratio)
+        take_transfer = (
+            transfer_index < len(transfer_pair_list)
+            and transfer_count < target_transfer_count
+        )
+        if take_transfer:
+            pair = transfer_pair_list[transfer_index]
+            transfer_index += 1
+            transfer_count += 1
+        elif direct_index < len(multi_line_pairs):
+            pair, _line_count = multi_line_pairs[direct_index]
+            direct_index += 1
+        else:
+            pair = transfer_pair_list[transfer_index]
+            transfer_index += 1
+            transfer_count += 1
+        if pair in seen:
+            continue
         output.append(pair)
         seen.add(pair)
         if len(output) >= pair_pool_size:
@@ -330,6 +461,32 @@ def _candidate_to_feature_row(
     }
 
 
+def _select_diverse_candidates(candidates: list[Any], max_candidates: int) -> list[Any]:
+    if len(candidates) <= max_candidates:
+        return candidates
+
+    selected: list[Any] = []
+    selected_route_ids: set[str] = set()
+
+    def add(candidate: Any) -> None:
+        route_id = str(candidate.route_id)
+        if route_id in selected_route_ids or len(selected) >= max_candidates:
+            return
+        selected.append(candidate)
+        selected_route_ids.add(route_id)
+
+    for transfer_count in sorted({int(candidate.transfer_count) for candidate in candidates}):
+        for candidate in candidates:
+            if int(candidate.transfer_count) == transfer_count:
+                add(candidate)
+                break
+
+    for candidate in candidates:
+        add(candidate)
+
+    return selected
+
+
 def build_route_feature_frame(args: argparse.Namespace) -> pd.DataFrame:
     started_at = datetime.now()
     print("[dataset] loading processed feature tables...", flush=True)
@@ -338,8 +495,40 @@ def build_route_feature_frame(args: argparse.Namespace) -> pd.DataFrame:
     by_station_line, by_line, latest_arrival = _latest_arrival_tables(bundle.lta_bus_arrival)
 
     rng = random.Random(args.seed)
-    print("[dataset] building OD pair pool from processed line_station...", flush=True)
-    od_pairs = _candidate_od_pairs_from_processed(bundle, rng, args.pair_pool_size)
+    station_filter: set[int] | None = None
+    if not args.ignore_hot_stops:
+        raw_hot_station_ids = _load_hot_station_ids(args.hot_stops_file)
+        if raw_hot_station_ids:
+            processed_station_ids = set(_clean_line_station(bundle.line_station)["station_id"].unique())
+            station_filter = raw_hot_station_ids & processed_station_ids
+            print(
+                f"[dataset] hot station filter file={args.hot_stops_file} "
+                f"loaded={len(raw_hot_station_ids)} matched={len(station_filter)}",
+                flush=True,
+            )
+        elif args.hot_stops_file.exists():
+            print(f"[dataset] hot station filter file is empty: {args.hot_stops_file}", flush=True)
+        else:
+            print(f"[dataset] hot station filter file not found: {args.hot_stops_file}", flush=True)
+
+    scope = "hot stations" if station_filter else "all processed stations"
+    print(f"[dataset] building OD pair pool from {scope}...", flush=True)
+    od_pairs = _candidate_od_pairs_from_processed(
+        bundle,
+        rng,
+        args.pair_pool_size,
+        station_filter=station_filter,
+        transfer_pair_ratio=args.transfer_pair_ratio,
+    )
+    if not od_pairs and station_filter:
+        print("[dataset] no OD pairs found in hot station filter; falling back to all processed stations", flush=True)
+        station_filter = None
+        od_pairs = _candidate_od_pairs_from_processed(
+            bundle,
+            rng,
+            args.pair_pool_size,
+            transfer_pair_ratio=0.0,
+        )
     print(f"[dataset] OD pair pool size={len(od_pairs)}", flush=True)
 
     print("[dataset] building transit graph from local processed CSV...", flush=True)
@@ -347,26 +536,42 @@ def build_route_feature_frame(args: argparse.Namespace) -> pd.DataFrame:
     search = TransitGraphSearch(snapshot)
     station_ids = sorted(int(item) for item in snapshot.transfer_links.keys())
     print(f"[dataset] graph stations={len(station_ids)}", flush=True)
+    fallback_station_ids = [station_id for station_id in station_ids if not station_filter or station_id in station_filter]
+    if len(fallback_station_ids) < 2:
+        fallback_station_ids = station_ids
 
     rows: list[dict[str, Any]] = []
     seen_groups: set[tuple[int, int]] = set()
     attempts = 0
+    candidate_search_limit = max(
+        args.max_candidates,
+        min(50, args.max_candidates * max(1, args.candidate_search_multiplier)),
+    )
     while len(seen_groups) < args.groups and attempts < args.max_attempts:
         attempts += 1
         if attempts <= len(od_pairs):
             start_station_id, end_station_id = od_pairs[attempts - 1]
         else:
-            start_station_id, end_station_id = rng.sample(station_ids, 2)
+            start_station_id, end_station_id = rng.sample(fallback_station_ids, 2)
         group_key = (start_station_id, end_station_id)
         if group_key in seen_groups:
             continue
 
-        candidates = search.find_candidates(
+        search_started = datetime.now()
+        searched_candidates = search.find_candidates(
             start_station_id=start_station_id,
             end_station_id=end_station_id,
             max_transfer=args.max_transfer,
-            max_candidates=args.max_candidates,
+            max_candidates=candidate_search_limit,
         )
+        candidates = _select_diverse_candidates(searched_candidates, args.max_candidates)
+        search_elapsed = (datetime.now() - search_started).total_seconds()
+        if args.slow_search_seconds > 0 and search_elapsed >= args.slow_search_seconds:
+            print(
+                f"[dataset] slow OD search start={start_station_id} end={end_station_id} "
+                f"seconds={search_elapsed:.1f} candidates={len(candidates)}/{len(searched_candidates)}",
+                flush=True,
+            )
         if len(candidates) < args.min_candidates:
             if args.attempt_progress_every > 0 and attempts % args.attempt_progress_every == 0:
                 elapsed = (datetime.now() - started_at).total_seconds()

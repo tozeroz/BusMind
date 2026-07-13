@@ -41,7 +41,7 @@ data/raw/lta
 |---|---|
 | `scripts/recommendation_data.py` | 只负责读取 raw / processed 数据，并提供站点客流、线路拥堵等查表能力 |
 | `scripts/recommendation_feature_contract.py` | 冻结 `features.csv` 字段、JSON 字段解析、业务字段转模型输入 |
-| `scripts/build_features.py` | 单一特征构建入口；从本地 CSV 构建候选路线并输出 `features.csv` |
+| `scripts/build_features.py` | 单一特征构建入口；默认用 `data/raw/collect_scripts/hot_bus_stops.txt` 筛选 OD，从本地 CSV 构建候选路线并输出 `features.csv` |
 | `scripts/build_labels.py` | 组装同款模型 payload，基于规则评分生成伪标签 |
 | `scripts/summarize_features.py` | 汇总训练特征的数据质量、来源覆盖和降级字段分布 |
 | `features.csv` / `pseudo_labels.csv` | 推荐模型离线训练数据产物 |
@@ -143,6 +143,8 @@ python .\algorithm\dataset\scripts\summarize_features.py --input D:\SummerTraini
 python .\algorithm\dataset\scripts\build_labels.py --input D:\SummerTraining\.tmp\frozen_features_20.csv --output D:\SummerTraining\.tmp\frozen_labels_20.csv
 python .\algorithm\model\train_ranker.py --features D:\SummerTraining\.tmp\frozen_features_20.csv --labels D:\SummerTraining\.tmp\frozen_labels_20.csv --output D:\SummerTraining\.tmp\route_scorer_test.json
 ```
+
+如需绕开热门站筛选，临时加 `--ignore-hot-stops`。如需调整换乘 OD 占比，可调 `--transfer-pair-ratio`；脚本还会用 `--candidate-search-multiplier` 先多搜候选，再保留 `--max-candidates` 条，以尽量让同一 OD 内同时出现直达和换乘路线。
 
 生成正式 v1 数据集：
 

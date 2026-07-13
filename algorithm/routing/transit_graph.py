@@ -80,7 +80,10 @@ class TransitGraphSearch:
     """0-1 BFS route search over a pre-built ``TransitGraphSnapshot``."""
 
     snapshot: TransitGraphSnapshot
-    _state_parents: dict[GraphNode, GraphNode] = field(default_factory=dict, init=False, repr=False)
+    _state_parents: dict[
+        tuple[GraphNode, frozenset[int]],
+        tuple[GraphNode, frozenset[int]],
+    ] = field(default_factory=dict, init=False, repr=False)
 
     def find_candidates(
         self,
@@ -171,10 +174,11 @@ class TransitGraphSearch:
 
         while queue:
             node, line_set = queue.popleft()
+            current_state = (node, line_set)
             current = len(line_set) - 1
 
             if node in end_nodes:
-                path = self._reconstruct_state((node, line_set))
+                path = self._reconstruct_state(current_state)
                 if path is None:
                     continue
                 candidate = self._build_internal_candidate(path)
@@ -196,7 +200,7 @@ class TransitGraphSearch:
                 if next_state in visited_states:
                     continue
                 visited_states.add(next_state)
-                self._state_parents[edge.to_node] = node
+                self._state_parents[next_state] = current_state
                 queue.appendleft(next_state)
 
             if current >= max_transfer:
@@ -210,7 +214,7 @@ class TransitGraphSearch:
                 if next_state in visited_states:
                     continue
                 visited_states.add(next_state)
-                self._state_parents[target] = node
+                self._state_parents[next_state] = current_state
                 queue.append(next_state)
 
         return results
@@ -219,10 +223,9 @@ class TransitGraphSearch:
         self,
         end_state: tuple[GraphNode, frozenset[int]],
     ) -> list[GraphNode] | None:
-        end_node, _line_set = end_state
-        path: list[GraphNode] = [end_node]
-        cursor = end_node
-        visited: set[GraphNode] = {end_node}
+        path: list[tuple[GraphNode, frozenset[int]]] = [end_state]
+        cursor = end_state
+        visited: set[tuple[GraphNode, frozenset[int]]] = {end_state}
         while cursor in self._state_parents:
             previous = self._state_parents[cursor]
             if previous in visited:
@@ -231,7 +234,7 @@ class TransitGraphSearch:
             path.append(previous)
             cursor = previous
         path.reverse()
-        return path
+        return [node for node, _line_set in path]
 
     def _build_internal_candidate(self, nodes: Sequence[GraphNode]) -> InternalCandidate | None:
         if len(nodes) < 2:
