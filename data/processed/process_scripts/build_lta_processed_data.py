@@ -893,7 +893,7 @@ def build_map_road_segment(
     return df
 
 
-def iter_traffic_speed_band_snapshots(traffic_root: Path) -> Iterable[dict[str, Any]]:
+def iter_traffic_speed_band_snapshots(traffic_root: Path) -> Iterable[tuple[Path, Any]]:
     if not traffic_root.exists():
         return
     files = sorted(list(traffic_root.glob("*/*.json")) + list(traffic_root.glob("*/*.jsonl")))
@@ -903,9 +903,9 @@ def iter_traffic_speed_band_snapshots(traffic_root: Path) -> Iterable[dict[str, 
                 for line in f:
                     line = line.strip()
                     if line:
-                        yield json.loads(line)
+                        yield path, json.loads(line)
         else:
-            yield read_json(path)
+            yield path, read_json(path)
 
 
 def traffic_items_from_snapshot(snapshot: Any) -> tuple[Any, list[dict[str, Any]]]:
@@ -920,10 +920,38 @@ def traffic_items_from_snapshot(snapshot: Any) -> tuple[Any, list[dict[str, Any]
     return query_time, value or []
 
 
-def build_traffic_speed_bands(raw_dir: Path, processed_dir: Path) -> pd.DataFrame:
+def traffic_snapshot_sort_time(query_time: Any, path: Path) -> pd.Timestamp:
+    parsed = pd.to_datetime(query_time, errors="coerce", utc=True)
+    if not pd.isna(parsed):
+        return parsed
+    return pd.Timestamp(path.stat().st_mtime, unit="s", tz="UTC")
+
+
+def build_traffic_speed_bands(
+    raw_dir: Path,
+    processed_dir: Path,
+    traffic_snapshot_mode: str = "latest",
+) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
-    for snapshot in iter_traffic_speed_band_snapshots(raw_dir / "traffic_speed_bands"):
-        query_time, items = traffic_items_from_snapshot(snapshot)
+
+    selected_snapshots: list[tuple[Any, list[dict[str, Any]]]] = []
+    if traffic_snapshot_mode == "latest":
+        # processed 层默认只保留最新路况快照，避免多天 5 分钟采样膨胀成千万行 CSV。
+        latest_snapshot: tuple[pd.Timestamp, Any, list[dict[str, Any]]] | None = None
+        for path, snapshot in iter_traffic_speed_band_snapshots(raw_dir / "traffic_speed_bands"):
+            query_time, items = traffic_items_from_snapshot(snapshot)
+            sort_time = traffic_snapshot_sort_time(query_time, path)
+            if latest_snapshot is None or sort_time > latest_snapshot[0]:
+                latest_snapshot = (sort_time, query_time, items)
+        if latest_snapshot is not None:
+            selected_snapshots.append((latest_snapshot[1], latest_snapshot[2]))
+    else:
+        # 只有明确需要历史路况样本时才使用 all；这个模式主要服务离线分析，不建议直接导入 MySQL。
+        for path, snapshot in iter_traffic_speed_band_snapshots(raw_dir / "traffic_speed_bands"):
+            query_time, items = traffic_items_from_snapshot(snapshot)
+            selected_snapshots.append((query_time, items))
+
+    for query_time, items in selected_snapshots:
         for item in items:
             rows.append(
                 {
@@ -996,6 +1024,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--processed-dir", type=Path, default=root / "data" / "processed")
     parser.add_argument("--month", default=None,
                         help="Passenger Volume month such as 202605. Defaults to latest folder.")
+    parser.add_argument(
+        "--traffic-snapshot-mode",
+        choices=["latest", "all"],
+        default="latest",
+        help=(
+            "Traffic Speed Bands output mode. 'latest' keeps only the newest "
+            "snapshot for backend/import CSV; 'all' preserves every collected "
+            "snapshot and can produce a very large file."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1014,7 +1052,7 @@ def main() -> None:
     eta, load = build_direct_status_tables(arrival, processed_dir)
     map_station = build_map_station(stations, line_station, processed_dir)
     map_road_segment = build_map_road_segment(line_station, stations, flow_trend, processed_dir)
-    traffic_speed_bands = build_traffic_speed_bands(raw_dir, processed_dir)
+    traffic_speed_bands = build_traffic_speed_bands(raw_dir, processed_dir, args.traffic_snapshot_mode)
 
     summary = pd.DataFrame(
         [

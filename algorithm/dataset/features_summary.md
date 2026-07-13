@@ -1,6 +1,6 @@
 # Recommendation Feature Dataset Summary
 
-Input: `algorithm\dataset\recommendation\v1\features.csv`
+Input: `algorithm\dataset\features.csv`
 
 - Rows: 3000
 - Candidate groups: 100

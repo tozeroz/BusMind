@@ -13,7 +13,8 @@ if __package__ in {None, ""}:
 import numpy as np
 import pandas as pd
 
-from algorithm.dataset.recommendation_data import default_dataset_dir
+from algorithm.dataset.scripts.recommendation_data import default_dataset_dir
+from algorithm.dataset.scripts.recommendation_feature_contract import numeric_feature_frame, read_frozen_features
 from algorithm.model.contracts import MODEL_VERSION, NUMERIC_FEATURE_NAMES
 from algorithm.model.scorer import ARTIFACT_DIR
 
@@ -56,14 +57,14 @@ def _fit_linear_heads(x: np.ndarray, y_scores: np.ndarray, ridge: float) -> tupl
 
 def main() -> None:
     args = parse_args()
-    features = pd.read_csv(args.features)
+    features = read_frozen_features(args.features)
     labels = pd.read_csv(args.labels)
 
     # route_id 在真实采样里可能不是全局唯一；训练分项评分时按候选集合内的线路去重对齐。
     join_keys = ["candidate_group_id", "route_id"]
-    features = features.drop_duplicates(join_keys).copy()
+    numeric_features = numeric_feature_frame(features.drop_duplicates(join_keys).copy())
     score_targets = labels.drop_duplicates(join_keys)[[*join_keys, *SCORE_NAMES]]
-    dataset = features.merge(score_targets, on=join_keys, how="inner", validate="one_to_one")
+    dataset = numeric_features.merge(score_targets, on=join_keys, how="inner", validate="one_to_one")
     if dataset.empty:
         raise ValueError("No route rows matched between features and pseudo labels")
 

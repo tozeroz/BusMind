@@ -4,19 +4,20 @@
 
 ## 1. 目录职责
 
-本目录负责把后端业务数据口径转换成推荐模型训练口径。
+本目录负责把本地 `data/processed` 中的公交网络、实时样本、历史客流和路况数据，整理成与线上后端 `routes[]` payload 对齐的训练数据。
 
 固定边界：
 
-- 优先读取 `data/processed` 下的标准 CSV。
-- 如果 processed 数据缺失，则从 `data/raw/lta` 按同一处理口径重建。
+- 优先读取 `data/processed/*.csv`。
+- 不直接调用 LTA API，不查 MySQL，不依赖 SSH 隧道。
 - 输出推荐模型训练用的 `features.csv` 和 `pseudo_labels.csv`。
-- 构造 12 维模型输入特征。
+- `features.csv` 保存业务字段，不保存模型内部映射分。
+- 训练前统一通过 `algorithm/model/preprocessing.py` 转成 12 维数值特征。
 - 标记 `is_synthetic`，记录 `feature_sources` 和 `degraded_fields`。
 
 禁止在本目录承担：
 
-- 调用 LTA API。
+- 采集 LTA 原始数据。
 - 写入 MySQL 或缓存。
 - 承担线上后端实时刷新逻辑。
 - 保存模型权重或模型推理产物。
@@ -28,30 +29,90 @@ data/raw/lta
     ↓
 data/processed/*.csv
     ↓
-algorithm/dataset/build_features.py
+algorithm/dataset/scripts/build_features.py
     ↓
-algorithm/dataset/recommendation/v1/features.csv
+algorithm/dataset/features.csv
     ↓
-algorithm/dataset/build_labels.py
+algorithm/dataset/scripts/build_labels.py
     ↓
-algorithm/dataset/recommendation/v1/pseudo_labels.csv
+algorithm/dataset/pseudo_labels.csv
     ↓
 algorithm/model/train_ranker.py
+    ↓
+algorithm/model/artifacts/route_scorer_v1.json
 ```
 
 ## 3. 文件说明
 
 | 文件或目录 | 用途 |
 |---|---|
-| `recommendation_data.py` | 数据读取、字段转换、12 维特征构建 |
-| `build_features.py` | 生成模型输入数据 `features.csv` |
-| `build_labels.py` | 基于规则基线生成伪标签 `pseudo_labels.csv` |
-| `summarize_features.py` | 汇总训练特征的数据质量、来源覆盖和降级字段分布 |
-| `recommendation/v1/` | 推荐模型 v1 的离线训练数据输出目录 |
+| `scripts/recommendation_data.py` | 读取 raw / processed 数据，提供基础数据加载能力 |
+| `scripts/recommendation_feature_contract.py` | 冻结 `features.csv` 字段、JSON 字段解析、业务字段转模型 12 维特征 |
+| `scripts/build_features.py` | 单一特征构建入口；从本地 processed CSV 生成后端契约对齐的候选路线训练样本 |
+| `scripts/build_labels.py` | 组装同款模型 payload，基于规则评分生成伪标签 |
+| `scripts/summarize_features.py` | 汇总训练特征的数据质量、来源覆盖和降级字段分布 |
+| `features.csv` / `pseudo_labels.csv` | 推荐模型离线训练数据产物 |
 
-## 4. 输出字段要求
+候选路线搜索核心算法位于 `algorithm/routing/transit_graph.py`，后端和离线训练数据构建共用同一套图搜索逻辑。
 
-`features.csv` 必须包含模型 12 个数值特征：
+## 4. features.csv 冻结字段
+
+`features.csv` 必须只保存线上后端 route payload 对齐字段，以及离线训练管理字段：
+
+```text
+candidate_group_id
+route_id
+service_nos
+eta_minutes
+ride_time_minutes
+walk_time_minutes
+walk_distance_meters
+transfer_count
+avg_service_frequency_minutes
+load_code
+station_flow_level
+route_speed_band
+source_updated_at
+monitored
+degraded_fields
+feature_sources
+is_synthetic
+```
+
+其中：
+
+- `candidate_group_id`：离线候选路线组 ID，线上后端不需要传。
+- `is_synthetic`：离线训练样本标记，线上后端不需要传。
+- 其余字段与线上后端传入模型的单条 `routes[]` 字段对齐。
+
+`features.csv` 不允许保存这些模型内部字段：
+
+```text
+load_score
+history_flow_score
+congestion_score
+data_freshness_seconds
+monitored_score
+completeness_score
+```
+
+这些字段只能由 `algorithm/model/preprocessing.py` 根据业务字段统一映射得到。
+
+## 5. JSON 字段格式
+
+CSV 中复杂字段统一保存为 JSON 字符串：
+
+```text
+service_nos      -> ["105","88"]
+degraded_fields -> ["walk_distance_meters"]
+feature_sources -> {"eta_minutes":"lta_realtime","transfer_count":"backend_graph"}
+```
+
+训练脚本读取时必须先把这些字段恢复为 `list` / `dict`，再组装成 `predict_recommendation(payload)` 同款结构。
+
+## 6. 模型真正使用的 12 维特征
+
+训练和推理时，模型内部固定使用下面 12 个数值特征：
 
 ```text
 eta_minutes
@@ -68,55 +129,33 @@ completeness_score
 avg_service_frequency_minutes
 ```
 
-同时必须保留：
+字段来源分层：
 
-```text
-candidate_group_id
-route_id
-service_nos
-load_code
-feature_sources
-degraded_fields
-is_synthetic
-```
+| 内部特征 | `features.csv` 业务字段 | 处理口径 |
+|---|---|---|
+| `load_score` | `load_code` | `SEA=100`，`SDA=70`，`LSD=35`，`UNKNOWN=60` |
+| `history_flow_score` | `station_flow_level` | `low=90`，`medium=70`，`high=45` |
+| `congestion_score` | `route_speed_band` | LTA `SpeedBand=1..8` 映射为通畅分 |
+| `data_freshness_seconds` | `source_updated_at` | 当前时间减数据更新时间 |
+| `monitored_score` | `monitored` | `1 -> 100`，`0 -> 75` |
+| `completeness_score` | `degraded_fields` | 降级字段越多，完整度越低 |
 
-## 5. 当前数据口径
+## 7. 快速验证
 
-真实来源字段：
-
-- `eta_minutes`：LTA Bus Arrival 的 `EstimatedArrival - query_time`。
-- `load_score`：LTA Bus Arrival 的 `Load` 映射。
-- `history_flow_score`：Passenger Volume by Bus Stops 的历史客流映射。
-- `congestion_score`：Traffic Speed Bands 的 `SpeedBand` 映射。
-- `avg_service_frequency_minutes`：Bus Services 的发车频率字段解析。
-
-估算或过渡字段：
-
-- `ride_time_minutes`：当前按线路剩余距离和默认速度估算。
-- `walk_time_minutes`：当前离线阶段缺少真实步行路径，必要时模拟。
-- `walk_distance_meters`：当前由步行时间反推。
-- `transfer_count`：当前离线阶段必要时模拟。
-- `data_freshness_seconds`：当前离线阶段使用默认值。
-- `completeness_score`：当前按 `degraded_fields` 的字段数量计算。
-
-估算或模拟字段必须通过 `feature_sources` 和 `degraded_fields` 显式标记。
-
-## 6. 快速验证
+临时小样本建议写到 `D:\SummerTraining\.tmp`：
 
 ```powershell
-python .\algorithm\dataset\build_features.py --max-groups 3
-python .\algorithm\dataset\summarize_features.py
-python .\algorithm\dataset\build_labels.py
+python .\algorithm\dataset\scripts\build_features.py --groups 20 --output D:\SummerTraining\.tmp\frozen_features_20.csv
+python .\algorithm\dataset\scripts\summarize_features.py --input D:\SummerTraining\.tmp\frozen_features_20.csv
+python .\algorithm\dataset\scripts\build_labels.py --input D:\SummerTraining\.tmp\frozen_features_20.csv --output D:\SummerTraining\.tmp\frozen_labels_20.csv
+python .\algorithm\model\train_ranker.py --features D:\SummerTraining\.tmp\frozen_features_20.csv --labels D:\SummerTraining\.tmp\frozen_labels_20.csv --output D:\SummerTraining\.tmp\route_scorer_test.json
 ```
 
-生成完整训练集时可以直接输出到 v1 目录：
+生成正式 v1 数据集：
 
 ```powershell
-python .\algorithm\dataset\build_features.py --min-groups 500
-python .\algorithm\dataset\summarize_features.py --output .\algorithm\dataset\recommendation\v1\features_summary.md
-python .\algorithm\dataset\build_labels.py
+python .\algorithm\dataset\scripts\build_features.py --groups 1000
+python .\algorithm\dataset\scripts\summarize_features.py --output .\algorithm\dataset\features_summary.md
+python .\algorithm\dataset\scripts\build_labels.py
+python .\algorithm\model\train_ranker.py
 ```
-
-`--min-groups` 会在真实候选组不足时用可控扰动生成补充候选组。补充样本会保留 `is_synthetic=true`，并把 `feature_sources` 标为 `model`，避免和真实来源混淆。
-
-如果只想临时验证，建议把输出写到 `D:\SummerTraining\.tmp`，避免把训练样本提交到仓库。

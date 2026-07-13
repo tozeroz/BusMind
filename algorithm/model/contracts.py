@@ -25,7 +25,20 @@ PREFERENCE_ALIASES = {
 }
 
 LOAD_CODES = {"SEA", "SDA", "LSD", "UNKNOWN"}
-SOURCE_NAMES = {"lta_realtime", "cache", "database", "historical", "rule_estimate", "model", "default"}
+SOURCE_NAMES = {
+    "lta_realtime",
+    "lta_line_fallback",
+    "cache",
+    "database",
+    "processed_csv",
+    "historical",
+    "traffic_speed_bands",
+    "backend_graph",
+    "backend_graph_estimate",
+    "rule_estimate",
+    "model",
+    "default",
+}
 
 NUMERIC_FEATURE_NAMES = (
     "eta_minutes",
