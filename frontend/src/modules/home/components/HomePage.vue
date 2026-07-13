@@ -138,6 +138,10 @@
             </div>
           </template>
 
+          <p :class="['backend-listen-status', `is-${backendHealth.state}`]" role="status">
+            <span class="backend-status-dot" aria-hidden="true"></span>
+            {{ backendHealth.label }}
+          </p>
         </aside>
       </Transition>
 
@@ -237,7 +241,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import BusMap from '@/modules/map/components/BusMap.vue'
 import RouteResultsPopup from '@/modules/home/components/RouteResultsPopup.vue'
 import SelectedRouteDetailCard from '@/modules/home/components/SelectedRouteDetailCard.vue'
@@ -246,8 +250,9 @@ import { askAiTravel } from '@/api/ai'
 import { getNearbyLocations, searchLocations } from '@/api/location'
 import { getEta } from '@/api/intelligence'
 import { getCachedBusArrival } from '@/api/map'
-import { getRouteRecommendations, RECOMMENDATION_PREFERENCES } from '@/api/recommendation'
+import { getProgressiveRouteRecommendations, RECOMMENDATION_PREFERENCES } from '@/api/recommendation'
 import { getPassengerFlowTrend } from '@/api/history'
+import { getApiHealth } from '@/api/health'
 import { getRealtimeVehicles } from '@/api/vehicle'
 import { getApiErrorMessage, unwrapData, unwrapList } from '@/api/response'
 import { triggerArrivalRefresh } from '@/api/user'
@@ -262,6 +267,11 @@ const query = reactive({ start: 'Aft Braddell Rd', end: 'New Tech Pk' })
 const notice = ref('')
 const recommendation = ref(null)
 const isSearching = ref(false)
+const backendHealth = reactive({ state: 'checking', label: '\u540e\u7aef\u76d1\u542c\uff1a\u68c0\u67e5\u4e2d' })
+const backendHealthIntervalMs = 3000
+const backendHealthTimeoutMs = 2500
+let backendHealthRequestPending = false
+let backendHealthTimer = null
 const panelMode = ref('search')
 const isInfoPanelOpen = ref(false)
 const isAiChatOpen = ref(false)
@@ -536,7 +546,7 @@ const searchRoutes = async () => {
       return
     }
 
-    const result = await getRouteRecommendations({
+    const { result } = await getProgressiveRouteRecommendations({
       startStationId: startStation.station_id,
       endStationId: endStation.station_id,
       preference: RECOMMENDATION_PREFERENCES.BALANCED,
@@ -562,6 +572,22 @@ const searchRoutes = async () => {
     notice.value = getApiErrorMessage(error, '路线检索失败，请检查后端服务和站点数据')
   } finally {
     isSearching.value = false
+  }
+}
+
+const checkBackendHealth = async () => {
+  if (backendHealthRequestPending) return
+  backendHealthRequestPending = true
+  try {
+    const data = unwrapData(await getApiHealth({ timeout: backendHealthTimeoutMs }), {})
+    if (data.status !== 'ok') throw new Error('Unexpected health status')
+    backendHealth.state = 'online'
+    backendHealth.label = `\u540e\u7aef\u76d1\u542c\uff1a\u6b63\u5e38${data.version ? ` \u00b7 ${data.version}` : ''}`
+  } catch {
+    backendHealth.state = 'offline'
+    backendHealth.label = '\u540e\u7aef\u76d1\u542c\uff1a\u672a\u8fde\u63a5'
+  } finally {
+    backendHealthRequestPending = false
   }
 }
 
@@ -819,7 +845,13 @@ const closeStationDetail = () => {
   clearStationEtaRefreshTimer()
 }
 
+onMounted(() => {
+  checkBackendHealth()
+  backendHealthTimer = window.setInterval(checkBackendHealth, backendHealthIntervalMs)
+})
+
 onBeforeUnmount(() => {
   clearStationEtaRefreshTimer()
+  if (backendHealthTimer) window.clearInterval(backendHealthTimer)
 })
 </script>

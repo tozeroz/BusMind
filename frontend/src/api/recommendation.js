@@ -24,7 +24,7 @@ export const RECOMMEND_TYPES = Object.freeze({
 })
 
 const PREFERENCE_VALUES = new Set(Object.values(RECOMMENDATION_PREFERENCES))
-const RECOMMENDATION_TIMEOUT = Number(import.meta.env.VITE_RECOMMENDATION_TIMEOUT || 60000)
+const RECOMMENDATION_TIMEOUT = Number(import.meta.env.VITE_RECOMMENDATION_TIMEOUT || 180000)
 
 const positiveInteger = (value, field) => {
   const number = Number(value)

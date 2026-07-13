@@ -53,4 +53,4 @@ export const LOCATION_PRESETS = Object.freeze({
 })
 
 // 当前启用的固定位置。切换站点时只需修改这里的预设名称。
-export const INJECTED_LOCATION = LOCATION_PRESETS.oppBlk25
+export const INJECTED_LOCATION = LOCATION_PRESETS.aftBraddellRd

@@ -1518,6 +1518,33 @@ label {
     rgba(44, 68, 96, 0.34);
 }
 
+.backend-listen-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 2px 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.backend-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f2c94c;
+  box-shadow: 0 0 0 3px rgba(242, 201, 76, 0.12);
+}
+
+.backend-listen-status.is-online .backend-status-dot {
+  background: #5ee0a0;
+  box-shadow: 0 0 0 3px rgba(94, 224, 160, 0.13);
+}
+
+.backend-listen-status.is-offline .backend-status-dot {
+  background: #ff7b7b;
+  box-shadow: 0 0 0 3px rgba(255, 123, 123, 0.13);
+}
 .map-info-dock h1 {
   font-size: 26px;
   line-height: 1.18;
