@@ -1,3 +1,9 @@
+/**
+ * 文件：tests/live-api-smoke.mjs
+ * 用途：验证前端接口契约和集成行为。
+ * 存放内容：可执行断言、测试数据以及冒烟测试流程。
+ * 实现功能：在生产代码之外发现接口契约和真实联调回归。
+ */
 import assert from 'node:assert/strict'
 
 const base = (process.env.BUSMIND_API_BASE_URL || 'http://127.0.0.1:8001/api/v1').replace(/\/$/, '')

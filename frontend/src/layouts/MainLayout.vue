@@ -1,3 +1,9 @@
+<!--
+  文件：src/layouts/MainLayout.vue
+  用途：定义应用级页面布局。
+  存放内容：导航、整体页面框架和嵌套路由出口。
+  实现功能：提供统一页面结构，不实现某个页面专属的业务逻辑。
+-->
 <template>
   <div class="app-shell">
     <aside class="sidebar">

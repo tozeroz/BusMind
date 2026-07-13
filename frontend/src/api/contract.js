@@ -1,3 +1,9 @@
+/**
+ * 文件：src/api/contract.js
+ * 用途：定义某项后端能力对应的前端 API 访问边界。
+ * 存放内容：接口请求函数、请求参数以及响应边界处理代码。
+ * 实现功能：为页面和业务组合式函数提供统一、可复用的 HTTP 调用入口。
+ */
 // 由运行时 app.openapi() v1.2.0 核对。用于自动检查 72 个操作均有明确前端处理策略。
 export const API_OPERATION_CONTRACT = [
   { method: 'GET', path: '/', wrapper: null, status: 'backend_only', note: '后端部署根健康检查，不经 Vite /api 代理', deprecated: false },
