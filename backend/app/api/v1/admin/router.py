@@ -24,9 +24,20 @@ from app.schemas.admin_refresh import (
     LtaTrafficSpeedBandsAdminRefreshRequest,
 )
 from app.services.collector_service.service import LtaCollectorService
+from app.services.scheduler_service import get_default_scheduler
 from app.services.sync_service.service import CacheSyncService
 
 router = APIRouter(prefix="/admin/lta", tags=["Admin LTA Refresh"])
+
+
+@router.get("/bus-arrival/scheduler-status", response_model=ApiResponse)
+async def get_bus_arrival_scheduler_status(
+    _admin: User = Depends(get_current_admin_user),
+) -> ApiResponse:
+    return success_response(
+        get_default_scheduler().status(),
+        "req_admin_lta_scheduler_status",
+    )
 
 
 @router.post("/bus-arrival/refresh", response_model=ApiResponse)
