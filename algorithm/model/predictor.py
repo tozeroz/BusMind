@@ -11,6 +11,10 @@ from typing import Any
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[2]))
 
+from algorithm.dataset.scripts.recommendation_feature_contract import (
+    model_input_routes_from_feature_group,
+    read_frozen_features,
+)
 from algorithm.model.contracts import CONTRACT_VERSION
 from algorithm.model.scorer import score_routes
 
@@ -24,7 +28,7 @@ def predict(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _parse_args() -> argparse.Namespace:
-    from algorithm.dataset.recommendation_data import default_dataset_dir
+    from algorithm.dataset.scripts.recommendation_data import default_dataset_dir
 
     parser = argparse.ArgumentParser(description="Run a small recommendation-model smoke test.")
     parser.add_argument("--features", type=Path, default=default_dataset_dir() / "features.csv")
@@ -34,47 +38,8 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _sources(value: object) -> dict[str, str]:
-    output: dict[str, str] = {}
-    for part in str(value or "").split("|"):
-        if ":" not in part:
-            continue
-        key, source = part.split(":", 1)
-        output[key] = source
-    return output
-
-
-def _route_payload(group: Any) -> list[dict[str, object]]:
-    routes = []
-    for row in group.to_dict("records"):
-        routes.append(
-            {
-                "route_id": row["route_id"],
-                "service_nos": [item for item in str(row["service_nos"]).split("|") if item],
-                "eta_minutes": row["eta_minutes"],
-                "ride_time_minutes": row["ride_time_minutes"],
-                "walk_time_minutes": row["walk_time_minutes"],
-                "walk_distance_meters": row["walk_distance_meters"],
-                "transfer_count": row["transfer_count"],
-                "load_code": row["load_code"],
-                "load_score": row["load_score"],
-                "history_flow_score": row["history_flow_score"],
-                "congestion_score": row["congestion_score"],
-                "data_freshness_seconds": row["data_freshness_seconds"],
-                "monitored_score": row["monitored_score"],
-                "completeness_score": row["completeness_score"],
-                "avg_service_frequency_minutes": row["avg_service_frequency_minutes"],
-                "feature_sources": _sources(row["feature_sources"]),
-                "degraded_fields": [item for item in str(row.get("degraded_fields") or "").split("|") if item],
-            }
-        )
-    return routes
-
-
 def _build_payload_from_features(args: argparse.Namespace) -> dict[str, Any]:
-    import pandas as pd
-
-    features = pd.read_csv(args.features)
+    features = read_frozen_features(args.features)
     if features.empty:
         raise ValueError(f"No feature rows found in {args.features}")
 
@@ -92,14 +57,14 @@ def _build_payload_from_features(args: argparse.Namespace) -> dict[str, Any]:
         "contract_version": CONTRACT_VERSION,
         "request_id": f"smoke-test:{candidate_group_id}",
         "preference": args.preference,
-        "routes": _route_payload(group),
+        "routes": model_input_routes_from_feature_group(group),
     }
 
 
 def main() -> None:
     args = _parse_args()
     payload = _build_payload_from_features(args)
-    result = score_routes(payload, strict_backend=False)
+    result = score_routes(payload, strict_backend=True)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

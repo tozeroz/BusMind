@@ -34,7 +34,7 @@ class DatasetBundle:
 
 
 def project_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[3]
 
 
 def default_raw_dir() -> Path:
@@ -50,7 +50,7 @@ def default_model_dir() -> Path:
 
 
 def default_dataset_dir() -> Path:
-    return project_root() / "algorithm" / "dataset" / "recommendation" / "v1"
+    return project_root() / "algorithm" / "dataset"
 
 
 def normalize_stop_code(value: Any) -> str:
