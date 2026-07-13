@@ -21,12 +21,12 @@ if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from algorithm.dataset.scripts.recommendation_data import (
-    _line_congestion_lookup,
-    _station_flow_hourly_lookup,
     default_dataset_dir,
     default_processed_dir,
     default_raw_dir,
+    line_congestion_lookup,
     load_bundle,
+    station_flow_hourly_lookup,
 )
 from algorithm.dataset.scripts.recommendation_feature_contract import FROZEN_FEATURE_COLUMNS, dump_json
 from algorithm.routing.transit_graph import GraphNode, RideEdge, TransitGraphSearch, TransitGraphSnapshot
@@ -223,7 +223,7 @@ def _build_lookup_frames(bundle: Any) -> dict[str, Any]:
     line["line_id"] = pd.to_numeric(line["line_id"], errors="coerce").astype("Int64")
     line_by_id = line.set_index("line_id").to_dict("index")
 
-    flow = _station_flow_hourly_lookup(bundle.passenger_flow_trend)
+    flow = station_flow_hourly_lookup(bundle.passenger_flow_trend)
     flow_by_station = flow.groupby("station_id", as_index=False)["station_flow_mean"].mean()
     flow_by_station["station_flow_level"] = pd.qcut(
         flow_by_station["station_flow_mean"].rank(method="first"),
@@ -232,7 +232,7 @@ def _build_lookup_frames(bundle: Any) -> dict[str, Any]:
     ).astype(str)
     flow_lookup = flow_by_station.set_index("station_id").to_dict("index")
 
-    line_congestion = _line_congestion_lookup(bundle.bus_station, bundle.line_station, bundle.traffic_speed_bands)
+    line_congestion = line_congestion_lookup(bundle.bus_station, bundle.line_station, bundle.traffic_speed_bands)
     congestion_lookup = line_congestion.set_index("line_id")["congestion_score"].to_dict()
     global_congestion = float(line_congestion["congestion_score"].mean()) if not line_congestion.empty else 0.45
 
