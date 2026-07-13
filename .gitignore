@@ -76,7 +76,6 @@ backend/logs/
 data/raw/*
 !data/raw/README.md
 !data/raw/.gitkeep
-!data/raw/collect_lta_realtime_server.py
 !data/raw/collect_scripts/
 !data/raw/collect_scripts/**
 data/raw/lta/

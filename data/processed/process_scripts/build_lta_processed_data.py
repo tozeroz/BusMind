@@ -14,6 +14,7 @@ import hashlib
 import json
 import math
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -57,6 +58,8 @@ SPEED_BAND_COLOR = {
     8: "#1b5e20",
 }
 
+TrafficSnapshotMeta = tuple[Path, pd.Timestamp]
+
 
 def project_root() -> Path:
     return Path(__file__).resolve().parents[3]
@@ -84,6 +87,22 @@ def write_csv(df: pd.DataFrame, path: Path) -> None:
     ensure_dir(path.parent)
     df.to_csv(path, index=False, encoding="utf-8-sig", quoting=csv.QUOTE_MINIMAL)
     print(f"wrote {len(df):>8} rows -> {path}")
+
+
+def parse_lta_datetime(value: Any) -> pd.Timestamp:
+    parsed = pd.to_datetime(value, errors="coerce", utc=True)
+    if pd.isna(parsed):
+        return pd.NaT
+    return parsed.tz_convert("Asia/Singapore").tz_localize(None)
+
+
+def parse_lta_datetime_series(values: pd.Series) -> pd.Series:
+    if pd.api.types.is_datetime64_any_dtype(values):
+        if getattr(values.dt, "tz", None) is None:
+            return values
+        return values.dt.tz_convert("Asia/Singapore").dt.tz_localize(None)
+    parsed = pd.to_datetime(values, errors="coerce", utc=True)
+    return parsed.dt.tz_convert("Asia/Singapore").dt.tz_localize(None)
 
 
 def normalize_stop_code(value: Any) -> str:
@@ -421,11 +440,84 @@ def iter_arrival_records(arrival_root: Path) -> Iterable[dict[str, Any]]:
                     yield json.loads(line)
 
 
+def traffic_snapshot_time_from_path(path: Path) -> pd.Timestamp:
+    prefix = "traffic_speed_bands_"
+    if path.stem.startswith(prefix):
+        timestamp_text = path.stem[len(prefix):]
+        try:
+            return pd.Timestamp(datetime.strptime(timestamp_text, "%Y%m%d_%H%M%S"))
+        except ValueError:
+            pass
+    return pd.Timestamp(path.stat().st_mtime, unit="s", tz="UTC").tz_convert("Asia/Singapore").tz_localize(None)
+
+
+def traffic_snapshot_paths(traffic_root: Path) -> list[Path]:
+    if not traffic_root.exists():
+        return []
+    return sorted(list(traffic_root.glob("*/*.json")) + list(traffic_root.glob("*/*.jsonl")))
+
+
+def collect_traffic_snapshot_metadata(traffic_root: Path) -> list[TrafficSnapshotMeta]:
+    return [(path, traffic_snapshot_time_from_path(path)) for path in traffic_snapshot_paths(traffic_root)]
+
+
+def attach_traffic_match(
+    arrival: pd.DataFrame,
+    traffic_snapshots: list[TrafficSnapshotMeta],
+    match_window_minutes: float,
+) -> pd.DataFrame:
+    tolerance = pd.to_timedelta(float(match_window_minutes), unit="m")
+    if arrival.empty or not traffic_snapshots:
+        result = arrival.copy()
+        result["matched_traffic_query_time"] = pd.NaT
+        result["traffic_match_delta_seconds"] = pd.NA
+        result["traffic_match_status"] = "unmatched"
+        return result
+
+    traffic_times = (
+        pd.DataFrame(
+            {
+                "matched_traffic_query_time": [snapshot_time for _, snapshot_time in traffic_snapshots],
+            }
+        )
+        .dropna()
+        .drop_duplicates()
+        .sort_values("matched_traffic_query_time")
+    )
+    if traffic_times.empty:
+        result = arrival.copy()
+        result["matched_traffic_query_time"] = pd.NaT
+        result["traffic_match_delta_seconds"] = pd.NA
+        result["traffic_match_status"] = "unmatched"
+        return result
+
+    work = arrival.reset_index(names="_arrival_index").sort_values("query_time")
+    matched = pd.merge_asof(
+        work,
+        traffic_times,
+        left_on="query_time",
+        right_on="matched_traffic_query_time",
+        direction="nearest",
+        tolerance=tolerance,
+    )
+    delta_seconds = (
+        matched["query_time"] - matched["matched_traffic_query_time"]
+    ).abs().dt.total_seconds()
+    matched["traffic_match_delta_seconds"] = delta_seconds.round().astype("Int64")
+    matched["traffic_match_status"] = matched["matched_traffic_query_time"].map(
+        lambda value: "matched" if not pd.isna(value) else "unmatched"
+    )
+    return matched.sort_values("_arrival_index").drop(columns=["_arrival_index"]).reset_index(drop=True)
+
+
 def flatten_bus_arrival(
         raw_dir: Path,
         processed_dir: Path,
         lines: pd.DataFrame,
         stations: pd.DataFrame,
+        eta_max_minutes: float,
+        traffic_snapshots: list[TrafficSnapshotMeta] | None = None,
+        traffic_match_window_minutes: float | None = None,
 ) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     for record in iter_arrival_records(raw_dir / "bus_arrival_samples"):
@@ -482,13 +574,40 @@ def flatten_bus_arrival(
     if df.empty:
         raise ValueError("No usable Bus Arrival rows found.")
 
-    df["query_time"] = pd.to_datetime(df["query_time"], errors="coerce")
-    estimated_arrival = pd.to_datetime(df["estimated_arrival"], errors="coerce", utc=True)
-    df["estimated_arrival"] = estimated_arrival.dt.tz_convert("Asia/Singapore").dt.tz_localize(None)
+    df["query_time"] = parse_lta_datetime_series(df["query_time"])
+    df["estimated_arrival"] = parse_lta_datetime_series(df["estimated_arrival"])
     df["predicted_eta_minutes"] = (
             (df["estimated_arrival"] - df["query_time"]).dt.total_seconds() / 60
     ).round(2)
-    df = df[df["predicted_eta_minutes"].notna() & (df["predicted_eta_minutes"] >= 0)].copy()
+    before_eta_filter = len(df)
+    df = df[
+        df["predicted_eta_minutes"].notna()
+        & (df["predicted_eta_minutes"] >= 0)
+        & (df["predicted_eta_minutes"] <= eta_max_minutes)
+    ].copy()
+    dropped_eta = before_eta_filter - len(df)
+    if dropped_eta:
+        print(f"dropped {dropped_eta} Bus Arrival rows outside ETA range 0-{eta_max_minutes:g} minutes")
+
+    if traffic_match_window_minutes is not None:
+        before_match_filter = len(df)
+        df = attach_traffic_match(df, traffic_snapshots or [], traffic_match_window_minutes)
+        df = df[df["traffic_match_status"] == "matched"].copy()
+        dropped_unmatched = before_match_filter - len(df)
+        if dropped_unmatched:
+            print(
+                "dropped "
+                f"{dropped_unmatched} Bus Arrival rows without Traffic Speed Bands "
+                f"within {traffic_match_window_minutes:g} minutes"
+            )
+    else:
+        df["matched_traffic_query_time"] = pd.NaT
+        df["traffic_match_delta_seconds"] = pd.NA
+        df["traffic_match_status"] = "not_required"
+
+    if df.empty:
+        raise ValueError("No usable Bus Arrival rows remain after ETA/time-window filtering.")
+
     df["duration_ms"] = (df["predicted_eta_minutes"] * 60 * 1000).round().astype("Int64")
     df["station_id"] = df["station_id"].astype(int)
     df["vehicle_latitude"] = pd.to_numeric(df["vehicle_latitude"], errors="coerce")
@@ -544,10 +663,10 @@ def flatten_bus_arrival(
     df["capacity"] = df["bus_type"].map(BUS_CAPACITY).fillna(80).astype(int)
     df["predicted_load_rate"] = df["predicted_load"].map(LOAD_RATE).fillna(0.45)
     df["onboard_count"] = (df["capacity"] * df["predicted_load_rate"]).round().astype(int)
-    eta_hours = df["predicted_eta_minutes"] / 60
+    eta_hours = pd.to_numeric(df["predicted_eta_minutes"], errors="coerce") / 60
     distance_km = pd.to_numeric(df["vehicle_to_stop_distance_m"], errors="coerce") / 1000
-    speed = distance_km / eta_hours.replace(0, pd.NA)
-    df["speed_kph"] = speed.fillna(24).clip(lower=8, upper=60).round(1)
+    speed = distance_km / eta_hours.where(eta_hours != 0)
+    df["speed_kph"] = pd.to_numeric(speed, errors="coerce").fillna(24.0).clip(lower=8, upper=60).round(1)
 
     columns = [
         "query_time",
@@ -578,6 +697,9 @@ def flatten_bus_arrival(
         "feature",
         "vehicle_to_stop_distance_m",
         "speed_kph",
+        "matched_traffic_query_time",
+        "traffic_match_delta_seconds",
+        "traffic_match_status",
     ]
     output = df[columns].sort_values(["query_time", "station_id", "service_no", "visit_order"])
     output = output.rename(
@@ -894,10 +1016,7 @@ def build_map_road_segment(
 
 
 def iter_traffic_speed_band_snapshots(traffic_root: Path) -> Iterable[tuple[Path, Any]]:
-    if not traffic_root.exists():
-        return
-    files = sorted(list(traffic_root.glob("*/*.json")) + list(traffic_root.glob("*/*.jsonl")))
-    for path in files:
+    for path in traffic_snapshot_paths(traffic_root):
         if path.suffix.lower() == ".jsonl":
             with path.open("r", encoding="utf-8-sig") as f:
                 for line in f:
@@ -921,16 +1040,103 @@ def traffic_items_from_snapshot(snapshot: Any) -> tuple[Any, list[dict[str, Any]
 
 
 def traffic_snapshot_sort_time(query_time: Any, path: Path) -> pd.Timestamp:
-    parsed = pd.to_datetime(query_time, errors="coerce", utc=True)
+    parsed = parse_lta_datetime(query_time)
     if not pd.isna(parsed):
         return parsed
-    return pd.Timestamp(path.stat().st_mtime, unit="s", tz="UTC")
+    return traffic_snapshot_time_from_path(path)
+
+
+def matched_traffic_snapshot_paths(
+    arrival: pd.DataFrame,
+    traffic_snapshots: list[TrafficSnapshotMeta],
+    match_window_minutes: float,
+) -> set[Path]:
+    tolerance = pd.to_timedelta(float(match_window_minutes), unit="m")
+    if arrival.empty or not traffic_snapshots:
+        return set()
+
+    arrivals = (
+        pd.DataFrame({"arrival_query_time": arrival["query_time"].dropna().drop_duplicates()})
+        .sort_values("arrival_query_time")
+    )
+    snapshots = (
+        pd.DataFrame(
+            {
+                "path": [path for path, _ in traffic_snapshots],
+                "snapshot_query_time": [snapshot_time for _, snapshot_time in traffic_snapshots],
+            }
+        )
+        .dropna(subset=["snapshot_query_time"])
+        .sort_values("snapshot_query_time")
+    )
+    if arrivals.empty or snapshots.empty:
+        return set()
+
+    matched = pd.merge_asof(
+        snapshots,
+        arrivals,
+        left_on="snapshot_query_time",
+        right_on="arrival_query_time",
+        direction="nearest",
+        tolerance=tolerance,
+    )
+    return set(matched.loc[matched["arrival_query_time"].notna(), "path"])
+
+
+def _first_non_null(values: pd.Series) -> Any:
+    non_null = values.dropna()
+    if non_null.empty:
+        return pd.NA
+    return non_null.iloc[0]
+
+
+def _most_common_non_null(values: pd.Series) -> Any:
+    non_null = values.dropna()
+    if non_null.empty:
+        return pd.NA
+    modes = non_null.mode(dropna=True)
+    if modes.empty:
+        return non_null.iloc[0]
+    return modes.iloc[0]
+
+
+def aggregate_matched_traffic_by_road(df: pd.DataFrame) -> pd.DataFrame:
+    work = df.dropna(subset=["query_time", "road_name", "speed_band"]).copy()
+    if work.empty:
+        return work
+
+    work["congestion_score"] = work["speed_band"].map(traffic_congestion_score)
+    grouped = (
+        work.groupby(["query_time", "road_name"], as_index=False)
+        .agg(
+            road_category=("road_category", _most_common_non_null),
+            speed_band=("speed_band", "median"),
+            minimum_speed_kmh=("minimum_speed_kmh", "median"),
+            maximum_speed_kmh=("maximum_speed_kmh", "median"),
+            congestion_score=("congestion_score", "mean"),
+            start_lon=("start_lon", _first_non_null),
+            start_lat=("start_lat", _first_non_null),
+            end_lon=("end_lon", _first_non_null),
+            end_lat=("end_lat", _first_non_null),
+            source_link_count=("link_id", "count"),
+        )
+    )
+    grouped["speed_band"] = grouped["speed_band"].round().clip(lower=1, upper=8).astype(int)
+    grouped["minimum_speed_kmh"] = grouped["minimum_speed_kmh"].round(2)
+    grouped["maximum_speed_kmh"] = grouped["maximum_speed_kmh"].round(2)
+    grouped["congestion_score"] = grouped["congestion_score"].round(4)
+    grouped["link_id"] = pd.NA
+    grouped["aggregation_level"] = "query_time_road_name"
+    return grouped
 
 
 def build_traffic_speed_bands(
     raw_dir: Path,
     processed_dir: Path,
     traffic_snapshot_mode: str = "latest",
+    arrival: pd.DataFrame | None = None,
+    traffic_snapshots: list[TrafficSnapshotMeta] | None = None,
+    traffic_match_window_minutes: float = 15.0,
 ) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
 
@@ -945,6 +1151,24 @@ def build_traffic_speed_bands(
                 latest_snapshot = (sort_time, query_time, items)
         if latest_snapshot is not None:
             selected_snapshots.append((latest_snapshot[1], latest_snapshot[2]))
+    elif traffic_snapshot_mode == "matched":
+        metadata = traffic_snapshots or collect_traffic_snapshot_metadata(raw_dir / "traffic_speed_bands")
+        selected_paths = matched_traffic_snapshot_paths(
+            arrival if arrival is not None else pd.DataFrame(),
+            metadata,
+            traffic_match_window_minutes,
+        )
+        if not selected_paths:
+            raise ValueError(
+                "No Traffic Speed Bands snapshots matched Bus Arrival query_time "
+                f"within {traffic_match_window_minutes:g} minutes."
+            )
+        for path, snapshot in iter_traffic_speed_band_snapshots(raw_dir / "traffic_speed_bands"):
+            if path not in selected_paths:
+                continue
+            query_time, items = traffic_items_from_snapshot(snapshot)
+            selected_snapshots.append((query_time or traffic_snapshot_time_from_path(path), items))
+        print(f"selected {len(selected_paths)} matched Traffic Speed Bands snapshots")
     else:
         # 只有明确需要历史路况样本时才使用 all；这个模式主要服务离线分析，不建议直接导入 MySQL。
         for path, snapshot in iter_traffic_speed_band_snapshots(raw_dir / "traffic_speed_bands"):
@@ -990,7 +1214,7 @@ def build_traffic_speed_bands(
         return pd.DataFrame(columns=columns)
 
     df = pd.DataFrame(rows)
-    df["query_time"] = pd.to_datetime(df["query_time"], errors="coerce")
+    df["query_time"] = parse_lta_datetime_series(df["query_time"])
     for col in [
         "speed_band",
         "minimum_speed_kmh",
@@ -1001,18 +1225,27 @@ def build_traffic_speed_bands(
         "end_lat",
     ]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
-    df = df.dropna(subset=["speed_band", "start_lon", "start_lat", "end_lon", "end_lat"]).copy()
-    df["speed_band"] = df["speed_band"].astype(int)
-    df["congestion_score"] = df["speed_band"].map(traffic_congestion_score)
+    if traffic_snapshot_mode == "matched":
+        before_aggregate = len(df)
+        df = aggregate_matched_traffic_by_road(df)
+        print(f"aggregated matched Traffic Speed Bands rows {before_aggregate} -> {len(df)} by query_time + road_name")
+    else:
+        df = df.dropna(subset=["speed_band", "start_lon", "start_lat", "end_lon", "end_lat"]).copy()
+        df["speed_band"] = df["speed_band"].astype(int)
+        df["congestion_score"] = df["speed_band"].map(traffic_congestion_score)
+
     df["heat_color"] = df["speed_band"].map(SPEED_BAND_COLOR)
-    df["line_coordinates"] = df.apply(
+    valid_coordinates = df[["start_lon", "start_lat", "end_lon", "end_lat"]].notna().all(axis=1)
+    df["line_coordinates"] = ""
+    df.loc[valid_coordinates, "line_coordinates"] = df.loc[valid_coordinates].apply(
         lambda row: json.dumps(
             [[row["start_lon"], row["start_lat"]], [row["end_lon"], row["end_lat"]]],
             ensure_ascii=True,
         ),
         axis=1,
     )
-    df = df[columns].sort_values(["query_time", "link_id"])
+    extra_columns = [column for column in ("source_link_count", "aggregation_level") if column in df.columns]
+    df = df[columns + extra_columns].sort_values(["query_time", "road_name", "link_id"])
     write_csv(df, processed_dir / "traffic_speed_bands.csv")
     return df
 
@@ -1025,13 +1258,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--month", default=None,
                         help="Passenger Volume month such as 202605. Defaults to latest folder.")
     parser.add_argument(
+        "--eta-max-minutes",
+        type=float,
+        default=120.0,
+        help="Drop Bus Arrival rows whose computed ETA is outside 0..N minutes.",
+    )
+    parser.add_argument(
+        "--traffic-match-window-minutes",
+        type=float,
+        default=15.0,
+        help="Time window used by --traffic-snapshot-mode matched.",
+    )
+    parser.add_argument(
         "--traffic-snapshot-mode",
-        choices=["latest", "all"],
+        choices=["latest", "matched", "all"],
         default="latest",
         help=(
             "Traffic Speed Bands output mode. 'latest' keeps only the newest "
-            "snapshot for backend/import CSV; 'all' preserves every collected "
-            "snapshot and can produce a very large file."
+            "snapshot for backend/import CSV; 'matched' keeps snapshots whose "
+            "time is close to Bus Arrival query_time for model datasets; 'all' "
+            "preserves every collected snapshot and can produce a very large file."
         ),
     )
     return parser.parse_args()
@@ -1047,12 +1293,36 @@ def main() -> None:
     lines = build_bus_line(raw_dir, processed_dir)
     line_station = build_line_station(raw_dir, processed_dir, lines)
     flow_trend = build_passenger_flow_trend(raw_dir, processed_dir, stations, args.month)
-    arrival = flatten_bus_arrival(raw_dir, processed_dir, lines, stations)
+    traffic_snapshots = (
+        collect_traffic_snapshot_metadata(raw_dir / "traffic_speed_bands")
+        if args.traffic_snapshot_mode == "matched"
+        else []
+    )
+    arrival = flatten_bus_arrival(
+        raw_dir,
+        processed_dir,
+        lines,
+        stations,
+        eta_max_minutes=args.eta_max_minutes,
+        traffic_snapshots=traffic_snapshots,
+        traffic_match_window_minutes=(
+            args.traffic_match_window_minutes
+            if args.traffic_snapshot_mode == "matched"
+            else None
+        ),
+    )
     vehicles = build_bus_vehicle(arrival, stations, processed_dir)
     eta, load = build_direct_status_tables(arrival, processed_dir)
     map_station = build_map_station(stations, line_station, processed_dir)
     map_road_segment = build_map_road_segment(line_station, stations, flow_trend, processed_dir)
-    traffic_speed_bands = build_traffic_speed_bands(raw_dir, processed_dir, args.traffic_snapshot_mode)
+    traffic_speed_bands = build_traffic_speed_bands(
+        raw_dir,
+        processed_dir,
+        args.traffic_snapshot_mode,
+        arrival=arrival,
+        traffic_snapshots=traffic_snapshots,
+        traffic_match_window_minutes=args.traffic_match_window_minutes,
+    )
 
     summary = pd.DataFrame(
         [
