@@ -4,9 +4,11 @@ from datetime import time
 import math
 from typing import List, Optional
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.bus_line import BusLine, BusStation, LineStation
+from app.models.bus_vehicle import BusVehicle
 from app.schemas.bus_schema import (
     BusLineCreateRequest,
     BusLineDTO,
@@ -370,8 +372,19 @@ def get_station_list(
     page: int = 1,
     limit: int = 20,
     station_name: Optional[str] = None,
+    active_only: bool = False,
 ) -> StationListResponse:
     query = db.query(BusStation)
+    if active_only:
+        active_station_ids = (
+            select(LineStation.station_id)
+            .join(BusLine, BusLine.line_id == LineStation.line_id)
+            .join(BusVehicle, BusVehicle.line_id == LineStation.line_id)
+            .where(BusLine.status.in_(("running", "active")))
+            .where(BusVehicle.status != "offline")
+            .distinct()
+        )
+        query = query.filter(BusStation.station_id.in_(active_station_ids))
     if station_name:
         query = query.filter(BusStation.station_name.like(f"%{station_name}%"))
     total = query.count()
@@ -555,6 +568,7 @@ def get_nearby_stations(
     latitude: float,
     longitude: float,
     radius_km: float = 1.0,
+    active_only: bool = False,
 ) -> NearbyStationResponse:
     min_lat, max_lat, min_lon, max_lon = _bounding_box(latitude, longitude, radius_km)
     candidates: list[tuple[BusStation, float]] = []
@@ -565,6 +579,16 @@ def get_nearby_stations(
         .filter(BusStation.longitude >= min_lon)
         .filter(BusStation.longitude <= max_lon)
     )
+    if active_only:
+        active_station_ids = (
+            select(LineStation.station_id)
+            .join(BusLine, BusLine.line_id == LineStation.line_id)
+            .join(BusVehicle, BusVehicle.line_id == LineStation.line_id)
+            .where(BusLine.status.in_(("running", "active")))
+            .where(BusVehicle.status != "offline")
+            .distinct()
+        )
+        query = query.filter(BusStation.station_id.in_(active_station_ids))
     for station in query.all():
         distance = haversine_distance(
             latitude,

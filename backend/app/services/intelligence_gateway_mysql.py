@@ -254,7 +254,8 @@ class MySQLTransitGateway:
             end_station_id,
             max_transfer_count,
         )
-        return [self._attach_first_line_vehicle(candidate) for candidate in graph_results]
+        attached = [self._attach_first_line_vehicle(candidate) for candidate in graph_results]
+        return [candidate for candidate in attached if candidate.vehicle_id > 0]
 
     def _attach_first_line_vehicle(self, candidate: CandidateRouteData) -> CandidateRouteData:
         """Fill the graph placeholder vehicle from the candidate's first line."""

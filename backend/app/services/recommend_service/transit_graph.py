@@ -17,6 +17,7 @@ from algorithm.routing.transit_graph import (
     TransitGraphSnapshot,
 )
 from app.models.bus_line import BusLine, BusStation, LineStation
+from app.models.bus_vehicle import BusVehicle
 from app.services.intelligence_gateway import CandidateRouteData, RouteSegmentData
 
 
@@ -36,6 +37,11 @@ class TransitGraphBuilder:
 
     def build(self) -> TransitGraphSnapshot:
         session = self._session()
+        active_line_ids = (
+            select(BusVehicle.line_id)
+            .where(BusVehicle.status != "offline")
+            .distinct()
+        )
         line_station_rows = (
             session.execute(
                 select(
@@ -49,6 +55,7 @@ class TransitGraphBuilder:
                 )
                 .join(BusLine, BusLine.line_id == LineStation.line_id)
                 .where(BusLine.status.in_(("running", "active")))
+                .where(LineStation.line_id.in_(active_line_ids))
                 .order_by(LineStation.line_id, LineStation.order_index)
             )
             .all()
@@ -76,10 +83,13 @@ class TransitGraphBuilder:
                 station_to_nodes[station_id].append(from_node)
                 station_to_nodes[next_station_id].append(to_node)
 
+        active_station_ids = set(node_station.values())
         station_lookup = {
             int(station.station_id): station
-            for station in session.execute(select(BusStation)).scalars()
-        }
+            for station in session.execute(
+                select(BusStation).where(BusStation.station_id.in_(active_station_ids))
+            ).scalars()
+        } if active_station_ids else {}
 
         return TransitGraphSnapshot(
             ride_edges={node: tuple(edges) for node, edges in ride_edges.items()},

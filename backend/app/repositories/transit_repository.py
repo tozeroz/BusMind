@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from math import asin, cos, radians, sin, sqrt
 
-from sqlalchemy import desc, func, text
+from sqlalchemy import desc, func, select, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
@@ -246,27 +246,44 @@ class TransitRepository:
         if None in {start_lon, start_lat, end_lon, end_lat}:
             return None
 
-        latest_time = self.db.query(func.max(TrafficSpeedBand.query_time)).scalar()
-        if latest_time is None:
-            return None
-        rows = (
-            self.db.query(TrafficSpeedBand)
-            .filter(TrafficSpeedBand.query_time == latest_time)
-            .all()
-        )
-        if not rows:
-            return None
         target_mid_lon = (float(start_lon) + float(end_lon)) / 2
         target_mid_lat = (float(start_lat) + float(end_lat)) / 2
-        nearest = min(
-            rows,
-            key=lambda row: _haversine_meters(
-                target_mid_lon,
-                target_mid_lat,
-                (float(row.start_lon) + float(row.end_lon)) / 2,
-                (float(row.start_lat) + float(row.end_lat)) / 2,
-            ),
+        traffic_mid_lon = (TrafficSpeedBand.start_lon + TrafficSpeedBand.end_lon) / 2
+        traffic_mid_lat = (TrafficSpeedBand.start_lat + TrafficSpeedBand.end_lat) / 2
+        distance_squared = (
+            (traffic_mid_lon - target_mid_lon) * (traffic_mid_lon - target_mid_lon)
+            + (traffic_mid_lat - target_mid_lat) * (traffic_mid_lat - target_mid_lat)
         )
+        latest_time = select(func.max(TrafficSpeedBand.query_time)).scalar_subquery()
+        latest_snapshot = self.db.query(TrafficSpeedBand).filter(
+            TrafficSpeedBand.query_time == latest_time
+        )
+
+        # Keep the candidate set local to the route segment. Coordinate columns are
+        # not spatially indexed yet, but filtering and sorting in MySQL avoids
+        # transferring and materializing the entire latest snapshot in Python.
+        search_radius_degrees = 0.03
+        nearest = (
+            latest_snapshot
+            .filter(
+                traffic_mid_lon.between(
+                    target_mid_lon - search_radius_degrees,
+                    target_mid_lon + search_radius_degrees,
+                )
+            )
+            .filter(
+                traffic_mid_lat.between(
+                    target_mid_lat - search_radius_degrees,
+                    target_mid_lat + search_radius_degrees,
+                )
+            )
+            .order_by(distance_squared)
+            .first()
+        )
+        if nearest is None:
+            nearest = latest_snapshot.order_by(distance_squared).first()
+        if nearest is None:
+            return None
         return _traffic_record(nearest)
 
     def get_candidate_routes(
@@ -320,7 +337,12 @@ class TransitRepository:
         weighted_total = 0.0
         total_weight = 0.0
         for segment in segments:
-            traffic = self.get_segment_traffic(segment_id=str(segment.segment_id))
+            traffic = self.get_segment_traffic(
+                start_lon=float(segment.start_lon),
+                start_lat=float(segment.start_lat),
+                end_lon=float(segment.end_lon),
+                end_lat=float(segment.end_lat),
+            )
             if traffic is None or traffic.congestion_score is None:
                 continue
             weight = float(segment.ride_time_minutes or segment.segment_distance_km or 1.0)

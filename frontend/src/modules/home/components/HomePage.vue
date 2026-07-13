@@ -438,7 +438,12 @@ const normalizeRecommendation = (route) => ({
 const findRouteForDestination = () => routeOptions.value[0] || null
 
 const searchStation = async (keyword) => {
-  const response = await searchLocations({ keyword: keyword.trim(), page: 1, limit: 5 })
+  const response = await searchLocations({
+    keyword: keyword.trim(),
+    page: 1,
+    limit: 5,
+    active_only: true
+  })
   const stations = response.data?.stations || response.data?.items || []
   return stations[0] || null
 }
@@ -514,7 +519,8 @@ const getCurrentLocation = () => {
       const response = await getNearbyLocations({
         latitude: coords.latitude,
         longitude: coords.longitude,
-        radius_km: 2
+        radius_km: 2,
+        active_only: true
       })
       const nearest = response.data?.stations?.[0]
       if (!nearest) {
@@ -643,6 +649,9 @@ const handleShowEta = () => {
 }
 
 const handleSelectRoute = (route) => {
+  if (selectedInfo.id) {
+    busMapRef.value?.showStationRoutes({ stop_id: selectedInfo.id, stop_name: selectedInfo.name })
+  }
   busMapRef.value?.focusRouteById(route.line_id || route.id)
   selectMapRoute(route)
   isRoutesExpanded.value = false

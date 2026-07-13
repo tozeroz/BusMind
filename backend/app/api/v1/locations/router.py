@@ -47,9 +47,10 @@ async def search_locations(
     keyword: Optional[str] = Query(None, description="Search keyword for station name"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
+    active_only: bool = Query(False, description="Only return stations served by non-offline vehicles"),
     db: Session = Depends(get_db)
 ):
-    result = get_station_list(db, page, limit, keyword)
+    result = get_station_list(db, page, limit, keyword, active_only=active_only)
     return build_response(0, "success", result.model_dump())
 
 @router.get(
@@ -65,9 +66,16 @@ async def get_nearby_locations(
     latitude: float = Query(..., ge=-90, le=90, description="Current latitude"),
     longitude: float = Query(..., ge=-180, le=180, description="Current longitude"),
     radius_km: float = Query(1.0, ge=0.1, le=10.0, description="Search radius in km"),
+    active_only: bool = Query(False, description="Only return stations served by non-offline vehicles"),
     db: Session = Depends(get_db)
 ):
-    result = get_nearby_stations(db, latitude, longitude, radius_km)
+    result = get_nearby_stations(
+        db,
+        latitude,
+        longitude,
+        radius_km,
+        active_only=active_only,
+    )
     return build_response(0, "success", result.model_dump())
 
 @router.get(
