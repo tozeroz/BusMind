@@ -11,7 +11,6 @@
       <div>
         <p class="profile-kicker">个人中心</p>
         <h1>{{ displayName }}</h1>
-        <p>{{ roleText }} · 常用通勤：乌节站 → 滨海湾</p>
       </div>
     </div>
     <aside class="today-preference">
