@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/bus-lines/{{line_id}}/geometry"
+method: GET
+headers:
+  Accept: application/json
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404, 422]); });
+      pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });
+    language: text/javascript
+order: 14000

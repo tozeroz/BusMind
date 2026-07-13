@@ -27,6 +27,10 @@ class PassengerFlowSummary(BaseModel):
     peak_hour: Optional[int] = None
     peak_flow: Optional[int] = None
     dominant_flow_level: Optional[str] = None
+    granularity: str = "hour"
+    point_count: int = 0
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
 
 
 class PassengerFlowResponse(BaseModel):

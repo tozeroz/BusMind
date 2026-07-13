@@ -54,21 +54,21 @@ def build_response(code: int, message: str, data=None) -> ApiResponse:
 async def get_passenger_flow(
     line_id: Optional[int] = Query(None, ge=1),
     station_id: Optional[int] = Query(None, ge=1),
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
-    granularity: str = Query("hour", regex="^(hour|day|week)$"),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    granularity: str = Query("hour", pattern="^(hour|day|week)$"),
     db: Session = Depends(get_db)
 ):
-    start_datetime = datetime.fromisoformat(start_date) if start_date else None
-    end_datetime = datetime.fromisoformat(end_date) if end_date else None
-    
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise HTTPException(status_code=400, detail="start_date must not be later than end_date")
+
     result = get_passenger_flow_trend(
         db=db,
         line_id=line_id,
         station_id=station_id,
-        start_date=start_datetime,
-        end_date=end_datetime,
-        granularity=granularity
+        start_date=start_date,
+        end_date=end_date,
+        granularity=granularity,
     )
     return build_response(0, "success", result.model_dump())
 
@@ -254,7 +254,7 @@ async def get_passenger_load(
     }
 )
 async def get_predictions_api(
-    prediction_type: Optional[str] = Query(None, regex="^(eta|passenger_load|passenger_flow)$"),
+    prediction_type: Optional[str] = Query(None, pattern="^(eta|passenger_load|passenger_flow)$"),
     line_id: Optional[int] = Query(None, ge=1),
     station_id: Optional[int] = Query(None, ge=1),
     vehicle_id: Optional[int] = Query(None, ge=1),

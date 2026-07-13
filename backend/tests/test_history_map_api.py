@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -123,6 +125,53 @@ def test_get_passenger_flow_trend(db_session, test_data):
     assert hasattr(result.summary, 'total_flow')
     assert hasattr(result.summary, 'peak_hour')
 
+
+
+def test_passenger_flow_uses_latest_month_and_line_station_mapping(db_session, test_data):
+    station = test_data["station1"]
+    line = test_data["line"]
+    db_session.add_all(
+        [
+            PassengerFlowTrend(
+                target_type="station",
+                target_id=station.station_id,
+                bus_stop_code=station.station_code,
+                record_time=datetime(2025, 2, 1, 8),
+                day_type="weekday",
+                tap_in_volume=40,
+                tap_out_volume=20,
+                total_flow=60,
+                flow_level="medium",
+                data_source="test",
+            ),
+            PassengerFlowTrend(
+                target_type="station",
+                target_id=station.station_id,
+                bus_stop_code=station.station_code,
+                record_time=datetime(2025, 2, 1, 9),
+                day_type="weekday",
+                tap_in_volume=70,
+                tap_out_volume=30,
+                total_flow=100,
+                flow_level="high",
+                data_source="test",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    result = get_passenger_flow_trend(
+        db_session,
+        line_id=line.line_id,
+        granularity="hour",
+    )
+
+    assert len(result.items) == 2
+    assert result.summary.total_flow == 160
+    assert result.summary.point_count == 2
+    assert result.summary.granularity == "hour"
+    assert all(item.target_type == "line" for item in result.items)
+    assert all(item.record_time.year == 2025 for item in result.items)
 
 def test_get_road_segments(db_session, test_data):
     result = get_road_segments(db_session)

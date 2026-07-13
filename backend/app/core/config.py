@@ -6,11 +6,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-BACKEND_ENV_FILE = BACKEND_ROOT / ".env"
+PROJECT_ROOT = BACKEND_ROOT.parent
+
+# Load the repository-level .env as a compatibility fallback, then load
+# backend/.env as the canonical runtime configuration.
+# When the same variable exists in both files, backend/.env takes precedence.
+ENV_FILES = (
+    str(PROJECT_ROOT / ".env"),
+    str(BACKEND_ROOT / ".env"),
+)
 
 
 class Settings(BaseSettings):
-    """Runtime settings loaded from environment variables or ``.env``."""
+    """Runtime settings loaded from environment variables or project env files."""
 
     SECRET_KEY: str = "your-secret-key-here-change-in-production-1234567890"
     ALGORITHM: str = "HS256"
@@ -25,10 +33,8 @@ class Settings(BaseSettings):
     AUTO_CREATE_TABLES: bool = False
     VALIDATE_DB_SCHEMA_ON_STARTUP: bool = False
 
-    # Always load the backend-local .env so runtime configuration does not depend
-    # on the shell's current working directory.
     model_config = SettingsConfigDict(
-        env_file=str(BACKEND_ENV_FILE),
+        env_file=ENV_FILES,
         env_file_encoding="utf-8",
         extra="ignore",
     )

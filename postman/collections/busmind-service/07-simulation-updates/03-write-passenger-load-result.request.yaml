@@ -1,0 +1,31 @@
+$kind: http-request
+url: "{{base_url}}/simulation/prediction-results"
+method: POST
+headers:
+  Authorization: "Bearer {{access_token}}"
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "prediction_type": "passenger_load",
+      "vehicle_id": 101,
+      "line_id": 1,
+      "station_id": 3,
+      "predicted_load_level": "limited_standing",
+      "predicted_load_rate": 0.93,
+      "predicted_onboard_count": 56,
+      "capacity": 60,
+      "confidence": 0.96,
+      "model_version": "load_model_20260709",
+      "source": "data_engineer_model",
+      "expires_in_seconds": 300
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 401, 403, 404, 422, 503]); });
+      pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });
+      pm.test('Load result stored', function () { const j=pm.response.json(); pm.expect(j.code).to.eql(0); pm.expect(j.data.prediction_type).to.eql('passenger_load'); });
+    language: text/javascript
+order: 3000

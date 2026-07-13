@@ -1,14 +1,16 @@
 # BusMind项目接口文档
 
 > 文档角色：后端接口路径、请求参数、响应结构和数据模型的唯一真相来源。
-> 核对基线：2026-07-12；运行时 `app.openapi()`（BusMind API v1.2.0）优先于代码注释和历史文档。
+> 核对基线：2026-07-13；运行时 `app.openapi()`（BusMind API v1.2.0）优先于代码注释和历史文档。
 
-## 2026-07-12 增量核对结论
+## 2026-07-13 增量核对结论
 
-- 当前运行时 OpenAPI 共 **73 个操作**：`/`、`/api/v1/` 两个健康检查及 71 个业务操作，分布在 59 条路径上。
+- 当前运行时 OpenAPI 共 **77 个操作**：`/`、`/api/v1/` 两个健康检查及 75 个业务操作，分布在 62 条路径上。
 - 正式主路径使用 `/lines`、`/stations`、`/vehicles`、`/locations` 等；`/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime` 是兼容路径。`POST /simulation/lta-bus-arrival/refresh` 在 OpenAPI 中明确 `deprecated: true`，正式替代入口为 `/admin/lta/bus-arrival/refresh`。所有后台刷新接口和线路/站点/车辆写操作（POST/PATCH/DELETE）均要求 admin 角色；未登录返回 401，已登录但非 admin 返回 403。
 - ETA 的业务来源应解释为 **LTA Bus Arrival 实时数据**；Load 的业务来源应解释为 **LTA 实时客载字段**，正式接口为 `POST /realtime-passenger-load`（响应字段 `load_rate`/`load_level`/`onboard_count`），旧路径 `/passenger-load-prediction` 保留兼容。当前代码中 `predicted_*` 历史命名不代表项目训练了 ETA 或客载预测模型。
 - Passenger Flow 是历史客流分析能力，第一阶段不作为预测模型。`/history/passenger-flow/prediction` 和仿真预测写入接口仍在运行，保留但标为历史/兼容能力，不作为第一阶段核心算法宣传。
+- `GET /api/v1/history/passenger-flow` 已改为数据库端按 hour/day/week 聚合；未给日期时只查询最新可用月份，`line_id` 会通过 `line_station` 关联到站点客流，避免全表明细导致页面长期处于“加载中”。
+- 新增 `GET/POST /api/v1/map/traffic-heatmap`。该能力是**推荐路线沿途道路交通拥堵热力图**，使用 `map_road_segment` 确定路线骨架、使用最新 `traffic_speed_bands` 着色，不使用 `passenger_flow_trend` 或 `bus_load_status`。
 - 核心算法口径统一为：**多源数据融合、多目标评分和个性化推荐**。
 - 正式推荐偏好目标为 `balanced`、`fastest`、`comfort`、`less_walking`、`less_transfer`，`low_load` 作为兼容别名保留并映射到 `comfort`。当前运行时 OpenAPI 已同时接受 `comfort` 和 `low_load`，前端可直接使用正式值 `comfort`。
 - 统一响应字段是 `trace_id`，不是 `request_id`；分页参数以运行时 OpenAPI 的 `page`、`limit` 为准。
@@ -35,9 +37,9 @@
 
 |**统计项**|**数量**|**说明**|
 |---|---|---|
-|运行时路径|59|由 2026-07-12 运行时 `openapi.json` 统计；同一路径可有多个 HTTP 方法。|
-|运行时接口操作|73|GET/POST/PATCH/DELETE 操作总数，含两个健康检查。|
-|业务接口操作|71|不含 `GET /` 与 `GET /api/v1/`。|
+|运行时路径|62|由 2026-07-13 运行时 `openapi.json` 统计；同一路径可有多个 HTTP 方法。|
+|运行时接口操作|77|GET/POST/PATCH/DELETE 操作总数，含两个健康检查。|
+|业务接口操作|75|不含 `GET /` 与 `GET /api/v1/`。|
 |兼容接口|见第五章|包含 `/bus-lines`、`/bus-stations`、`/bus-vehicles/realtime`、部分 history 聚合/兼容路径。|
 |废弃接口|1|`POST /api/v1/simulation/lta-bus-arrival/refresh`。|
 
@@ -119,6 +121,8 @@
 |route\_mode|straight\_line   / map\_api|步行估算模式。|
 |prediction\_type|eta   / passenger\_load / passenger\_flow|写入的预测结果类别。|
 |granularity|hour   / day / week|客流趋势粒度。|
+|congestion\_level|free\_flow / slow / congested / severe / no\_data|推荐路线道路拥堵等级。|
+|data\_status|realtime / stale / no\_data|道路路况数据新鲜度。|
 
 
 
@@ -126,83 +130,87 @@
 
 # 三、接口总览
 
-下表是原有 62 项基线清单；2026-07-12 运行时 OpenAPI 已增至 73 个操作。新增/遗漏操作（`GET /api/v1/`、`GET /api/v1/bus-lines/{line_id}/map`、`GET /api/v1/bus-lines/{line_id}/geometry`、`GET /api/v1/bus-stations/nearby`、`GET /api/v1/bus-vehicles/realtime`、`GET /api/v1/stations/nearby`、`GET /api/v1/history/passenger-load`、`GET /api/v1/history/predictions`、`GET /api/v1/location/nearby`、`GET /api/v1/location/{station_id}`）已于 2026-07-12 全部补入下表（序号 63–72），状态见第五章。
+下表以 2026-07-13 运行时 OpenAPI 为准，共 77 个操作。序号 76–77 为本次新增的推荐路线道路拥堵热力图 GET/POST 操作；两个方法共用同一条 `/api/v1/map/traffic-heatmap` 路径。
 
 |**序号**|**模块**|**方法**|**路径**|**功能**|**鉴权**|**前端方法**|
 |---|---|---|---|---|---|---|
 |1|用户与鉴权|POST|/api/v1/users/login|用户登录|无需鉴权（按当前代码）|loginUser\(data\)|
 |2|用户与鉴权|GET|/api/v1/users/me|获取当前用户信息|Bearer   Token|getCurrentUser\(\)|
-|3|用户与鉴权|PATCH|/api/v1/users/me|修改当前用户信息|Bearer   Token|updateCurrentUser\(data\)|
-|4|用户与鉴权|GET|/api/v1/users/me/favorites|查询用户收藏|Bearer   Token|getUserFavorites\(params\)|
-|5|用户与鉴权|POST|/api/v1/users/me/favorites|新增用户收藏|Bearer   Token|addUserFavorite\(data\)|
-|6|用户与鉴权|DELETE|/api/v1/users/me/favorites/\{favorite\_id\}|取消用户收藏|Bearer   Token|deleteUserFavorite\(favoriteId\)|
-|7|用户与鉴权|GET|/api/v1/users/me/query\-history|查询用户搜索/调用历史|Bearer   Token|getUserQueryHistory\(params\)|
-|8|用户与鉴权|POST|/api/v1/users/register|用户注册|无需鉴权（按当前代码）|registerUser\(data\)|
-|9|线路管理|GET|/api/v1/bus\-lines|查询线路列表（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|10|线路管理|GET|/api/v1/bus\-lines/\{line\_id\}|查询线路详情（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|11|线路管理|GET|/api/v1/bus\-lines/\{line\_id\}/stations|查询线路站点（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|12|线路管理|GET|/api/v1/lines|查询线路列表|无需鉴权（按当前代码）|getLines\(params\)|
-|13|线路管理|POST|/api/v1/lines|创建线路|无需鉴权（按当前代码）|createLine\(data\)|
-|14|线路管理|PATCH|/api/v1/lines/stations/\{line\_station\_id\}|修改线路站点顺序或方向|无需鉴权（按当前代码）|updateLineStation\(lineStationId,   data\)|
-|15|线路管理|DELETE|/api/v1/lines/stations/\{line\_station\_id\}|从线路移除站点|无需鉴权（按当前代码）|removeStationFromLine\(lineStationId\)|
-|16|线路管理|GET|/api/v1/lines/\{line\_id\}|查询线路详情|无需鉴权（按当前代码）|getLineDetail\(lineId\)|
-|17|线路管理|PATCH|/api/v1/lines/\{line\_id\}|修改线路|无需鉴权（按当前代码）|updateLine\(lineId,   data\)|
-|18|线路管理|DELETE|/api/v1/lines/\{line\_id\}|删除线路|无需鉴权（按当前代码）|deleteLine\(lineId\)|
-|19|线路管理|GET|/api/v1/lines/\{line\_id\}/stations|查询线路站点顺序|无需鉴权（按当前代码）|getLineStations\(lineId\)|
-|20|线路管理|POST|/api/v1/lines/\{line\_id\}/stations|向线路添加站点|无需鉴权（按当前代码）|addStationToLine\(lineId,   data\)|
-|21|站点管理|GET|/api/v1/bus\-stations|查询站点列表（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|22|站点管理|GET|/api/v1/bus\-stations/\{station\_id\}|查询站点详情（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|23|站点管理|GET|/api/v1/stations|查询站点列表|无需鉴权（按当前代码）|getStations\(params\)|
-|24|站点管理|POST|/api/v1/stations|创建站点|无需鉴权（按当前代码）|createStation\(data\)|
-|25|站点管理|GET|/api/v1/stations/coordinates/all|查询全部站点坐标|无需鉴权（按当前代码）|getAllStationCoordinates\(\)|
-|26|站点管理|POST|/api/v1/stations/nearby|查询附近站点|无需鉴权（按当前代码）|searchNearbyStations\(data\)|
-|27|站点管理|GET|/api/v1/stations/\{station\_id\}|查询站点详情|无需鉴权（按当前代码）|getStationDetail\(stationId\)|
-|28|站点管理|PATCH|/api/v1/stations/\{station\_id\}|修改站点|无需鉴权（按当前代码）|updateStation\(stationId,   data\)|
-|29|站点管理|DELETE|/api/v1/stations/\{station\_id\}|删除站点|无需鉴权（按当前代码）|deleteStation\(stationId\)|
-|30|站点管理|GET|/api/v1/stations/\{station\_id\}/lines|查询站点经过线路|无需鉴权（按当前代码）|getStationLines\(stationId\)|
-|31|车辆管理|GET|/api/v1/vehicles|查询车辆列表|无需鉴权（按当前代码）|getVehicles\(params\)|
-|32|车辆管理|POST|/api/v1/vehicles|创建车辆|无需鉴权（按当前代码）|createVehicle\(data\)|
-|33|车辆管理|GET|/api/v1/vehicles/line/\{line\_id\}|查询指定线路车辆|无需鉴权（按当前代码）|getVehiclesByLine\(lineId\)|
-|34|车辆管理|GET|/api/v1/vehicles/realtime|查询车辆实时位置与状态|无需鉴权（按当前代码）|getRealtimeVehicles\(params\)|
-|35|车辆管理|GET|/api/v1/vehicles/\{vehicle\_id\}|查询车辆详情|无需鉴权（按当前代码）|getVehicleDetail\(vehicleId\)|
-|36|车辆管理|PATCH|/api/v1/vehicles/\{vehicle\_id\}|修改车辆|无需鉴权（按当前代码）|updateVehicle\(vehicleId,   data\)|
-|37|车辆管理|DELETE|/api/v1/vehicles/\{vehicle\_id\}|删除车辆|无需鉴权（按当前代码）|deleteVehicle\(vehicleId\)|
-|38|地图数据|GET|/api/v1/map/lines|查询地图线路折线|无需鉴权（按当前代码）|getMapLines\(\)|
-|39|地图数据|GET|/api/v1/map/road\-segments|查询地图路段连线|无需鉴权（按当前代码）|getRoadSegments\(\)|
-|40|地图数据|GET|/api/v1/map/stations|查询地图站点|无需鉴权（按当前代码）|getMapStations\(params\)|
-|41|位置搜索|GET|/api/v1/locations/map/stations|查询地图所需全部站点|无需鉴权（按当前代码）|getLocationMapStations\(\)|
-|42|位置搜索|GET|/api/v1/locations/nearby|按坐标查询附近站点|无需鉴权（按当前代码）|getNearbyLocations\(params\)|
-|43|位置搜索|GET|/api/v1/locations/search|搜索位置/站点|无需鉴权（按当前代码）|searchLocations\(params\)|
-|44|位置搜索|GET|/api/v1/locations/\{location\_id\}|查询位置/站点详情|无需鉴权（按当前代码）|getLocationDetail\(locationId\)|
-|45|历史与预测查询|GET|/api/v1/history/eta/line/\{line\_id\}|查询线路 ETA 历史记录（LTA 实时数据）|无需鉴权（按当前代码）|getEtaPredictionsByLine\(lineId,   params\)|
-|46|历史与预测查询|GET|/api/v1/history/eta/\{vehicle\_id\}/\{target\_station\_id\}|查询车辆到目标站的最新 ETA（LTA 实时数据）|无需鉴权（按当前代码）|getEtaPredictionForVehicle\(vehicleId,   targetStationId, params\)|
-|47|历史与预测查询|GET|/api/v1/history/load/line/\{line\_id\}|查询线路客载预测记录|无需鉴权（按当前代码）|getLoadPredictionsByLine\(lineId,   params\)|
-|48|历史与预测查询|GET|/api/v1/history/load/\{line\_id\}|查询最新客载预测|无需鉴权（按当前代码）|getLoadPrediction\(lineId,   params\)|
-|49|历史与预测查询|GET|/api/v1/history/passenger\-flow|查询历史客流趋势|无需鉴权（按当前代码）|getPassengerFlowTrend\(params\)|
-|50|历史与预测查询（兼容/实验）|GET|/api/v1/history/passenger\-flow/prediction|查询客流预测记录（兼容/实验接口，非第一阶段核心能力）|无需鉴权（按当前代码）|getPassengerFlowPrediction\(params\)|
-|51|实时 ETA（LTA Bus Arrival）|GET|/api/v1/eta|基于 LTA 实时数据返回预计到站时间；字段 predicted_eta_minutes/model_version 为历史兼容命名|无需鉴权（按当前代码）|getEta\(params\)|
-|52|实时客载（正式）|POST|/api/v1/realtime-passenger-load|查询 LTA 实时客载状态（不含 predicted 前缀）|无需鉴权（按当前代码）|getRealtimePassengerLoad\(data\)|
-|52a|实时客载（兼容旧路径）|POST|/api/v1/passenger\-load\-prediction|同上，兼容旧路径，字段含 predicted 前缀|无需鉴权（按当前代码）|predictPassengerLoad\(data\)|
-|53|步行、体验评价与路线推荐|POST|/api/v1/recommend\-routes|生成公交出行推荐方案|无需鉴权（按当前代码）|recommendRoutes\(data\)|
-|54|步行、体验评价与路线推荐|POST|/api/v1/travel\-experience/evaluate|计算出行体验评分|无需鉴权（按当前代码）|evaluateTravelExperience\(data\)|
-|55|步行、体验评价与路线推荐|POST|/api/v1/walking\-time\-estimation|估算前往上车站的步行时间|无需鉴权（按当前代码）|estimateWalkingTime\(data\)|
-|56|AI   出行助手|POST|/api/v1/ai/travel|AI 出行问答、建议与路线解释|无需鉴权（按当前代码）|askAiTravel\(data\)|
-|57|后台 LTA 采集刷新|POST|/api/v1/admin/lta/bus\-arrival/refresh|手动刷新 LTA 公交到站并可同步入库|admin（Bearer Token）|后端管理/无直接调用|
-|58|后台 LTA 采集刷新|POST|/api/v1/admin/lta/traffic\-speed\-bands/refresh|手动刷新 LTA 路况速度带并可同步入库|admin（Bearer Token）|后端管理/无直接调用|
-|59|仿真与预测更新|POST|/api/v1/simulation/lta\-bus\-arrival/refresh|刷新   LTA 公交到站数据（兼容旧入口，已废弃）|admin（Bearer Token）|refreshLtaBusArrival\(data\)|
-|60|仿真与预测更新|POST|/api/v1/simulation/prediction\-results|写入/刷新预测结果|admin（Bearer Token）|updatePredictionResult\(data\)|
-|61|仿真与预测更新|PATCH|/api/v1/simulation/vehicle\-status/\{vehicle\_id\}|更新仿真车辆状态|admin（Bearer Token）|updateVehicleStatus\(vehicleId,   data\)|
-|62|健康检查|GET|/|服务健康检查|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|63|健康检查|GET|/api/v1/|API v1 健康检查|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|64|线路管理（兼容别名）|GET|/api/v1/bus\-lines/\{line\_id\}/map|线路地图数据|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|65|线路管理（兼容别名）|GET|/api/v1/bus\-lines/\{line\_id\}/geometry|线路几何数据 GeoJSON|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|66|站点管理（兼容别名）|GET|/api/v1/bus\-stations/nearby|查询附近站点（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|67|车辆管理（兼容别名）|GET|/api/v1/bus\-vehicles/realtime|查询实时车辆位置（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|68|站点管理（兼容）|GET|/api/v1/stations/nearby|附近站点（GET 不支持，返回 405 提示用 POST 或 /bus\-stations/nearby）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|69|历史与预测查询（兼容）|GET|/api/v1/history/passenger\-load|查询客载负载（兼容旧路径，聚合 load 查询）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|70|历史与预测查询（兼容）|GET|/api/v1/history/predictions|聚合预测查询（兼容，按 prediction\_type 聚合）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|71|位置搜索（兼容旧路径）|GET|/api/v1/location/nearby|查询附近站点（兼容旧路径）|无需鉴权（按当前代码）|后端兼容/无直接调用|
-|72|位置搜索（兼容旧路径）|GET|/api/v1/location/\{station\_id\}|查询站点详情（兼容旧路径）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|3|用户与鉴权|POST|/api/v1/users/me/refresh\-arrivals|登录用户进入首页时触发一次非阻塞到站数据刷新|Bearer Token|triggerArrivalRefresh\(\)|
+|4|用户与鉴权|PATCH|/api/v1/users/me|修改当前用户信息|Bearer   Token|updateCurrentUser\(data\)|
+|5|用户与鉴权|GET|/api/v1/users/me/favorites|查询用户收藏|Bearer   Token|getUserFavorites\(params\)|
+|6|用户与鉴权|POST|/api/v1/users/me/favorites|新增用户收藏|Bearer   Token|addUserFavorite\(data\)|
+|7|用户与鉴权|DELETE|/api/v1/users/me/favorites/\{favorite\_id\}|取消用户收藏|Bearer   Token|deleteUserFavorite\(favoriteId\)|
+|8|用户与鉴权|GET|/api/v1/users/me/query\-history|查询用户搜索/调用历史|Bearer   Token|getUserQueryHistory\(params\)|
+|9|用户与鉴权|POST|/api/v1/users/register/email\-code|发送注册邮箱验证码|无需鉴权（按当前代码）|sendRegisterEmailCode\(data\)|
+|10|用户与鉴权|POST|/api/v1/users/register|用户注册|无需鉴权（按当前代码）|registerUser\(data\)|
+|11|线路管理|GET|/api/v1/bus\-lines|查询线路列表（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|12|线路管理|GET|/api/v1/bus\-lines/\{line\_id\}|查询线路详情（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|13|线路管理|GET|/api/v1/bus\-lines/\{line\_id\}/stations|查询线路站点（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|14|线路管理|GET|/api/v1/lines|查询线路列表|无需鉴权（按当前代码）|getLines\(params\)|
+|15|线路管理|POST|/api/v1/lines|创建线路|admin（Bearer Token）|createLine\(data\)|
+|16|线路管理|PATCH|/api/v1/lines/stations/\{line\_station\_id\}|修改线路站点顺序或方向|admin（Bearer Token）|updateLineStation\(lineStationId,   data\)|
+|17|线路管理|DELETE|/api/v1/lines/stations/\{line\_station\_id\}|从线路移除站点|admin（Bearer Token）|removeStationFromLine\(lineStationId\)|
+|18|线路管理|GET|/api/v1/lines/\{line\_id\}|查询线路详情|无需鉴权（按当前代码）|getLineDetail\(lineId\)|
+|19|线路管理|PATCH|/api/v1/lines/\{line\_id\}|修改线路|admin（Bearer Token）|updateLine\(lineId,   data\)|
+|20|线路管理|DELETE|/api/v1/lines/\{line\_id\}|删除线路|admin（Bearer Token）|deleteLine\(lineId\)|
+|21|线路管理|GET|/api/v1/lines/\{line\_id\}/stations|查询线路站点顺序|无需鉴权（按当前代码）|getLineStations\(lineId\)|
+|22|线路管理|POST|/api/v1/lines/\{line\_id\}/stations|向线路添加站点|admin（Bearer Token）|addStationToLine\(lineId,   data\)|
+|23|站点管理|GET|/api/v1/bus\-stations|查询站点列表（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|24|站点管理|GET|/api/v1/bus\-stations/\{station\_id\}|查询站点详情（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|25|站点管理|GET|/api/v1/stations|查询站点列表|无需鉴权（按当前代码）|getStations\(params\)|
+|26|站点管理|POST|/api/v1/stations|创建站点|admin（Bearer Token）|createStation\(data\)|
+|27|站点管理|GET|/api/v1/stations/coordinates/all|查询全部站点坐标|无需鉴权（按当前代码）|getAllStationCoordinates\(\)|
+|28|站点管理|POST|/api/v1/stations/nearby|查询附近站点|无需鉴权（按当前代码）|searchNearbyStations\(data\)|
+|29|站点管理|GET|/api/v1/stations/\{station\_id\}|查询站点详情|无需鉴权（按当前代码）|getStationDetail\(stationId\)|
+|30|站点管理|PATCH|/api/v1/stations/\{station\_id\}|修改站点|admin（Bearer Token）|updateStation\(stationId,   data\)|
+|31|站点管理|DELETE|/api/v1/stations/\{station\_id\}|删除站点|admin（Bearer Token）|deleteStation\(stationId\)|
+|32|站点管理|GET|/api/v1/stations/\{station\_id\}/lines|查询站点经过线路|无需鉴权（按当前代码）|getStationLines\(stationId\)|
+|33|车辆管理|GET|/api/v1/vehicles|查询车辆列表|无需鉴权（按当前代码）|getVehicles\(params\)|
+|34|车辆管理|POST|/api/v1/vehicles|创建车辆|admin（Bearer Token）|createVehicle\(data\)|
+|35|车辆管理|GET|/api/v1/vehicles/line/\{line\_id\}|查询指定线路车辆|无需鉴权（按当前代码）|getVehiclesByLine\(lineId\)|
+|36|车辆管理|GET|/api/v1/vehicles/realtime|查询车辆实时位置与状态|无需鉴权（按当前代码）|getRealtimeVehicles\(params\)|
+|37|车辆管理|GET|/api/v1/vehicles/\{vehicle\_id\}|查询车辆详情|无需鉴权（按当前代码）|getVehicleDetail\(vehicleId\)|
+|38|车辆管理|PATCH|/api/v1/vehicles/\{vehicle\_id\}|修改车辆|admin（Bearer Token）|updateVehicle\(vehicleId,   data\)|
+|39|车辆管理|DELETE|/api/v1/vehicles/\{vehicle\_id\}|删除车辆|admin（Bearer Token）|deleteVehicle\(vehicleId\)|
+|40|地图数据|GET|/api/v1/map/lines|查询地图线路折线|无需鉴权（按当前代码）|getMapLines\(\)|
+|41|地图数据|GET|/api/v1/map/road\-segments|查询地图路段连线|无需鉴权（按当前代码）|getRoadSegments\(\)|
+|42|地图数据|GET|/api/v1/map/stations|查询地图站点|无需鉴权（按当前代码）|getMapStations\(params\)|
+|43|位置搜索|GET|/api/v1/locations/map/stations|查询地图所需全部站点|无需鉴权（按当前代码）|getLocationMapStations\(\)|
+|44|位置搜索|GET|/api/v1/locations/nearby|按坐标查询附近站点|无需鉴权（按当前代码）|getNearbyLocations\(params\)|
+|45|位置搜索|GET|/api/v1/locations/search|搜索位置/站点|无需鉴权（按当前代码）|searchLocations\(params\)|
+|46|位置搜索|GET|/api/v1/locations/\{location\_id\}|查询位置/站点详情|无需鉴权（按当前代码）|getLocationDetail\(locationId\)|
+|47|历史与预测查询|GET|/api/v1/history/eta/line/\{line\_id\}|查询线路 ETA 历史记录（LTA 实时数据）|无需鉴权（按当前代码）|getEtaPredictionsByLine\(lineId,   params\)|
+|48|历史与预测查询|GET|/api/v1/history/eta/\{vehicle\_id\}/\{target\_station\_id\}|查询车辆到目标站的最新 ETA（LTA 实时数据）|无需鉴权（按当前代码）|getEtaPredictionForVehicle\(vehicleId,   targetStationId, params\)|
+|49|历史与预测查询|GET|/api/v1/history/load/line/\{line\_id\}|查询线路客载预测记录|无需鉴权（按当前代码）|getLoadPredictionsByLine\(lineId,   params\)|
+|50|历史与预测查询|GET|/api/v1/history/load/\{line\_id\}|查询最新客载预测|无需鉴权（按当前代码）|getLoadPrediction\(lineId,   params\)|
+|51|历史与预测查询|GET|/api/v1/history/passenger\-flow|查询历史客流趋势|无需鉴权（按当前代码）|getPassengerFlowTrend\(params\)|
+|52|历史与预测查询（兼容/实验）|GET|/api/v1/history/passenger\-flow/prediction|查询客流预测记录（兼容/实验接口，非第一阶段核心能力）|无需鉴权（按当前代码）|getPassengerFlowPrediction\(params\)|
+|53|实时 ETA（LTA Bus Arrival）|GET|/api/v1/eta|基于 LTA 实时数据返回预计到站时间；字段 predicted_eta_minutes/model_version 为历史兼容命名|无需鉴权（按当前代码）|getEta\(params\)|
+|54|实时客载（正式）|POST|/api/v1/realtime-passenger-load|查询 LTA 实时客载状态（不含 predicted 前缀）|无需鉴权（按当前代码）|getRealtimePassengerLoad\(data\)|
+|55|实时客载（兼容旧路径）|POST|/api/v1/passenger\-load\-prediction|同上，兼容旧路径，字段含 predicted 前缀|无需鉴权（按当前代码）|predictPassengerLoad\(data\)|
+|56|步行、体验评价与路线推荐|POST|/api/v1/recommend\-routes|生成公交出行推荐方案|无需鉴权（按当前代码）|recommendRoutes\(data\)|
+|57|步行、体验评价与路线推荐|POST|/api/v1/travel\-experience/evaluate|计算出行体验评分|无需鉴权（按当前代码）|evaluateTravelExperience\(data\)|
+|58|步行、体验评价与路线推荐|POST|/api/v1/walking\-time\-estimation|估算前往上车站的步行时间|无需鉴权（按当前代码）|estimateWalkingTime\(data\)|
+|59|AI   出行助手|POST|/api/v1/ai/travel|AI 出行问答、建议与路线解释|无需鉴权（按当前代码）|askAiTravel\(data\)|
+|60|后台 LTA 采集刷新|POST|/api/v1/admin/lta/bus\-arrival/refresh|手动刷新 LTA 公交到站并可同步入库|admin（Bearer Token）|后端管理/无直接调用|
+|61|后台 LTA 采集刷新|POST|/api/v1/admin/lta/traffic\-speed\-bands/refresh|手动刷新 LTA 路况速度带并可同步入库|admin（Bearer Token）|后端管理/无直接调用|
+|62|仿真与预测更新|POST|/api/v1/simulation/lta\-bus\-arrival/refresh|刷新   LTA 公交到站数据（兼容旧入口，已废弃）|admin（Bearer Token）|refreshLtaBusArrival\(data\)|
+|63|仿真与预测更新|POST|/api/v1/simulation/prediction\-results|写入/刷新预测结果|admin（Bearer Token）|updatePredictionResult\(data\)|
+|64|仿真与预测更新|PATCH|/api/v1/simulation/vehicle\-status/\{vehicle\_id\}|更新仿真车辆状态|admin（Bearer Token）|updateVehicleStatus\(vehicleId,   data\)|
+|65|健康检查|GET|/|服务健康检查|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|66|健康检查|GET|/api/v1/|API v1 健康检查|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|67|线路管理（兼容别名）|GET|/api/v1/bus\-lines/\{line\_id\}/map|线路地图数据|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|68|线路管理（兼容别名）|GET|/api/v1/bus\-lines/\{line\_id\}/geometry|线路几何数据 GeoJSON|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|69|站点管理（兼容别名）|GET|/api/v1/bus\-stations/nearby|查询附近站点（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|70|车辆管理（兼容别名）|GET|/api/v1/bus\-vehicles/realtime|查询实时车辆位置（兼容别名）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|71|站点管理（兼容）|GET|/api/v1/stations/nearby|附近站点（GET 不支持，返回 405 提示用 POST 或 /bus\-stations/nearby）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|72|历史与预测查询（兼容）|GET|/api/v1/history/passenger\-load|查询客载负载（兼容旧路径，聚合 load 查询）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|73|历史与预测查询（兼容）|GET|/api/v1/history/predictions|聚合预测查询（兼容，按 prediction\_type 聚合）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|74|位置搜索（兼容旧路径）|GET|/api/v1/location/nearby|查询附近站点（兼容旧路径）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|75|位置搜索（兼容旧路径）|GET|/api/v1/location/\{station\_id\}|查询站点详情（兼容旧路径）|无需鉴权（按当前代码）|后端兼容/无直接调用|
+|76|地图数据|GET|/api/v1/map/traffic\-heatmap|按线路或地图路段查询推荐路线道路拥堵分段|无需鉴权（按当前代码）|后端已封装，当前前端未调用|
+|77|地图数据|POST|/api/v1/map/traffic\-heatmap|按推荐结果的换乘分段精确查询道路拥堵热力图|无需鉴权（按当前代码）|后端已封装，当前前端未调用|
 
 
 
@@ -210,11 +218,11 @@
 
 # 四、各模块接口说明
 
-本章保留原有 56 个主接口的详细说明；运行时新增与兼容操作按 2026-07-12 增量说明及第五章为准，避免因大规模重排破坏原文档引用。
+本章以 2026-07-13 代码为准；本次补充历史客流聚合行为及推荐路线道路拥堵热力图接口。
 
 ## 4\.1 用户与鉴权
 
-完成用户注册登录、当前用户、收藏与查询历史；仅“我的”相关接口需要登录。
+完成邮箱验证码注册、登录、当前用户、收藏、查询历史，以及登录用户进入首页时触发到站数据刷新；“我的”相关接口需要登录。
 
 ### 4\.1\.1 POST /api/v1/users/login
 
@@ -471,21 +479,69 @@
 
 |**字段**|**位置**|**类型**|**必填**|**说明**|
 |---|---|---|---|---|
-|username|Body|string|是|登录账号，4\-32 个字符，系统内唯一。|
-|password|Body|string|是|密码，8\-64   个字符。|
-|nickname|Body|string（可空）|否|用户昵称，最长 32 个字符。 默认   ""。|
-|role|Body|string（可空）|否|用户角色：passenger   或 admin；默认 passenger。 默认 "passenger"。|
-
+|username|Body|string|是|登录账号，4-32 个字符，系统内唯一。|
+|password|Body|string|是|密码，8-64 个字符。|
+|password_confirm|Body|string|是|确认密码，必须与 `password` 一致。|
+|email|Body|string|是|接收验证码的邮箱，保存前转为小写。|
+|verification_code|Body|string|是|6 位数字注册验证码。|
+|nickname|Body|string（可空）|否|用户昵称，最长 50 个字符，默认空字符串。|
 
 
 **响应结构**
 
 |**响应项**|**类型/结构**|**说明**|
 |---|---|---|
-|**HTTP 状态**|201   / 400 / 409 / 422|OpenAPI 中声明的响应状态；业务成功 code=0。|
+|**HTTP 状态**|201 / 400 / 409 / 422|OpenAPI 中声明的响应状态；业务成功 code=0。|
 |**统一外壳**|ApiResponse|code、message、data、trace\_id、timestamp。|
 |**data**|UserDTO|字段明细见“核心数据模型”。|
 
+### 4\.1\.9 POST /api/v1/users/register/email\-code
+
+|**项目**|**内容**|
+|---|---|
+|**接口名称**|发送注册邮箱验证码|
+|**模块**|用户与鉴权|
+|**当前鉴权**|无需鉴权（按当前代码）|
+|**前端方法**|sendRegisterEmailCode\(data\)|
+|**数据来源/实现**|校验邮箱格式和是否已注册，生成 6 位验证码并通过邮件服务发送；验证码带过期时间和重发冷却。|
+
+**请求参数**
+
+|**字段**|**位置**|**类型**|**必填**|**说明**|
+|---|---|---|---|---|
+|email|Body|string|是|用于注册的邮箱地址。|
+
+**响应结构**
+
+|**响应项**|**类型/结构**|**说明**|
+|---|---|---|
+|**HTTP 状态**|200 / 400 / 429 / 500 / 422|发送成功、邮箱无效/已注册、发送过于频繁、邮件服务不可用或模型校验失败。|
+|**统一外壳**|ApiResponse|code、message、data、trace_id、timestamp。|
+|**data**|object|成功时包含 `email`。|
+
+
+### 4\.1\.10 POST /api/v1/users/me/refresh\-arrivals
+
+|**项目**|**内容**|
+|---|---|
+|**接口名称**|触发首页到站数据刷新|
+|**模块**|用户与鉴权|
+|**当前鉴权**|Bearer Token|
+|**前端方法**|triggerArrivalRefresh\(\)|
+|**数据来源/实现**|调用默认后台调度器的 `trigger_once`，60 秒冷却，非阻塞触发一次到站数据刷新。|
+
+请求参数：无。
+
+**响应结构**
+
+|**响应项**|**类型/结构**|**说明**|
+|---|---|---|
+|**HTTP 状态**|202 / 401|已接受刷新请求或未登录。|
+|**统一外壳**|ApiResponse|code、message、data、trace_id、timestamp。|
+|**data**|object|包含调度器返回的 `status`。|
+
+|**说明：**需要 Authorization: Bearer <access_token>。|
+|---|
 
 
 ## 4\.2 线路管理
@@ -530,7 +586,7 @@
 |---|---|
 |**接口名称**|创建线路|
 |**模块**|线路管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|createLine\(data\)|
 |**数据来源/实现**|SQLAlchemy 线路、站点、线路站点关系表。|
 
@@ -574,7 +630,7 @@
 |---|---|
 |**接口名称**|修改线路站点顺序或方向|
 |**模块**|线路管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|updateLineStation\(lineStationId,   data\)|
 |**数据来源/实现**|SQLAlchemy 线路、站点、线路站点关系表。|
 
@@ -611,7 +667,7 @@
 |---|---|
 |**接口名称**|从线路移除站点|
 |**模块**|线路管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|removeStationFromLine\(lineStationId\)|
 |**数据来源/实现**|SQLAlchemy 线路、站点、线路站点关系表。|
 
@@ -676,7 +732,7 @@
 |---|---|
 |**接口名称**|修改线路|
 |**模块**|线路管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|updateLine\(lineId,   data\)|
 |**数据来源/实现**|SQLAlchemy 线路、站点、线路站点关系表。|
 
@@ -718,7 +774,7 @@
 |---|---|
 |**接口名称**|删除线路|
 |**模块**|线路管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|deleteLine\(lineId\)|
 |**数据来源/实现**|SQLAlchemy 线路、站点、线路站点关系表。|
 
@@ -783,7 +839,7 @@
 |---|---|
 |**接口名称**|向线路添加站点|
 |**模块**|线路管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|addStationToLine\(lineId,   data\)|
 |**数据来源/实现**|SQLAlchemy 线路、站点、线路站点关系表。|
 
@@ -858,7 +914,7 @@
 |---|---|
 |**接口名称**|创建站点|
 |**模块**|站点管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|createStation\(data\)|
 |**数据来源/实现**|SQLAlchemy 站点与线路站点关系表。|
 
@@ -987,7 +1043,7 @@
 |---|---|
 |**接口名称**|修改站点|
 |**模块**|站点管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|updateStation\(stationId,   data\)|
 |**数据来源/实现**|SQLAlchemy 站点与线路站点关系表。|
 
@@ -1027,7 +1083,7 @@
 |---|---|
 |**接口名称**|删除站点|
 |**模块**|站点管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|deleteStation\(stationId\)|
 |**数据来源/实现**|SQLAlchemy 站点与线路站点关系表。|
 
@@ -1126,7 +1182,7 @@
 |---|---|
 |**接口名称**|创建车辆|
 |**模块**|车辆管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|createVehicle\(data\)|
 |**数据来源/实现**|SQLAlchemy 车辆与线路/站点数据。|
 
@@ -1262,7 +1318,7 @@
 |---|---|
 |**接口名称**|修改车辆|
 |**模块**|车辆管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|updateVehicle\(vehicleId,   data\)|
 |**数据来源/实现**|SQLAlchemy 车辆与线路/站点数据。|
 
@@ -1306,7 +1362,7 @@
 |---|---|
 |**接口名称**|删除车辆|
 |**模块**|车辆管理|
-|**当前鉴权**|无需鉴权（按当前代码）|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|deleteVehicle\(vehicleId\)|
 |**数据来源/实现**|SQLAlchemy 车辆与线路/站点数据。|
 
@@ -1337,7 +1393,7 @@
 
 ## 4\.5 地图数据
 
-面向前端地图渲染，输出站点标记、路段连线和线路折线。
+面向前端地图渲染，输出站点标记、路线骨架、线路折线，以及仅覆盖推荐路线的道路拥堵着色分段。
 
 ### 4\.5\.1 GET /api/v1/map/lines
 
@@ -1415,6 +1471,89 @@
 |**统一外壳**|ApiResponse|code、message、data、trace\_id、timestamp。|
 |**data**|MapStationResponse|字段明细见“核心数据模型”。|
 
+
+
+### 4.5.4 GET /api/v1/map/traffic-heatmap
+
+|**项目**|**内容**|
+|---|---|
+|**接口名称**|按线路或地图路段查询推荐路线道路拥堵热力图|
+|**模块**|地图数据|
+|**当前鉴权**|无需鉴权（按当前代码）|
+|**前端方法**|当前前端未改动；已提供 Postman 请求 `12-map/04-get-route-traffic-heatmap.request.yaml`|
+|**数据来源/实现**|`map_road_segment` 提供推荐路线骨架；按 `link_id` 读取 `traffic_speed_bands` 在指定时间点之前的最新记录；后端进行空间距离和方向匹配，并把着色坐标裁剪到推荐路线骨架。|
+
+**请求参数**
+
+|**字段**|**位置**|**类型**|**必填**|**说明**|
+|---|---|---|---|---|
+|line_id|Query|int[]|条件必填|可重复传入，换乘线路示例：`line_id=1&line_id=2`。与 `segment_id` 至少提供一种。|
+|segment_id|Query|string[]|条件必填|精确指定 `map_road_segment.segment_id`，可重复传入。|
+|observed_at|Query|datetime（可空）|否|选择该时间点之前的最新路况；未提供时使用数据库最新记录。|
+|min_lat / max_lat / min_lon / max_lon|Query|float（可空）|否|地图可视范围；四项必须同时提供。|
+|match_radius_m|Query|float|否|道路速度带与路线骨架的最大匹配距离，20～500 米，默认 120。|
+|stale_after_minutes|Query|int|否|超过该分钟数标记为 `stale`，默认 15。|
+
+**响应结构**
+
+|**响应项**|**类型/结构**|**说明**|
+|---|---|---|
+|**HTTP 状态**|200 / 400 / 422|缺少线路/路段筛选时返回 400；参数模型校验失败返回 422。|
+|**统一外壳**|ApiResponse|code、message、data、trace_id、timestamp。|
+|**data**|TrafficHeatmapResponse|包含原始推荐路线骨架 `route_segments` 和可直接分段着色的 `traffic_segments`。|
+
+### 4.5.5 POST /api/v1/map/traffic-heatmap
+
+|**项目**|**内容**|
+|---|---|
+|**接口名称**|按推荐结果精确查询换乘路线道路拥堵热力图|
+|**模块**|地图数据|
+|**当前鉴权**|无需鉴权（按当前代码）|
+|**前端方法**|当前前端未改动；已提供 Postman 请求 `12-map/05-get-exact-route-traffic-heatmap.request.yaml`|
+|**数据来源/实现**|按 `segment_order` 逐段解析推荐接口返回的线路、上车站和下车站；每个换乘段只截取对应的 `map_road_segment` 连续区间，再关联最新 `traffic_speed_bands`。|
+
+**请求体**
+
+```json
+{
+  "route_id": "route-001",
+  "route_segments": [
+    {
+      "segment_order": 1,
+      "line_id": 12,
+      "boarding_station_id": 101,
+      "alighting_station_id": 108
+    },
+    {
+      "segment_order": 2,
+      "line_id": 27,
+      "boarding_station_id": 108,
+      "alighting_station_id": 116
+    }
+  ],
+  "match_radius_m": 120,
+  "stale_after_minutes": 15
+}
+```
+
+`route_segments` 的四个关键字段与 `POST /api/v1/recommend-routes` 返回的 `items[].segments[]` 一致。换乘路线应把每一段都传入。无法在 `map_road_segment` 中找到精确上下车区间时，接口返回空路线数据，不会错误地退化为整条线路。
+
+**颜色映射**
+
+|**congestion_score**|**congestion_level**|**含义**|**heat_color**|
+|---|---|---|---|
+|0.00 ≤ score < 0.25|free_flow|畅通|`#22C55E`|
+|0.25 ≤ score < 0.50|slow|缓行|`#EAB308`|
+|0.50 ≤ score < 0.75|congested|拥堵|`#F97316`|
+|0.75 ≤ score ≤ 1.00|severe|严重拥堵|`#EF4444`|
+|无匹配数据|no_data|暂无路况数据|`#9CA3AF`|
+
+**关键验收行为**
+
+- `traffic_segments.coordinates` 始终位于推荐路线骨架上，热力颜色不覆盖无关道路。
+- 每个有数据路段同时返回 `observed_at` 和兼容字段 `query_time`；`data_status` 标记 `realtime` 或 `stale`。
+- 无实时交通数据时仍返回路线坐标，并以 `no_data`、灰色和“暂无路况数据”标记。
+- 推荐路线基础几何在 `route_segments` 中完整返回，前端可先绘制灰色底线，再叠加 `traffic_segments` 彩色分段。
 
 
 ## 4\.6 位置搜索
@@ -1614,7 +1753,7 @@
 |**模块**|历史与预测查询|
 |**当前鉴权**|无需鉴权（按当前代码）|
 |**前端方法**|getLoadPredictionsByLine\(lineId,   params\)|
-|**数据来源/实现**|历史客流、ETA、客载预测记录表。|
+|**数据来源/实现**|`passenger_flow_trend` 在数据库端先聚合再返回；`line_id` 通过 `line_station` 展开到站点记录。未指定日期时自动选取当前筛选条件下最新可用月份。|
 
 
 
@@ -1677,7 +1816,7 @@
 |**模块**|历史与预测查询|
 |**当前鉴权**|无需鉴权（按当前代码）|
 |**前端方法**|getPassengerFlowTrend\(params\)|
-|**数据来源/实现**|历史客流、ETA、客载预测记录表。|
+|**数据来源/实现**|`passenger_flow_trend` 历史客流表；线路筛选通过 `line_station` 解析为站点集合，并在数据库端按指定粒度聚合。|
 
 
 
@@ -1685,11 +1824,11 @@
 
 |**字段**|**位置**|**类型**|**必填**|**说明**|
 |---|---|---|---|---|
-|line\_id|Query|int（可空）|否|线路编号。|
-|station\_id|Query|int（可空）|否|站点编号。|
-|start\_date|Query|string（可空）|否|开始日期时间，ISO 8601 字符串。|
-|end\_date|Query|string（可空）|否|结束日期时间，ISO 8601 字符串。|
-|granularity|Query|string|否|聚合粒度：hour   / day / week。 默认 "hour"；格式 ^\(hour\|day\|week\)$。|
+|line\_id|Query|int（可空）|否|线路编号；优先映射为该线路包含的站点后汇总。|
+|station\_id|Query|int（可空）|否|站点编号。与 `line_id` 同时提供时，该站点必须属于该线路。|
+|start\_date|Query|datetime（可空）|否|开始日期时间，ISO 8601；不能晚于 `end_date`。|
+|end\_date|Query|datetime（可空）|否|结束日期时间，ISO 8601；不能早于 `start_date`。|
+|granularity|Query|string|否|聚合粒度：`hour`、`day` 或 `week`，默认 `hour`。|
 
 
 
@@ -1701,6 +1840,14 @@
 |**统一外壳**|ApiResponse|code、message、data、trace\_id、timestamp。|
 |**data**|PassengerFlowResponse|字段明细见“核心数据模型”。|
 
+
+
+**加载与聚合规则**
+
+- 不再读取并序列化全部站点明细，而是在 SQL 中按年、月、日、小时聚合，因此默认页面请求只返回图表级数据点。
+- 未提供 `start_date` 和 `end_date` 时，先查当前筛选条件的最大 `record_time`，再限定到该记录所在自然月。
+- `line_id` 查询优先使用 `line_station` 对应的站点客流；只有线路没有站点映射时才兼容显式的 line 级历史记录。
+- 返回 `summary.granularity`、`point_count`、`start_time`、`end_time`，便于前端判断实际数据范围。
 
 
 ### 4\.7\.6 GET /api/v1/history/passenger\-flow/prediction（兼容/实验，非第一阶段核心）
@@ -2007,7 +2154,7 @@
 |---|---|
 |**接口名称**|手动刷新 LTA 公交到站并可同步入库|
 |**模块**|后台 LTA 采集刷新|
-|**当前鉴权**|admin（Bearer Token）；未登录返回 401，已登录但非 admin 返回 403。|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|后端管理/无直接调用|
 |**数据来源/实现**|LtaCollectorService.refresh\_bus\_arrival\(\)；CacheSyncService.sync\_bus\_arrival\(\)。|
 
@@ -2044,7 +2191,7 @@
 |---|---|
 |**接口名称**|手动刷新 LTA 路况速度带并可同步入库|
 |**模块**|后台 LTA 采集刷新|
-|**当前鉴权**|admin（Bearer Token）；未登录返回 401，已登录但非 admin 返回 403。|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|后端管理/无直接调用|
 |**数据来源/实现**|LtaCollectorService.refresh\_traffic\_speed\_bands\(\)；CacheSyncService.sync\_traffic\_speed\_bands\(\)。|
 
@@ -2083,7 +2230,7 @@
 |---|---|
 |**接口名称**|刷新   LTA 公交到站数据（兼容旧入口，已废弃）|
 |**模块**|仿真与预测更新|
-|**当前鉴权**|admin（Bearer Token）；未登录返回 401，已登录但非 admin 返回 403。|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|refreshLtaBusArrival\(data\)|
 |**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新；实际转调 SimulationService.refresh\_bus\_arrival\_status\_from\_lta\(\)。|
 
@@ -2124,7 +2271,7 @@
 |---|---|
 |**接口名称**|写入/刷新预测结果|
 |**模块**|仿真与预测更新|
-|**当前鉴权**|admin（Bearer Token）；未登录返回 401，已登录但非 admin 返回 403。|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|updatePredictionResult\(data\)|
 |**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新。|
 
@@ -2176,7 +2323,7 @@
 |---|---|
 |**接口名称**|更新仿真车辆状态|
 |**模块**|仿真与预测更新|
-|**当前鉴权**|admin（Bearer Token）；未登录返回 401，已登录但非 admin 返回 403。|
+|**当前鉴权**|admin（Bearer Token）|
 |**前端方法**|updateVehicleStatus\(vehicleId,   data\)|
 |**数据来源/实现**|仿真存储、预测结果缓存及 LTA 刷新。|
 
@@ -2603,6 +2750,78 @@
 
 
 
+### TrafficHeatmapRouteSegmentRequest
+
+推荐路线中的一个公交换乘分段。
+
+|**字段**|**中文含义**|**类型**|**必有**|**说明**|
+|---|---|---|---|---|
+|segment_order|换乘段顺序|int|是|从 1 开始。|
+|line_id|线路编号|int|是|对应 `map_road_segment.line_id`。|
+|boarding_station_id|上车站编号|int|是|用于截取该线路的起始路段。|
+|alighting_station_id|下车站编号|int|是|用于截取该线路的结束路段。|
+
+### TrafficHeatmapRequest
+
+|**字段**|**中文含义**|**类型**|**必有**|**说明**|
+|---|---|---|---|---|
+|route_id|推荐路线编号|string（可空）|否|原样返回，便于关联推荐结果。|
+|route_segments|推荐路线分段|TrafficHeatmapRouteSegmentRequest[]|是|至少 1 项，支持换乘。|
+|observed_at|路况截止时间|datetime（可空）|否|选择该时间之前的最新路况。|
+|min_lat / max_lat / min_lon / max_lon|可视范围|float（可空）|否|四项同时提供。|
+|match_radius_m|匹配半径|float|否|20～500 米，默认 120。|
+|stale_after_minutes|过期阈值|int|否|默认 15 分钟。|
+
+### RouteGeometrySegmentDTO
+
+|**字段**|**中文含义**|**类型**|**必有**|**说明**|
+|---|---|---|---|---|
+|route_segment_id|路线骨架分段编号|string|是|来自 `map_road_segment.segment_id`。|
+|line_id|线路编号|int|是|所属公交线路。|
+|segment_order|换乘段顺序|int（可空）|否|POST 精确查询时对应推荐路线段顺序。|
+|road_name|路线段名称|string（可空）|否|地图路线骨架名称。|
+|coordinates|完整路线骨架坐标|float[][]|是|坐标顺序为 `[longitude, latitude]`。|
+
+### TrafficHeatmapSegmentDTO
+
+|**字段**|**中文含义**|**类型**|**必有**|**说明**|
+|---|---|---|---|---|
+|route_segment_id|路线骨架分段编号|string|是|对应推荐路线分段。|
+|line_id|线路编号|int|是|所属公交线路。|
+|segment_order|换乘段顺序|int（可空）|否|推荐路线段顺序。|
+|link_id|LTA 道路分段编号|int（可空）|否|无数据时为 null。|
+|road_name|道路名称|string（可空）|否|优先使用 LTA 道路名称。|
+|road_category|道路类型|string（可空）|否|来自 `traffic_speed_bands`。|
+|coordinates|着色折线坐标|float[][]|是|已裁剪到推荐路线骨架，仅用于绘制本路线。|
+|speed_band|LTA 速度等级|int（可空）|否|无数据时为 null。|
+|minimum_speed_kmh|最低速度|float（可空）|否|km/h。|
+|maximum_speed_kmh|最高速度|float（可空）|否|km/h。|
+|congestion_score|拥堵分数|float（可空）|否|0～1。|
+|congestion_level|拥堵等级|string|是|free_flow / slow / congested / severe / no_data。|
+|congestion_label|中文状态|string|是|畅通、缓行、拥堵、严重拥堵或暂无路况数据。|
+|heat_color|热力颜色|string|是|绿色、黄色、橙色、红色；无数据为灰色。|
+|observed_at|采集时间|datetime（可空）|否|最新匹配路况采集时间。|
+|query_time|采集时间兼容字段|datetime（可空）|否|与 `observed_at` 相同。|
+|data_status|数据状态|string|是|realtime / stale / no_data。|
+|is_stale|是否过期|bool|是|根据 `stale_after_minutes` 计算。|
+|match_distance_m|匹配距离|float（可空）|否|LTA 分段到路线骨架的距离。|
+
+### TrafficHeatmapResponse
+
+|**字段**|**中文含义**|**类型**|**必有**|**说明**|
+|---|---|---|---|---|
+|route_id|推荐路线编号|string（可空）|否|POST 请求中原样返回。|
+|line_ids|线路编号列表|int[]|是|实际返回的路线线路。|
+|route_segments|推荐路线基础几何|RouteGeometrySegmentDTO[]|是|完整底图路线。|
+|traffic_segments|拥堵着色分段|TrafficHeatmapSegmentDTO[]|是|仅包含推荐路线上的颜色分段和无数据分段。|
+|total|着色分段总数|int|是|`traffic_segments` 数量。|
+|matched_count|有路况数据分段数|int|是|匹配到 `traffic_speed_bands` 的数量。|
+|no_data_count|无数据路线段数|int|是|没有匹配实时路况的路线骨架段数。|
+|observed_at|最新采集时间|datetime（可空）|否|全部匹配数据中的最新时间。|
+|generated_at|响应生成时间|datetime|是|服务器本地时区。|
+|stale_after_minutes|过期阈值|int|是|本次判定阈值。|
+
+
 ### PassengerFlowTrendDTO
 
 历史客流时间点记录。
@@ -2634,7 +2853,11 @@
 |total\_flow|总客流|int|是|总客流。|
 |peak\_hour|峰值小时|int（可空）|是|峰值小时。|
 |peak\_flow|峰值客流|int（可空）|是|峰值客流。|
-|dominant\_flow\_level|主要客流等级|string（可空）|是|主要客流等级。|
+|dominant\_flow\_level|主要客流等级|string（可空）|是|low / medium / high。|
+|granularity|实际聚合粒度|string|是|hour / day / week。|
+|point\_count|数据点数量|int|是|`items` 数量。|
+|start\_time|数据起始时间|datetime（可空）|否|本次返回数据范围。|
+|end\_time|数据结束时间|datetime（可空）|否|本次返回数据范围。|
 
 
 
@@ -3037,7 +3260,7 @@ LTA 到站数据刷新结果。
 
 - LTA 后台刷新接口的 sync\_to\_db=true 会在采集后同步 MySQL；sync\_to\_db=false 只刷新内存缓存。
 
-- 当前写接口未做 admin 鉴权，属于演示联调状态；部署前建议补权限控制。
+- 线路、站点、车辆等写接口以及 LTA 后台刷新接口按当前代码要求 admin 角色；未登录返回 401，非 admin 返回 403。
 
 - OpenAPI 文档可通过运行主应用后访问 /docs 或 /openapi\.json，以运行时定义为最终准绳。
 
@@ -3082,3 +3305,41 @@ LTA 到站数据刷新结果。
 
 |POST /api/v1/admin/lta/traffic\-speed\-bands/refresh<br>Content\-Type: application/json<br>\{<br>    "sync\_to\_db": true<br>\}|
 |---|
+
+## A.7 查询推荐线路道路拥堵热力图
+
+```http
+GET /api/v1/map/traffic-heatmap?line_id=12&line_id=27&match_radius_m=120
+```
+
+## A.8 精确查询换乘推荐路线道路拥堵热力图
+
+```http
+POST /api/v1/map/traffic-heatmap
+Content-Type: application/json
+
+{
+  "route_id": "route-001",
+  "route_segments": [
+    {
+      "segment_order": 1,
+      "line_id": 12,
+      "boarding_station_id": 101,
+      "alighting_station_id": 108
+    },
+    {
+      "segment_order": 2,
+      "line_id": 27,
+      "boarding_station_id": 108,
+      "alighting_station_id": 116
+    }
+  ]
+}
+```
+
+## A.9 查询最新月份历史客流趋势
+
+```http
+GET /api/v1/history/passenger-flow?granularity=hour
+```
+
