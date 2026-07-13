@@ -846,6 +846,9 @@ function lineToFeature(line) {
       start_station: line.start_station,
       end_station: line.end_station,
       color: line.color,
+      crowd_level: line.crowd_level,
+      load_code: line.load_code,
+      load_score: line.load_score,
       display_color: routeColorForLine(line)
     },
     geometry: {
@@ -870,7 +873,8 @@ function mergeSegmentCoordinates(segments) {
 
 async function loadRouteGeometryFallback(lines) {
   try {
-    const segmentResponse = await runWithRetry(() => getRoadSegments(), 2)
+    const lineIds = lines.map((line) => line.line_id).filter(Boolean).join(',')
+    const segmentResponse = await runWithRetry(() => getRoadSegments(lineIds ? { line_ids: lineIds } : undefined), 2)
     const segments = segmentResponse?.data?.segments || []
     const segmentsByLine = new Map()
 

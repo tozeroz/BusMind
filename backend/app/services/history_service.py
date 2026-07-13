@@ -7,6 +7,8 @@ from typing import Optional
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
+from app.cache import memory_cache_provider
+from app.cache.cache_keys import passenger_flow_trend
 from app.models.bus_line import LineStation
 from app.models.history import EtaPrediction, LoadPrediction, PassengerFlowPrediction, PassengerFlowTrend
 from app.schemas.history_schema import (
@@ -17,6 +19,9 @@ from app.schemas.history_schema import (
     PassengerFlowSummary,
     PassengerFlowTrendDTO,
 )
+
+
+PASSENGER_FLOW_CACHE_TTL_SECONDS = 120
 
 
 def _as_float(value):
@@ -188,6 +193,11 @@ def get_passenger_flow_trend(
     end_date: Optional[datetime] = None,
     granularity: str = "hour",
 ) -> PassengerFlowResponse:
+    cache_key = passenger_flow_trend(line_id, station_id, start_date, end_date, granularity)
+    cached = memory_cache_provider.get(cache_key)
+    if isinstance(cached, PassengerFlowResponse):
+        return cached
+
     if start_date is not None and end_date is not None and start_date > end_date:
         raise ValueError("start_date must not be later than end_date")
     if granularity not in {"hour", "day", "week"}:
@@ -253,7 +263,7 @@ def get_passenger_flow_trend(
         if item.flow_level:
             levels[item.flow_level] = levels.get(item.flow_level, 0) + 1
 
-    return PassengerFlowResponse(
+    result = PassengerFlowResponse(
         items=items,
         summary=PassengerFlowSummary(
             total_tap_in=total_tap_in,
@@ -268,6 +278,8 @@ def get_passenger_flow_trend(
             end_time=items[-1].record_time if items else end_date,
         ),
     )
+    memory_cache_provider.set(cache_key, result, ttl_seconds=PASSENGER_FLOW_CACHE_TTL_SECONDS)
+    return result
 
 
 def get_passenger_flow_prediction(

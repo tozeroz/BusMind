@@ -213,6 +213,7 @@ CREATE TABLE IF NOT EXISTS bus_eta_status (
     KEY idx_eta_line_station (line_id, target_station_id),
     KEY idx_eta_line_time (line_id, query_time),
     KEY idx_eta_line_station_time (line_id, target_station_id, query_time),
+    KEY idx_eta_target_line_time (target_station_id, line_id, query_time),
     KEY idx_eta_arrival_time (arrival_time),
     CONSTRAINT fk_eta_line FOREIGN KEY (line_id) REFERENCES bus_line (line_id)
         ON DELETE CASCADE ON UPDATE CASCADE,
@@ -243,6 +244,7 @@ CREATE TABLE IF NOT EXISTS bus_load_status (
     KEY idx_load_line_time (line_id, query_time),
     KEY idx_load_station_time (station_id, query_time),
     KEY idx_load_line_station_time (line_id, station_id, query_time),
+    KEY idx_load_station_line_time (station_id, line_id, query_time),
     CONSTRAINT fk_load_line FOREIGN KEY (line_id) REFERENCES bus_line (line_id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_load_station FOREIGN KEY (station_id) REFERENCES bus_station (station_id)

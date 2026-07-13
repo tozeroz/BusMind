@@ -127,10 +127,38 @@ SET @sql = (
     SELECT IF(
         EXISTS (
             SELECT 1 FROM information_schema.statistics
+            WHERE table_schema = @schema_name AND table_name = 'bus_eta_status' AND index_name = 'idx_eta_target_line_time'
+        ),
+        'SELECT 1',
+        'ALTER TABLE bus_eta_status ADD KEY idx_eta_target_line_time (target_station_id, line_id, query_time)'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS (
+            SELECT 1 FROM information_schema.statistics
             WHERE table_schema = @schema_name AND table_name = 'bus_load_status' AND index_name = 'idx_load_line_station_time'
         ),
         'SELECT 1',
         'ALTER TABLE bus_load_status ADD KEY idx_load_line_station_time (line_id, station_id, query_time)'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS (
+            SELECT 1 FROM information_schema.statistics
+            WHERE table_schema = @schema_name AND table_name = 'bus_load_status' AND index_name = 'idx_load_station_line_time'
+        ),
+        'SELECT 1',
+        'ALTER TABLE bus_load_status ADD KEY idx_load_station_line_time (station_id, line_id, query_time)'
     )
 );
 PREPARE stmt FROM @sql;
