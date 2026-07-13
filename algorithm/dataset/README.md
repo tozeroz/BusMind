@@ -42,7 +42,7 @@ data/raw/lta
 | `scripts/recommendation_data.py` | 只负责读取 raw / processed 数据，并提供站点客流、线路拥堵等查表能力 |
 | `scripts/recommendation_feature_contract.py` | 冻结 `features.csv` 字段、JSON 字段解析、业务字段转模型输入 |
 | `scripts/build_features.py` | 单一特征构建入口；默认用 `data/raw/collect_scripts/hot_bus_stops.txt` 筛选 OD，从本地 CSV 构建候选路线并输出 `features.csv` |
-| `scripts/build_labels.py` | 组装同款模型 payload，基于规则评分生成伪标签 |
+| `scripts/build_labels.py` | 基于独立规则生成排序伪标签，不调用当前模型 scorer |
 | `scripts/summarize_features.py` | 汇总训练特征的数据质量、来源覆盖和降级字段分布 |
 | `features.csv` / `pseudo_labels.csv` | 推荐模型离线训练数据产物 |
 
@@ -145,6 +145,51 @@ python .\algorithm\model\train_ranker.py --features D:\SummerTraining\.tmp\froze
 ```
 
 如需绕开热门站筛选，临时加 `--ignore-hot-stops`。如需调整换乘 OD 占比，可调 `--transfer-pair-ratio`；脚本还会用 `--candidate-search-multiplier` 先多搜候选，再保留 `--max-candidates` 条，以尽量让同一 OD 内同时出现直达和换乘路线。
+
+## 伪标签策略
+
+当前阶段没有足够真实用户点击、选择、取消、满意度等行为数据，不能直接训练真实排序模型。`build_labels.py` 使用独立业务规则为候选路线生成伪标签，作为第一版模型的冷启动弱监督标准。
+
+伪标签只依赖 `features.csv` 中的候选路线业务字段，并在训练前通过 `algorithm/model/preprocessing.py` 映射到 12 维数值特征。它不调用当前模型 scorer，也不把模型已有输出重新当作标签，避免形成“模型自己教自己”的闭环。
+
+当前规则会先计算五类子目标：
+
+| 子目标 | 主要依据 |
+|---|---|
+| `time_score` | ETA、乘车时间、平均发车间隔、换乘惩罚 |
+| `comfort_score` | 实时客载、历史站点客流、线路道路拥堵、是否受实时监控 |
+| `walk_score` | 步行时间、步行距离 |
+| `transfer_score` | 换乘次数，采用非线性惩罚 |
+| `reliability_score` | 数据完整度、数据新鲜度、监控状态、字段来源可信度 |
+
+随后按 `balanced`、`fastest`、`comfort`、`less_walking`、`less_transfer` 五种偏好模板混合为 `recommend_score`，并在每个 `candidate_group_id` 内生成排序位置、硬标签、软标签、分数间隔和置信度。
+
+这套伪标签的意义是让模型先学习一套可解释、可复用的排序方法论。后续如果积累了真实推荐曝光、用户点击、最终选择或满意度反馈，可以保留当前 `features.csv` 字段和训练链路，把伪标签替换为真实标签，或用真实标签校准伪标签权重。
+
+## pseudo_labels.csv 字段
+
+`build_labels.py` 会为每个 `candidate_group_id` 和每种 preference 生成排序标签：
+
+```text
+candidate_group_id
+preference
+route_id
+rank_position
+label
+label_gain
+soft_label
+score_margin
+label_confidence
+time_score
+comfort_score
+walk_score
+transfer_score
+reliability_score
+recommend_score
+is_synthetic
+```
+
+其中 `time_score`、`comfort_score`、`walk_score`、`transfer_score`、`reliability_score` 是当前 `train_ranker.py` 的训练目标；`rank_position`、`label_gain`、`soft_label`、`score_margin`、`label_confidence` 用于后续升级排序损失或样本权重。
 
 生成正式 v1 数据集：
 
