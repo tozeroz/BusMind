@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ENV_FILE = BACKEND_ROOT / ".env"
 
 
 class Settings(BaseSettings):
@@ -19,7 +25,13 @@ class Settings(BaseSettings):
     AUTO_CREATE_TABLES: bool = False
     VALIDATE_DB_SCHEMA_ON_STARTUP: bool = False
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # Always load the backend-local .env so runtime configuration does not depend
+    # on the shell's current working directory.
+    model_config = SettingsConfigDict(
+        env_file=str(BACKEND_ENV_FILE),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # QQ Mail SMTP settings for sending verification codes.
     # QQ_MAIL_AUTH_CODE is an SMTP authorization code (not the QQ password).

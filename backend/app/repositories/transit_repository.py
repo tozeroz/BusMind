@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from math import asin, cos, radians, sin, sqrt
 
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.models.bus_line import (
@@ -122,10 +123,16 @@ class TransitRepository:
         return query.order_by(desc(LtaBusArrival.query_time)).first()
 
     def find_nearest_station(self, longitude: float, latitude: float) -> BusStation | None:
+        lat_delta = 3.0 / 111.32
+        lon_delta = 3.0 / (111.32 * max(cos(radians(latitude)), 0.01))
         stations = (
             self.db.query(BusStation)
             .filter(BusStation.status == "active")
             .filter(BusStation.longitude.isnot(None), BusStation.latitude.isnot(None))
+            .filter(BusStation.latitude >= latitude - lat_delta)
+            .filter(BusStation.latitude <= latitude + lat_delta)
+            .filter(BusStation.longitude >= longitude - lon_delta)
+            .filter(BusStation.longitude <= longitude + lon_delta)
             .all()
         )
         if not stations:
@@ -141,11 +148,14 @@ class TransitRepository:
         )
 
     def get_station_flow_level(self, station_id: int, hour: int) -> str:
+        profile = self._station_flow_hourly_profile(station_id, hour)
+        if profile and profile.get("dominant_flow_level"):
+            return str(profile["dominant_flow_level"])
         rows = (
             self.db.query(PassengerFlowTrend.flow_level, func.count(PassengerFlowTrend.flow_record_id))
             .filter(PassengerFlowTrend.target_type == "station")
             .filter(PassengerFlowTrend.target_id == station_id)
-            .filter(func.extract("hour", PassengerFlowTrend.record_time) == hour)
+            .filter(PassengerFlowTrend.record_hour == hour)
             .filter(PassengerFlowTrend.flow_level.isnot(None))
             .group_by(PassengerFlowTrend.flow_level)
             .order_by(desc(func.count(PassengerFlowTrend.flow_record_id)))
@@ -164,11 +174,14 @@ class TransitRepository:
         return str(fallback[0]) if fallback else "medium"
 
     def get_station_flow_average(self, station_id: int, hour: int) -> float | None:
+        profile = self._station_flow_hourly_profile(station_id, hour)
+        if profile and profile.get("avg_total_flow") is not None:
+            return float(profile["avg_total_flow"])
         value = (
             self.db.query(func.avg(PassengerFlowTrend.total_flow))
             .filter(PassengerFlowTrend.target_type == "station")
             .filter(PassengerFlowTrend.target_id == station_id)
-            .filter(func.extract("hour", PassengerFlowTrend.record_time) == hour)
+            .filter(PassengerFlowTrend.record_hour == hour)
             .scalar()
         )
         if value is not None:
@@ -515,6 +528,22 @@ class TransitRepository:
         if line.avg_service_frequency is not None:
             base_per_stop = 1.6 if float(line.avg_service_frequency) <= 8 else 2.1
         return round(max(3.0, stop_count * base_per_stop), 1)
+
+    def _station_flow_hourly_profile(self, station_id: int, hour: int) -> dict | None:
+        try:
+            row = self.db.execute(
+                text(
+                    """
+                    SELECT station_id, record_hour, avg_total_flow, dominant_flow_level
+                    FROM v_station_flow_hourly_profile
+                    WHERE station_id = :station_id AND record_hour = :record_hour
+                    """
+                ),
+                {"station_id": station_id, "record_hour": hour},
+            ).mappings().first()
+            return dict(row) if row else None
+        except (OperationalError, ProgrammingError):
+            return None
 
 
 def _haversine_meters(longitude_1: float, latitude_1: float, longitude_2: float, latitude_2: float) -> float:

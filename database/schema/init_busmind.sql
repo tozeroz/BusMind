@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS bus_station (
     PRIMARY KEY (station_id),
     UNIQUE KEY uk_station_code (bus_stop_code),
     KEY idx_station_name (station_name),
-    KEY idx_station_coordinate (longitude, latitude)
+    KEY idx_station_coordinate (longitude, latitude),
+    KEY idx_station_status_coordinate (status, longitude, latitude)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS user_query_history (
@@ -142,6 +143,8 @@ CREATE TABLE IF NOT EXISTS line_station (
     UNIQUE KEY uk_line_station_sequence (line_id, stop_sequence),
     KEY idx_line_station_pair (line_id, station_id),
     KEY idx_line_station_station (station_id),
+    KEY idx_line_station_line_station_sequence (line_id, station_id, stop_sequence),
+    KEY idx_line_station_station_line_sequence (station_id, line_id, stop_sequence),
     CONSTRAINT fk_line_station_line FOREIGN KEY (line_id) REFERENCES bus_line (line_id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_line_station_station FOREIGN KEY (station_id) REFERENCES bus_station (station_id)
@@ -179,6 +182,8 @@ CREATE TABLE IF NOT EXISTS bus_vehicle (
     KEY idx_vehicle_next_station (next_station_id),
     KEY idx_vehicle_status (operation_status),
     KEY idx_vehicle_updated (updated_at),
+    KEY idx_vehicle_line_code (line_id, vehicle_code, vehicle_id),
+    KEY idx_vehicle_line_reported (line_id, last_reported_at, updated_at),
     CONSTRAINT fk_vehicle_line FOREIGN KEY (line_id) REFERENCES bus_line (line_id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_vehicle_current_station FOREIGN KEY (current_station_id) REFERENCES bus_station (station_id)
@@ -206,6 +211,8 @@ CREATE TABLE IF NOT EXISTS bus_eta_status (
     UNIQUE KEY uk_eta_vehicle_station_time (vehicle_id, target_station_id, query_time),
     KEY idx_eta_vehicle_time (vehicle_id, query_time),
     KEY idx_eta_line_station (line_id, target_station_id),
+    KEY idx_eta_line_time (line_id, query_time),
+    KEY idx_eta_line_station_time (line_id, target_station_id, query_time),
     KEY idx_eta_arrival_time (arrival_time),
     CONSTRAINT fk_eta_line FOREIGN KEY (line_id) REFERENCES bus_line (line_id)
         ON DELETE CASCADE ON UPDATE CASCADE,
@@ -235,6 +242,7 @@ CREATE TABLE IF NOT EXISTS bus_load_status (
     KEY idx_load_vehicle_time (vehicle_id, query_time),
     KEY idx_load_line_time (line_id, query_time),
     KEY idx_load_station_time (station_id, query_time),
+    KEY idx_load_line_station_time (line_id, station_id, query_time),
     CONSTRAINT fk_load_line FOREIGN KEY (line_id) REFERENCES bus_line (line_id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_load_station FOREIGN KEY (station_id) REFERENCES bus_station (station_id)
@@ -247,6 +255,7 @@ CREATE TABLE IF NOT EXISTS passenger_flow_trend (
     target_id BIGINT NOT NULL,
     bus_stop_code VARCHAR(30) NULL,
     record_time DATETIME NOT NULL,
+    record_hour TINYINT GENERATED ALWAYS AS (HOUR(record_time)) STORED,
     day_type VARCHAR(20) NULL,
     tap_in_volume INT NOT NULL DEFAULT 0,
     tap_out_volume INT NOT NULL DEFAULT 0,
@@ -257,6 +266,8 @@ CREATE TABLE IF NOT EXISTS passenger_flow_trend (
     PRIMARY KEY (flow_record_id),
     UNIQUE KEY uk_flow_target_time (target_type, target_id, record_time, day_type),
     KEY idx_flow_target_time (target_type, target_id, record_time),
+    KEY idx_flow_target_hour (target_type, target_id, record_hour, record_time),
+    KEY idx_flow_target_hour_level (target_type, target_id, record_hour, flow_level),
     KEY idx_flow_record_time (record_time),
     KEY idx_flow_level (flow_level)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -304,6 +315,7 @@ CREATE TABLE IF NOT EXISTS map_road_segment (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (segment_id),
     KEY idx_segment_line (line_id),
+    KEY idx_segment_line_sequence (line_id, stop_sequence),
     KEY idx_segment_start_end (start_station_id, end_station_id),
     KEY idx_segment_flow_level (flow_level),
     CONSTRAINT fk_segment_line FOREIGN KEY (line_id) REFERENCES bus_line (line_id)
@@ -348,7 +360,9 @@ CREATE TABLE IF NOT EXISTS lta_bus_arrival (
     PRIMARY KEY (arrival_record_id),
     UNIQUE KEY uk_lta_arrival_sample (vehicle_id, station_id, line_id, query_time, visit_order),
     KEY idx_lta_service_stop_time (service_no, bus_stop_code, query_time),
-    KEY idx_lta_vehicle_time (vehicle_id, query_time)
+    KEY idx_lta_vehicle_time (vehicle_id, query_time),
+    KEY idx_lta_station_line_vehicle_time (station_id, line_id, vehicle_id, query_time),
+    KEY idx_lta_stop_line_vehicle_time (bus_stop_code, line_id, vehicle_id, query_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS traffic_speed_bands (
@@ -399,6 +413,52 @@ GROUP BY
     s.road_name,
     s.longitude,
     s.latitude;
+
+DROP VIEW IF EXISTS v_station_flow_hourly_profile;
+CREATE VIEW v_station_flow_hourly_profile AS
+SELECT
+    target_id AS station_id,
+    record_hour,
+    AVG(total_flow) AS avg_total_flow,
+    MAX(record_time) AS latest_record_time,
+    COUNT(*) AS sample_count,
+    CASE
+        WHEN SUM(flow_level = 'overcrowded') >= GREATEST(
+            SUM(flow_level = 'limited_standing'),
+            SUM(flow_level = 'standing_available'),
+            SUM(flow_level = 'seats_available'),
+            SUM(flow_level = 'high'),
+            SUM(flow_level = 'medium'),
+            SUM(flow_level = 'low')
+        ) THEN 'overcrowded'
+        WHEN SUM(flow_level = 'limited_standing') >= GREATEST(
+            SUM(flow_level = 'standing_available'),
+            SUM(flow_level = 'seats_available'),
+            SUM(flow_level = 'high'),
+            SUM(flow_level = 'medium'),
+            SUM(flow_level = 'low')
+        ) THEN 'limited_standing'
+        WHEN SUM(flow_level = 'standing_available') >= GREATEST(
+            SUM(flow_level = 'seats_available'),
+            SUM(flow_level = 'high'),
+            SUM(flow_level = 'medium'),
+            SUM(flow_level = 'low')
+        ) THEN 'standing_available'
+        WHEN SUM(flow_level = 'seats_available') >= GREATEST(
+            SUM(flow_level = 'high'),
+            SUM(flow_level = 'medium'),
+            SUM(flow_level = 'low')
+        ) THEN 'seats_available'
+        WHEN SUM(flow_level = 'high') >= GREATEST(
+            SUM(flow_level = 'medium'),
+            SUM(flow_level = 'low')
+        ) THEN 'high'
+        WHEN SUM(flow_level = 'medium') >= SUM(flow_level = 'low') THEN 'medium'
+        ELSE 'low'
+    END AS dominant_flow_level
+FROM passenger_flow_trend
+WHERE target_type = 'station'
+GROUP BY target_id, record_hour;
 
 -- Email verification code table for registration and other flows.
 CREATE TABLE IF NOT EXISTS email_verification_code (
