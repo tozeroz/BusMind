@@ -53,7 +53,7 @@ const {
   overflow: hidden;
   color: #f7fbff;
 }
-.profile-scroll-area { min-height:0; overflow-y:auto; scrollbar-color:rgba(255,255,255,.76) rgba(15,39,67,.18); }
+.profile-scroll-area { height:100%; min-height:0; overflow-y:auto; scrollbar-gutter:stable; scrollbar-color:rgba(255,255,255,.76) rgba(15,39,67,.18); }
 .profile-content { width:100%; margin:0 auto; padding:18px 22px 30px; }
 .profile-dashboard-grid { display:grid; grid-template-columns:minmax(300px,1fr) minmax(340px,1fr) minmax(310px,1fr); gap:18px; align-items:start; }
 .profile-column { display:grid; gap:18px; min-width:0; }

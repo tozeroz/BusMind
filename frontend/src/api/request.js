@@ -11,7 +11,8 @@ export const AUTH_TOKEN_KEY = 'busmind_access_token'
 
 const env = import.meta.env || {}
 
-const defaultApiBaseUrl = env.DEV ? 'http://127.0.0.1:8001/api/v1' : '/api/v1'
+// 浏览器始终请求同源的 /api/v1；开发环境由 Vite 代理到本地后端。
+const defaultApiBaseUrl = '/api/v1'
 
 const service = axios.create({
   baseURL: env.VITE_API_BASE_URL || defaultApiBaseUrl,

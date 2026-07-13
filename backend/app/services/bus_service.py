@@ -7,6 +7,8 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.cache import memory_cache_provider
+from app.cache.cache_keys import line_list
 from app.models.bus_line import BusLine, BusStation, LineStation
 from app.models.bus_vehicle import BusVehicle
 from app.schemas.bus_schema import (
@@ -27,6 +29,17 @@ from app.schemas.bus_schema import (
     StationListResponse,
 )
 from app.services.id_service import next_numeric_id, station_id_from_code
+from app.services.map_service import invalidate_map_cache
+from app.services.recommend_service.transit_graph import transit_graph_cache
+
+
+LINE_LIST_CACHE_TTL_SECONDS = 120
+
+
+def _invalidate_transit_static_caches() -> None:
+    invalidate_map_cache()
+    transit_graph_cache.invalidate()
+    memory_cache_provider.delete_prefix("lines:list:")
 
 
 def _as_float(value, default: float = 0.0) -> float:
@@ -187,6 +200,11 @@ def get_line_list(
     limit: int = 20,
     line_name: Optional[str] = None,
 ) -> LineListResponse:
+    cache_key = line_list(page, limit, line_name)
+    cached = memory_cache_provider.get(cache_key)
+    if isinstance(cached, LineListResponse):
+        return cached
+
     query = db.query(BusLine)
     if line_name:
         query = query.filter(BusLine.line_name.like(f"%{line_name}%"))
@@ -205,10 +223,12 @@ def get_line_list(
         db,
         [value for line in lines for value in (line.start_station, line.end_station)],
     )
-    return LineListResponse(
+    result = LineListResponse(
         lines=[_build_line_dto(line, station_by_id, station_by_code) for line in lines],
         total=total,
     )
+    memory_cache_provider.set(cache_key, result, ttl_seconds=LINE_LIST_CACHE_TTL_SECONDS)
+    return result
 
 
 def get_line_by_id(db: Session, line_id: int) -> Optional[BusLineWithStationsDTO]:
@@ -279,6 +299,7 @@ def create_line(db: Session, request: BusLineCreateRequest) -> BusLineDTO:
     db.add(new_line)
     db.commit()
     db.refresh(new_line)
+    _invalidate_transit_static_caches()
     return _build_line_dto(
         new_line,
         _station_map_by_ids(db, [new_line.origin_station_id, new_line.destination_station_id]),
@@ -336,6 +357,7 @@ def update_line(
 
     db.commit()
     db.refresh(line)
+    _invalidate_transit_static_caches()
     return _build_line_dto(
         line,
         _station_map_by_ids(db, [line.origin_station_id, line.destination_station_id]),
@@ -349,6 +371,7 @@ def delete_line(db: Session, line_id: int) -> bool:
         return False
     db.delete(line)
     db.commit()
+    _invalidate_transit_static_caches()
     return True
 
 
@@ -426,6 +449,7 @@ def create_station(db: Session, request: BusStationCreateRequest) -> BusStationD
     db.add(station)
     db.commit()
     db.refresh(station)
+    _invalidate_transit_static_caches()
     return _station_dto(station)
 
 
@@ -460,6 +484,7 @@ def update_station(
         station.status = values["status"]
     db.commit()
     db.refresh(station)
+    _invalidate_transit_static_caches()
     return _station_dto(station)
 
 
@@ -469,6 +494,7 @@ def delete_station(db: Session, station_id: int) -> bool:
         return False
     db.delete(station)
     db.commit()
+    _invalidate_transit_static_caches()
     return True
 
 
@@ -518,6 +544,7 @@ def add_line_station(db: Session, request: LineStationCreateRequest) -> LineStat
     db.add(item)
     db.commit()
     db.refresh(item)
+    _invalidate_transit_static_caches()
     return _line_station_dto(item, station)
 
 
@@ -550,6 +577,7 @@ def update_line_station(
         item.route_distance_km = values["route_distance_km"]
     db.commit()
     db.refresh(item)
+    _invalidate_transit_static_caches()
     station = db.query(BusStation).filter(BusStation.station_id == item.station_id).first()
     return _line_station_dto(item, station) if station else None
 
@@ -560,6 +588,7 @@ def remove_line_station(db: Session, line_station_id: str) -> bool:
         return False
     db.delete(item)
     db.commit()
+    _invalidate_transit_static_caches()
     return True
 
 

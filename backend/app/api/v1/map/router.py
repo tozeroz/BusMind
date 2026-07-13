@@ -51,7 +51,7 @@ def build_response(code: int, message: str, data=None) -> ApiResponse:
         200: {"description": "Get success"}
     }
 )
-async def list_map_stations(
+def list_map_stations(
     line_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db)
 ):
@@ -70,10 +70,14 @@ async def list_map_stations(
         200: {"description": "Get success"}
     }
 )
-async def list_road_segments(
+def list_road_segments(
+    line_ids: Optional[str] = Query(None, description="Comma-separated line ids, e.g. 15,105"),
+    bbox: Optional[str] = Query(None, description="min_lon,min_lat,max_lon,max_lat"),
     db: Session = Depends(get_db)
 ):
-    result = get_road_segments(db)
+    parsed_line_ids = _parse_line_ids(line_ids)
+    parsed_bbox = _parse_bbox(bbox)
+    result = get_road_segments(db, parsed_line_ids, parsed_bbox)
     return build_response(0, "success", result.model_dump())
 
 @router.get(
@@ -85,11 +89,43 @@ async def list_road_segments(
         200: {"description": "Get success"}
     }
 )
-async def list_map_lines(
+def list_map_lines(
     db: Session = Depends(get_db)
 ):
     result = get_map_lines(db)
     return build_response(0, "success", result.model_dump())
+
+
+def _parse_line_ids(value: str | None) -> tuple[int, ...]:
+    if not value:
+        return ()
+    try:
+        return tuple(
+            sorted(
+                {
+                    int(item.strip())
+                    for item in value.split(",")
+                    if item.strip()
+                }
+            )
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="line_ids must be comma-separated integers") from exc
+
+
+def _parse_bbox(value: str | None) -> tuple[float, float, float, float] | None:
+    if not value:
+        return None
+    try:
+        parts = tuple(float(item.strip()) for item in value.split(",") if item.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="bbox must be min_lon,min_lat,max_lon,max_lat") from exc
+    if len(parts) != 4:
+        raise HTTPException(status_code=400, detail="bbox must be min_lon,min_lat,max_lon,max_lat")
+    min_lon, min_lat, max_lon, max_lat = parts
+    if min_lon > max_lon or min_lat > max_lat:
+        raise HTTPException(status_code=400, detail="bbox min values must not exceed max values")
+    return parts
 
 def _validate_heatmap_bounds(
     min_lat: float | None,

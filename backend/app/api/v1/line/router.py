@@ -70,7 +70,7 @@ def build_response(code: int, message: str, data=None) -> ApiResponse:
         200: {"description": "Get success"}
     }
 )
-async def list_lines(
+def list_lines(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     line_name: Optional[str] = Query(None),
@@ -89,7 +89,7 @@ async def list_lines(
         404: {"description": "Line not found"}
     }
 )
-async def get_line(
+def get_line(
     line_id: int,
     db: Session = Depends(get_db)
 ):
@@ -193,7 +193,7 @@ async def delete_line_api(
         200: {"description": "Get success"}
     }
 )
-async def list_line_stations(
+def list_line_stations(
     line_id: int,
     db: Session = Depends(get_db)
 ):
@@ -297,7 +297,7 @@ bus_lines_router = APIRouter(prefix="/bus-lines", tags=["Lines"])
         200: {"description": "Get success"}
     }
 )
-async def list_lines_alias(
+def list_lines_alias(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     line_name: Optional[str] = Query(None),
@@ -316,7 +316,7 @@ async def list_lines_alias(
         404: {"description": "Line not found"}
     }
 )
-async def get_line_alias(
+def get_line_alias(
     line_id: int,
     db: Session = Depends(get_db)
 ):
@@ -337,7 +337,7 @@ async def get_line_alias(
         200: {"description": "Get success"}
     }
 )
-async def list_line_stations_alias(
+def list_line_stations_alias(
     line_id: int,
     db: Session = Depends(get_db)
 ):
@@ -354,7 +354,7 @@ async def list_line_stations_alias(
         404: {"description": "Line not found"}
     }
 )
-async def get_line_map(
+def get_line_map(
     line_id: int,
     direction: Optional[str] = Query(None, description="Direction filter (reserved for future use)"),
     db: Session = Depends(get_db)
@@ -378,7 +378,7 @@ async def get_line_map(
         404: {"description": "Line not found"}
     }
 )
-async def get_line_geometry(
+def get_line_geometry(
     line_id: int,
     direction: Optional[str] = Query(None, description="Direction filter (reserved for future use)"),
     db: Session = Depends(get_db)

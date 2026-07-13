@@ -18,8 +18,8 @@ export async function getMapStations(params) {
   }
 }
 
-export const getRoadSegments = () =>
-  request.get('/map/road-segments', { timeout: 60000 })
+export const getRoadSegments = (params) =>
+  request.get('/map/road-segments', { params, timeout: 60000 })
 
 export async function getMapLines(params = {}) {
   try {

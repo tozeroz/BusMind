@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+from threading import RLock
+from time import monotonic
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -124,6 +126,34 @@ def _to_backend_candidate(candidate: CandidateRoute) -> CandidateRouteData:
     )
 
 
+class TransitGraphSnapshotCache:
+    def __init__(self, ttl_seconds: int = 600) -> None:
+        self._snapshot: TransitGraphSnapshot | None = None
+        self._loaded_at = 0.0
+        self._ttl_seconds = ttl_seconds
+        self._lock = RLock()
+
+    def get(self, db: Session | object) -> TransitGraphSnapshot:
+        now = monotonic()
+        if self._snapshot is not None and now - self._loaded_at < self._ttl_seconds:
+            return self._snapshot
+
+        with self._lock:
+            now = monotonic()
+            if self._snapshot is None or now - self._loaded_at >= self._ttl_seconds:
+                self._snapshot = TransitGraphBuilder(db).build()
+                self._loaded_at = now
+            return self._snapshot
+
+    def invalidate(self) -> None:
+        with self._lock:
+            self._snapshot = None
+            self._loaded_at = 0.0
+
+
+transit_graph_cache = TransitGraphSnapshotCache()
+
+
 @dataclass
 class TransitGraphService:
     """Backend wrapper that owns the snapshot lifecycle."""
@@ -132,21 +162,20 @@ class TransitGraphService:
     _snapshot: TransitGraphSnapshot | None = field(default=None, init=False)
 
     def refresh(self) -> TransitGraphSnapshot:
-        self._snapshot = TransitGraphBuilder(self.db).build()
+        transit_graph_cache.invalidate()
+        self._snapshot = transit_graph_cache.get(self.db)
         return self._snapshot
 
     @property
     def snapshot(self) -> TransitGraphSnapshot:
-        if self._snapshot is None:
-            self._snapshot = TransitGraphBuilder(self.db).build()
-        return self._snapshot
+        return transit_graph_cache.get(self.db)
 
     def find_candidates(
         self,
         start_station_id: int,
         end_station_id: int,
         max_transfer: int = 2,
-        max_candidates: int = 8,
+        max_candidates: int = 6,
     ) -> list[CandidateRouteData]:
         routes = TransitGraphSearch(self.snapshot).find_candidates(
             start_station_id=start_station_id,
@@ -164,5 +193,7 @@ __all__ = [
     "TransitGraphBuilder",
     "TransitGraphSearch",
     "TransitGraphService",
+    "TransitGraphSnapshotCache",
+    "transit_graph_cache",
     "InternalCandidate",
 ]

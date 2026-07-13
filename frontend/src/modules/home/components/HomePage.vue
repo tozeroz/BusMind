@@ -616,7 +616,7 @@ const selectRoad = (route) => {
   openChartPanel('road')
   selectedInfo.id = route.line_id || route.id
   selectedInfo.name = route.line_name || route.title
-  selectedInfo.crowd = route.load || loadLevelText(route.crowd_level)
+  selectedInfo.crowd = route.load || loadLevelText(route.crowd_level || route.load_code)
   selectedInfo.status = route.status || (selectedInfo.crowd === '拥挤' ? '建议关注' : '运行正常')
   selectedInfo.eta = route.eta || route.eta_minutes ? `约 ${route.eta || route.eta_minutes} 分钟` : '约 8 分钟'
   selectedInfo.routes = ''
