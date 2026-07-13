@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, DECIMAL, ForeignKey, Integer, String, text
+from sqlalchemy import Column, Computed, DateTime, DECIMAL, ForeignKey, Integer, String, text
 from sqlalchemy.orm import synonym
 from sqlalchemy.sql import func
 
@@ -17,6 +17,7 @@ class PassengerFlowTrend(Base):
     target_id = Column(BIGINT_COMPAT, nullable=False, index=True)
     bus_stop_code = Column(String(30), nullable=True)
     record_time = Column(DateTime, nullable=False, index=True)
+    record_hour = Column(Integer, Computed("HOUR(record_time)", persisted=True))
     day_type = Column(String(20), nullable=True)
     tap_in_volume = Column(Integer, nullable=False, default=0, server_default=text("0"))
     tap_out_volume = Column(Integer, nullable=False, default=0, server_default=text("0"))

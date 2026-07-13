@@ -5,9 +5,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from app.api.v1.user import user_api
 from app.main import app
 from app.models.user import Base, EmailVerificationCode
 from app.dependencies.auth import get_db
+from app.services.email_service import EmailServiceConfigError
 
 engine = create_engine(
     "sqlite+pysqlite:///:memory:",
@@ -69,6 +71,58 @@ def test_register_user(client, test_user):
     assert data["code"] == 0
     assert data["data"]["username"] == test_user["username"]
     assert data["data"]["email"] == "test@example.com"
+
+
+def test_send_register_email_code_success(client, monkeypatch):
+    captured = {}
+
+    def fake_send_register_email_code(db, email):
+        captured["email"] = email
+
+    monkeypatch.setattr(user_api, "send_register_email_code", fake_send_register_email_code)
+
+    response = client.post(
+        "/api/v1/users/register/email-code",
+        json={"email": "newuser@qq.com"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["code"] == 0
+    assert data["data"]["email"] == "newuser@qq.com"
+    assert captured["email"] == "newuser@qq.com"
+
+
+def test_send_register_email_code_rate_limited(client, monkeypatch):
+    def fake_send_register_email_code(db, email):
+        raise ValueError("Please wait 60 seconds before requesting another code")
+
+    monkeypatch.setattr(user_api, "send_register_email_code", fake_send_register_email_code)
+
+    response = client.post(
+        "/api/v1/users/register/email-code",
+        json={"email": "newuser@qq.com"},
+    )
+
+    assert response.status_code == 429
+    data = response.json()
+    assert "Please wait 60 seconds" in data["detail"]["message"]
+
+
+def test_send_register_email_code_config_error(client, monkeypatch):
+    def fake_send_register_email_code(db, email):
+        raise EmailServiceConfigError("QQ SMTP not configured")
+
+    monkeypatch.setattr(user_api, "send_register_email_code", fake_send_register_email_code)
+
+    response = client.post(
+        "/api/v1/users/register/email-code",
+        json={"email": "newuser@qq.com"},
+    )
+
+    assert response.status_code == 503
+    data = response.json()
+    assert "QQ SMTP not configured" in data["detail"]["message"]
 
 
 def test_register_password_mismatch(client):

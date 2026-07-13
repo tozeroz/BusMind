@@ -1,3 +1,9 @@
+<!--
+  文件：src/modules/map/components/BusMap.vue
+  用途：实现地图业务模块中的地图展示与交互组件。
+  存放内容：地图实例、图层、站点线路数据以及地图交互代码。
+  实现功能：集中实现公交地图渲染、选中、高亮、定位和数据刷新能力。
+-->
 <template>
   <div class="bus-map-wrapper">
     <div ref="mapContainer" class="bus-map"></div>
@@ -11,7 +17,7 @@ import { Protocol } from 'pmtiles'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 import { getMapLines, getMapStations, getRoadSegments } from '@/api/map'
-import { createProtomapsStyle } from '@/map/map-style'
+import { createProtomapsStyle } from '@/modules/map/constants/map-style'
 
 const emit = defineEmits(['select-stop', 'select-route', 'load-error', 'initial-data-loaded'])
 

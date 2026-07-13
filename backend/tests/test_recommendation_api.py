@@ -1,3 +1,6 @@
+from app.services.recommend_service.recommendation_service import RecommendationService
+
+
 def test_recommend_routes_success(client):
     response = client.post(
         "/api/v1/recommend-routes",
@@ -17,6 +20,73 @@ def test_recommend_routes_success(client):
         assert item["walk_time_minutes"] >= 0
         assert item["experience_score"] >= 0
         assert item["reason"]
+
+
+def test_recommend_routes_uses_model_scores(client, monkeypatch):
+    def fake_model_score(payload):
+        return {
+            "contract_version": "1.0.0",
+            "request_id": payload["request_id"],
+            "model_name": "test-route-scorer",
+            "model_version": "test",
+            "results": [
+                {
+                    "route_id": "route_001",
+                    "time_score": 40.0,
+                    "comfort_score": 40.0,
+                    "walk_score": 40.0,
+                    "transfer_score": 95.0,
+                    "reliability_score": 80.0,
+                    "recommend_score": 41.0,
+                    "feature_contributions": {},
+                },
+                {
+                    "route_id": "route_002",
+                    "time_score": 92.0,
+                    "comfort_score": 96.0,
+                    "walk_score": 90.0,
+                    "transfer_score": 90.0,
+                    "reliability_score": 88.0,
+                    "recommend_score": 91.2,
+                    "feature_contributions": {},
+                },
+                {
+                    "route_id": "route_003",
+                    "time_score": 50.0,
+                    "comfort_score": 50.0,
+                    "walk_score": 99.0,
+                    "transfer_score": 30.0,
+                    "reliability_score": 60.0,
+                    "recommend_score": 50.0,
+                    "feature_contributions": {},
+                },
+            ],
+            "warnings": [],
+            "duration_ms": 0,
+            "generated_at": "2026-07-13T00:00:00+00:00",
+        }
+
+    monkeypatch.setattr(
+        RecommendationService,
+        "_predict_with_route_model",
+        staticmethod(fake_model_score),
+    )
+
+    response = client.post(
+        "/api/v1/recommend-routes",
+        json={
+            "start_station_id": 1,
+            "end_station_id": 12,
+            "preference": "balanced",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["best_experience_route_id"] == "route_002"
+    route_002 = next(item for item in data["items"] if item["route_id"] == "route_002")
+    assert route_002["experience_score"] == 91.2
+    assert "best_experience" in route_002["recommend_types"]
 
 
 def test_recommend_routes_without_transfer(client):

@@ -1,3 +1,9 @@
+/**
+ * 文件：vite.config.js
+ * 用途：配置 Vite 开发和生产构建环境。
+ * 存放内容：Vue 插件、路径别名以及本地后端代理配置。
+ * 实现功能：统一开发服务器、项目构建和接口代理行为。
+ */
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'

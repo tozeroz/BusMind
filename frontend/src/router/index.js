@@ -1,5 +1,11 @@
+/**
+ * 文件：src/router/index.js
+ * 用途：定义应用路由和导航守卫。
+ * 存放内容：路由记录、布局关系以及访问权限重定向规则。
+ * 实现功能：将 URL 连接到轻量页面入口，并执行路由级身份和权限检查。
+ */
 import { createRouter, createWebHistory } from 'vue-router'
-import MainLayout from '@/layout/MainLayout.vue'
+import MainLayout from '@/layouts/MainLayout.vue'
 import LoginView from '@/views/login/LoginView.vue'
 import RegisterView from '@/views/login/RegisterView.vue'
 import HomeView from '@/views/home/HomeView.vue'

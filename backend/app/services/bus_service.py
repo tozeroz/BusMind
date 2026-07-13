@@ -167,6 +167,18 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return radius * 2 * math.atan2(math.sqrt(value), math.sqrt(1 - value))
 
 
+def _bounding_box(latitude: float, longitude: float, radius_km: float) -> tuple[float, float, float, float]:
+    lat_delta = radius_km / 111.32
+    cos_lat = max(math.cos(math.radians(latitude)), 0.01)
+    lon_delta = radius_km / (111.32 * cos_lat)
+    return (
+        latitude - lat_delta,
+        latitude + lat_delta,
+        longitude - lon_delta,
+        longitude + lon_delta,
+    )
+
+
 def get_line_list(
     db: Session,
     page: int = 1,
@@ -544,8 +556,16 @@ def get_nearby_stations(
     longitude: float,
     radius_km: float = 1.0,
 ) -> NearbyStationResponse:
+    min_lat, max_lat, min_lon, max_lon = _bounding_box(latitude, longitude, radius_km)
     candidates: list[tuple[BusStation, float]] = []
-    for station in db.query(BusStation).all():
+    query = (
+        db.query(BusStation)
+        .filter(BusStation.latitude >= min_lat)
+        .filter(BusStation.latitude <= max_lat)
+        .filter(BusStation.longitude >= min_lon)
+        .filter(BusStation.longitude <= max_lon)
+    )
+    for station in query.all():
         distance = haversine_distance(
             latitude,
             longitude,
