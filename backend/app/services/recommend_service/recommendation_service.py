@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
+from app.cache import memory_cache_provider
+from app.cache.cache_keys import recommend_route
 from app.core.intelligence_exceptions import BusinessError
 from app.core.time_utils import ensure_local_datetime, now_local
 from app.schemas.common import RouteSegment, StationSummary
@@ -24,7 +28,9 @@ from app.services.load_service import PassengerLoadService
 from app.services.recommend_service.experience_service import TravelExperienceService
 
 
-MODEL_SCORE_LIMIT = 10
+logger = logging.getLogger(__name__)
+MODEL_SCORE_LIMIT = 6
+RECOMMENDATION_CACHE_TTL_SECONDS = 300
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,16 +60,51 @@ class RecommendationService:
     async def recommend(
         self, request: RecommendRoutesRequest
     ) -> RecommendRoutesResult:
+        trace_id = f"recommend:{now_local().timestamp():.6f}"
+        total_started = perf_counter()
         depart_time = ensure_local_datetime(request.depart_time)
+        started = perf_counter()
         start_station_id, end_station_id = await self._resolve_station_ids(request)
+        logger.info(
+            "recommend station_resolve trace_id=%s elapsed_ms=%.1f",
+            trace_id,
+            (perf_counter() - started) * 1000,
+        )
         if start_station_id == end_station_id:
             raise BusinessError(40003, "start and end station must be different", 400)
 
         max_transfer = request.max_transfer_count if request.allow_transfer else 0
+        cache_key = recommend_route(
+            start_station_id,
+            end_station_id,
+            request.preference.value,
+            depart_time,
+            request.allow_transfer,
+            max_transfer,
+        )
+        cache_key = f"{cache_key}:{id(type(self)._predict_with_route_model)}"
+        if request.max_walk_minutes is None:
+            cached = memory_cache_provider.get(cache_key)
+            if isinstance(cached, RecommendRoutesResult):
+                logger.info(
+                    "recommend cache_hit trace_id=%s elapsed_ms=%.1f",
+                    trace_id,
+                    (perf_counter() - total_started) * 1000,
+                )
+                return cached
+
+        started = perf_counter()
         candidates = await self.gateway.get_candidate_routes(
             start_station_id,
             end_station_id,
             max_transfer,
+        )
+        candidates = candidates[:MODEL_SCORE_LIMIT]
+        logger.info(
+            "recommend candidates trace_id=%s count=%s elapsed_ms=%.1f",
+            trace_id,
+            len(candidates),
+            (perf_counter() - started) * 1000,
         )
         if request.max_walk_minutes is not None:
             candidates = [
@@ -73,14 +114,28 @@ class RecommendationService:
             raise BusinessError(40400, "no route recommendation found", 404)
 
         weights = self._weights_for_preference(request.preference)
+        started = perf_counter()
         built_routes = [
             await self._build_route(item, depart_time, weights) for item in candidates
         ]
+        logger.info(
+            "recommend build_routes trace_id=%s count=%s elapsed_ms=%.1f",
+            trace_id,
+            len(built_routes),
+            (perf_counter() - started) * 1000,
+        )
+        started = perf_counter()
         built_routes, model_scores = self._apply_model_scores(
             built_routes,
             request.preference,
             start_station_id,
             end_station_id,
+        )
+        logger.info(
+            "recommend model_score trace_id=%s scored=%s elapsed_ms=%.1f",
+            trace_id,
+            len(model_scores),
+            (perf_counter() - started) * 1000,
         )
         items = [route.item for route in built_routes]
         selections = self._select_route_ids(items, model_scores)
@@ -102,7 +157,7 @@ class RecommendationService:
             model_scores,
         )
 
-        return RecommendRoutesResult(
+        result = RecommendRoutesResult(
             items=ordered_items,
             best_experience_route_id=selections["best_experience"],
             fastest_route_id=selections["fastest"],
@@ -112,6 +167,19 @@ class RecommendationService:
             preference=request.preference,
             generated_at=now_local(),
         )
+        if request.max_walk_minutes is None:
+            memory_cache_provider.set(
+                cache_key,
+                result,
+                ttl_seconds=RECOMMENDATION_CACHE_TTL_SECONDS,
+            )
+        logger.info(
+            "recommend total trace_id=%s count=%s elapsed_ms=%.1f",
+            trace_id,
+            len(result.items),
+            (perf_counter() - total_started) * 1000,
+        )
+        return result
 
     async def _resolve_station_ids(
         self, request: RecommendRoutesRequest

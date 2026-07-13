@@ -5,6 +5,8 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
+from app.cache import memory_cache_provider
+from app.cache.cache_keys import vehicle_list
 from app.models.bus_line import BusLine, BusStation
 from app.models.bus_vehicle import BusVehicle
 from app.schemas.vehicle_schema import (
@@ -14,6 +16,13 @@ from app.schemas.vehicle_schema import (
     VehicleUpdateRequest,
 )
 from app.services.id_service import next_numeric_id
+
+
+VEHICLE_LIST_CACHE_TTL_SECONDS = 10
+
+
+def _invalidate_vehicle_cache() -> None:
+    memory_cache_provider.delete_prefix("vehicles:list:")
 
 
 def _as_float(value, default: float = 0.0) -> float:
@@ -122,6 +131,11 @@ def get_vehicle_list(
     limit: int = 20,
     line_id: Optional[int] = None,
 ) -> VehicleListResponse:
+    cache_key = vehicle_list(page, limit, line_id)
+    cached = memory_cache_provider.get(cache_key)
+    if isinstance(cached, VehicleListResponse):
+        return cached
+
     query = db.query(BusVehicle)
     if line_id is not None:
         query = query.filter(BusVehicle.line_id == line_id)
@@ -133,10 +147,12 @@ def get_vehicle_list(
         .all()
     )
     line_map, station_map = _build_maps(db, vehicles)
-    return VehicleListResponse(
+    result = VehicleListResponse(
         vehicles=[_vehicle_dto(vehicle, line_map, station_map) for vehicle in vehicles],
         total=total,
     )
+    memory_cache_provider.set(cache_key, result, ttl_seconds=VEHICLE_LIST_CACHE_TTL_SECONDS)
+    return result
 
 
 def get_vehicle_by_id(db: Session, vehicle_id: int) -> Optional[BusVehicleDTO]:
@@ -204,6 +220,7 @@ def create_vehicle(db: Session, request: VehicleCreateRequest) -> BusVehicleDTO:
     db.add(vehicle)
     db.commit()
     db.refresh(vehicle)
+    _invalidate_vehicle_cache()
     line_map, station_map = _build_maps(db, [vehicle])
     return _vehicle_dto(vehicle, line_map, station_map)
 
@@ -252,6 +269,7 @@ def update_vehicle(
 
     db.commit()
     db.refresh(vehicle)
+    _invalidate_vehicle_cache()
     line_map, station_map = _build_maps(db, [vehicle])
     return _vehicle_dto(vehicle, line_map, station_map)
 
@@ -262,15 +280,9 @@ def delete_vehicle(db: Session, vehicle_id: int) -> bool:
         return False
     db.delete(vehicle)
     db.commit()
+    _invalidate_vehicle_cache()
     return True
 
 
 def get_vehicles_by_line(db: Session, line_id: int) -> List[BusVehicleDTO]:
-    vehicles = (
-        db.query(BusVehicle)
-        .filter(BusVehicle.line_id == line_id)
-        .order_by(BusVehicle.vehicle_code, BusVehicle.vehicle_id)
-        .all()
-    )
-    line_map, station_map = _build_maps(db, vehicles)
-    return [_vehicle_dto(vehicle, line_map, station_map) for vehicle in vehicles]
+    return get_vehicle_list(db, page=1, limit=100, line_id=line_id).vehicles

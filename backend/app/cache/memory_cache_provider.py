@@ -40,6 +40,12 @@ class MemoryCacheProvider:
         with self._lock:
             self._items.pop(key, None)
 
+    def delete_prefix(self, prefix: str) -> None:
+        with self._lock:
+            keys = [key for key in self._items if key.startswith(prefix)]
+            for key in keys:
+                self._items.pop(key, None)
+
     def get_or_set(
         self,
         key: str,

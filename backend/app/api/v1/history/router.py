@@ -51,7 +51,7 @@ def build_response(code: int, message: str, data=None) -> ApiResponse:
         200: {"description": "Get success"}
     }
 )
-async def get_passenger_flow(
+def get_passenger_flow(
     line_id: Optional[int] = Query(None, ge=1),
     station_id: Optional[int] = Query(None, ge=1),
     start_date: Optional[datetime] = Query(None),
@@ -81,7 +81,7 @@ async def get_passenger_flow(
         200: {"description": "Get success"}
     }
 )
-async def get_passenger_flow_prediction_api(
+def get_passenger_flow_prediction_api(
     target_type: Optional[str] = Query(None),
     target_id: Optional[str] = Query(None),
     start_time: Optional[str] = Query(None),
@@ -109,7 +109,7 @@ async def get_passenger_flow_prediction_api(
         200: {"description": "Get success"}
     }
 )
-async def get_eta_by_line(
+def get_eta_by_line(
     line_id: int,
     target_station_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db)
@@ -131,7 +131,7 @@ async def get_eta_by_line(
         404: {"description": "Not found"}
     }
 )
-async def get_eta(
+def get_eta(
     vehicle_id: int,
     target_station_id: int,
     line_id: Optional[int] = Query(None, ge=1),
@@ -159,7 +159,7 @@ async def get_eta(
         200: {"description": "Get success"}
     }
 )
-async def get_load_by_line(
+def get_load_by_line(
     line_id: int,
     station_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db)
@@ -181,7 +181,7 @@ async def get_load_by_line(
         404: {"description": "Not found"}
     }
 )
-async def get_load(
+def get_load(
     line_id: int,
     station_id: Optional[int] = Query(None, ge=1),
     vehicle_id: Optional[int] = Query(None, ge=1),
@@ -211,7 +211,7 @@ async def get_load(
         404: {"description": "Not found"}
     }
 )
-async def get_passenger_load(
+def get_passenger_load(
     line_id: Optional[int] = Query(None, ge=1),
     station_id: Optional[int] = Query(None, ge=1),
     vehicle_id: Optional[int] = Query(None, ge=1),
@@ -253,7 +253,7 @@ async def get_passenger_load(
         200: {"description": "Get success"}
     }
 )
-async def get_predictions_api(
+def get_predictions_api(
     prediction_type: Optional[str] = Query(None, pattern="^(eta|passenger_load|passenger_flow)$"),
     line_id: Optional[int] = Query(None, ge=1),
     station_id: Optional[int] = Query(None, ge=1),

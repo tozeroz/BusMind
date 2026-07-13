@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from fastapi import FastAPI
+from starlette.middleware.gzip import GZipMiddleware
 
 from app.api import router as api_router
 from app.core.config import settings
@@ -59,6 +60,7 @@ app = FastAPI(
 )
 
 register_intelligence_exception_handlers(app)
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
 app.include_router(api_router)
 
 
