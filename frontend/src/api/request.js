@@ -5,7 +5,7 @@ export const AUTH_TOKEN_KEY = 'busmind_access_token'
 
 const env = import.meta.env || {}
 
-const defaultApiBaseUrl = env.DEV ? 'http://127.0.0.1:8000/api/v1' : '/api/v1'
+const defaultApiBaseUrl = env.DEV ? 'http://127.0.0.1:8001/api/v1' : '/api/v1'
 
 const service = axios.create({
   baseURL: env.VITE_API_BASE_URL || defaultApiBaseUrl,

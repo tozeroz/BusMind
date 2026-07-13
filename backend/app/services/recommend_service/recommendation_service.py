@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
 from app.core.intelligence_exceptions import BusinessError
 from app.core.time_utils import ensure_local_datetime, now_local
 from app.schemas.common import RouteSegment, StationSummary
@@ -17,6 +22,20 @@ from app.services.eta_service import EtaService
 from app.services.intelligence_gateway import CandidateRouteData, IntelligenceDataGateway
 from app.services.load_service import PassengerLoadService
 from app.services.recommend_service.experience_service import TravelExperienceService
+
+
+MODEL_SCORE_LIMIT = 10
+
+
+@dataclass(frozen=True, slots=True)
+class BuiltRoute:
+    item: RouteRecommendation
+    model_payload: dict[str, Any]
+    line_names: list[str]
+    avg_service_frequency: float | None
+    station_flow_level: str | None
+    congestion_score: float | None
+    reliability_score: float | None
 
 
 class RecommendationService:
@@ -54,8 +73,17 @@ class RecommendationService:
             raise BusinessError(40400, "no route recommendation found", 404)
 
         weights = self._weights_for_preference(request.preference)
-        items = [await self._build_route(item, depart_time, weights) for item in candidates]
-        selections = self._select_route_ids(items)
+        built_routes = [
+            await self._build_route(item, depart_time, weights) for item in candidates
+        ]
+        built_routes, model_scores = self._apply_model_scores(
+            built_routes,
+            request.preference,
+            start_station_id,
+            end_station_id,
+        )
+        items = [route.item for route in built_routes]
+        selections = self._select_route_ids(items, model_scores)
 
         tags: dict[str, set[RecommendType]] = {item.route_id: set() for item in items}
         tags[selections["best_experience"]].add(RecommendType.BEST_EXPERIENCE)
@@ -68,7 +96,11 @@ class RecommendationService:
             item.model_copy(update={"recommend_types": sorted(tags[item.route_id], key=str)})
             for item in items
         ]
-        ordered_items = self._sort_by_preference(tagged_items, request.preference)
+        ordered_items = self._sort_by_preference(
+            tagged_items,
+            request.preference,
+            model_scores,
+        )
 
         return RecommendRoutesResult(
             items=ordered_items,
@@ -107,7 +139,7 @@ class RecommendationService:
         candidate: CandidateRouteData,
         depart_time,
         weights: ExperienceWeights | None,
-    ) -> RouteRecommendation:
+    ) -> BuiltRoute:
         boarding = await self.gateway.get_station(candidate.boarding_station_id)
         alighting = await self.gateway.get_station(candidate.alighting_station_id)
         first_line_id = candidate.line_ids[0]
@@ -161,7 +193,7 @@ class RecommendationService:
             1,
         )
 
-        return RouteRecommendation(
+        route_item = RouteRecommendation(
             route_id=candidate.route_id,
             line_ids=list(candidate.line_ids),
             segments=[
@@ -216,13 +248,260 @@ class RecommendationService:
             ),
         )
 
+        return BuiltRoute(
+            item=route_item,
+            model_payload=self._build_model_route_payload(
+                candidate=candidate,
+                item=route_item,
+                eta=eta,
+                load=load,
+                avg_service_frequency=avg_service_frequency,
+                station_flow_level=station_flow_level,
+                congestion_score=congestion_score,
+            ),
+            line_names=line_names,
+            avg_service_frequency=avg_service_frequency,
+            station_flow_level=station_flow_level,
+            congestion_score=congestion_score,
+            reliability_score=reliability_score,
+        )
+
+    def _apply_model_scores(
+        self,
+        built_routes: list[BuiltRoute],
+        preference: Preference,
+        start_station_id: int,
+        end_station_id: int,
+    ) -> tuple[list[BuiltRoute], dict[str, dict[str, float]]]:
+        """调用推荐模型给候选路线打分；失败时保留旧规则分数作为兜底。"""
+
+        scoreable_routes = built_routes[:MODEL_SCORE_LIMIT]
+        if not scoreable_routes:
+            return built_routes, {}
+
+        payload = {
+            "contract_version": "1.0.0",
+            "request_id": f"recommend:{start_station_id}:{end_station_id}:{now_local().isoformat()}",
+            "preference": self._model_preference(preference),
+            "routes": [route.model_payload for route in scoreable_routes],
+        }
+        try:
+            model_result = self._predict_with_route_model(payload)
+        except Exception:
+            return built_routes, {}
+
+        model_scores: dict[str, dict[str, float]] = {}
+        for raw_score in model_result.get("results", []):
+            route_id = str(raw_score.get("route_id") or "")
+            if not route_id:
+                continue
+            model_scores[route_id] = {
+                "time_score": float(raw_score.get("time_score", 0.0)),
+                "comfort_score": float(raw_score.get("comfort_score", 0.0)),
+                "walk_score": float(raw_score.get("walk_score", 0.0)),
+                "transfer_score": float(raw_score.get("transfer_score", 0.0)),
+                "reliability_score": float(raw_score.get("reliability_score", 0.0)),
+                "recommend_score": float(raw_score.get("recommend_score", 0.0)),
+            }
+
+        if not model_scores:
+            return built_routes, {}
+
+        updated_routes: list[BuiltRoute] = []
+        for route in built_routes:
+            score = model_scores.get(route.item.route_id)
+            if not score:
+                updated_routes.append(route)
+                continue
+            recommend_score = round(score["recommend_score"], 1)
+            item = route.item.model_copy(
+                update={
+                    "experience_score": recommend_score,
+                    "reason": self._build_route_reason(
+                        line_names=route.line_names,
+                        eta_minutes=route.item.predicted_eta_minutes,
+                        load_level=route.item.predicted_load.predicted_load_level.value,
+                        walk_time_minutes=route.item.walk_time_minutes,
+                        transfer_count=route.item.transfer_count,
+                        experience_score=recommend_score,
+                        avg_service_frequency=route.avg_service_frequency,
+                        station_flow_level=route.station_flow_level,
+                        congestion_score=route.congestion_score,
+                        reliability_score=route.reliability_score,
+                    ),
+                }
+            )
+            updated_routes.append(
+                BuiltRoute(
+                    item=item,
+                    model_payload=route.model_payload,
+                    line_names=route.line_names,
+                    avg_service_frequency=route.avg_service_frequency,
+                    station_flow_level=route.station_flow_level,
+                    congestion_score=route.congestion_score,
+                    reliability_score=route.reliability_score,
+                )
+            )
+
+        return updated_routes, model_scores
+
     @staticmethod
-    def _select_route_ids(items: list[RouteRecommendation]) -> dict[str, str]:
-        best = max(items, key=lambda item: (item.experience_score, -item.total_time_minutes))
-        fastest = min(items, key=lambda item: (item.total_time_minutes, -item.experience_score))
-        least_crowded = max(items, key=lambda item: (item.predicted_load.load_score, -item.total_time_minutes))
-        least_walking = min(items, key=lambda item: (item.walk_time_minutes, -item.experience_score))
-        least_transfer = min(items, key=lambda item: (item.transfer_count, -item.experience_score))
+    def _predict_with_route_model(payload: dict[str, Any]) -> dict[str, Any]:
+        """从项目根目录加载推荐模型，兼容 backend 目录下启动 Uvicorn 的场景。"""
+
+        project_root = Path(__file__).resolve().parents[4]
+        project_root_text = str(project_root)
+        if project_root_text not in sys.path:
+            sys.path.insert(0, project_root_text)
+
+        from algorithm.model.predictor import predict_recommendation
+
+        return predict_recommendation(payload)
+
+    @staticmethod
+    def _build_model_route_payload(
+        *,
+        candidate: CandidateRouteData,
+        item: RouteRecommendation,
+        eta,
+        load,
+        avg_service_frequency: float | None,
+        station_flow_level: str | None,
+        congestion_score: float | None,
+    ) -> dict[str, Any]:
+        degraded_fields: list[str] = ["walk_distance_meters"]
+        if avg_service_frequency is None:
+            degraded_fields.append("avg_service_frequency_minutes")
+        if station_flow_level is None:
+            degraded_fields.append("station_flow_level")
+        if congestion_score is None:
+            degraded_fields.append("route_speed_band")
+        if "rule" in str(eta.model_version).lower():
+            degraded_fields.append("eta_minutes")
+        if "rule" in str(load.model_version).lower():
+            degraded_fields.append("load_code")
+
+        load_source = RecommendationService._source_from_version(str(load.model_version))
+        eta_source = RecommendationService._source_from_version(str(eta.model_version))
+        congestion_source = "cache" if congestion_score is not None else "default"
+
+        return {
+            "route_id": item.route_id,
+            "service_nos": [str(line_id) for line_id in item.line_ids],
+            "eta_minutes": item.predicted_eta_minutes,
+            "ride_time_minutes": item.ride_time_minutes,
+            "walk_time_minutes": item.walk_time_minutes,
+            # 后端暂未给步行距离，模型侧 v1 先按 1.2m/s 由步行时间估算，并标记降级字段。
+            "walk_distance_meters": round(item.walk_time_minutes * 60.0 * 1.2, 1),
+            "transfer_count": item.transfer_count,
+            "avg_service_frequency_minutes": avg_service_frequency or 12.0,
+            "load_code": RecommendationService._load_code_from_level(
+                item.predicted_load.predicted_load_level.value
+            ),
+            "station_flow_level": station_flow_level or "medium",
+            "route_speed_band": RecommendationService._speed_band_from_congestion(
+                congestion_score
+            ),
+            "source_updated_at": now_local().isoformat(),
+            "monitored": 1 if eta_source in {"lta_realtime", "cache", "database"} else 0,
+            "degraded_fields": degraded_fields,
+            "feature_sources": {
+                "eta_minutes": eta_source,
+                "ride_time_minutes": "database",
+                "walk_time_minutes": "database",
+                "walk_distance_meters": "rule_estimate",
+                "transfer_count": "database",
+                "avg_service_frequency_minutes": "database"
+                if avg_service_frequency is not None
+                else "default",
+                "load_code": load_source,
+                "station_flow_level": "historical"
+                if station_flow_level is not None
+                else "default",
+                "route_speed_band": congestion_source,
+                "source_updated_at": "cache",
+                "monitored": eta_source,
+                "degraded_fields": "rule_estimate",
+            },
+        }
+
+    @staticmethod
+    def _model_preference(preference: Preference) -> str:
+        if preference == Preference.LOW_LOAD:
+            return "comfort"
+        return preference.value
+
+    @staticmethod
+    def _load_code_from_level(load_level: str) -> str:
+        mapping = {
+            "seats_available": "SEA",
+            "standing_available": "SDA",
+            "limited_standing": "LSD",
+            "overcrowded": "LSD",
+        }
+        return mapping.get(str(load_level).lower(), "UNKNOWN")
+
+    @staticmethod
+    def _speed_band_from_congestion(congestion_score: float | None) -> int:
+        if congestion_score is None:
+            return 5
+        value = max(0.0, float(congestion_score))
+        pressure = min(value, 1.0) if value <= 1.0 else min(value / 100.0, 1.0)
+        smoothness_score = 100.0 - pressure * 70.0
+        return max(1, min(8, int(round((smoothness_score - 30.0) / 10.0 + 1.0))))
+
+    @staticmethod
+    def _source_from_version(model_version: str) -> str:
+        text = model_version.lower()
+        if "mysql_realtime" in text or "lta" in text:
+            return "lta_realtime"
+        if "cache" in text:
+            return "cache"
+        if "rule" in text:
+            return "rule_estimate"
+        return "model"
+
+    @staticmethod
+    def _select_route_ids(
+        items: list[RouteRecommendation],
+        model_scores: dict[str, dict[str, float]] | None = None,
+    ) -> dict[str, str]:
+        model_scores = model_scores or {}
+        best = max(
+            items,
+            key=lambda item: (
+                model_scores.get(item.route_id, {}).get("recommend_score", item.experience_score),
+                -item.total_time_minutes,
+            ),
+        )
+        fastest = max(
+            items,
+            key=lambda item: (
+                model_scores.get(item.route_id, {}).get("time_score", -item.total_time_minutes),
+                -item.total_time_minutes,
+            ),
+        )
+        least_crowded = max(
+            items,
+            key=lambda item: (
+                model_scores.get(item.route_id, {}).get("comfort_score", item.predicted_load.load_score),
+                -item.total_time_minutes,
+            ),
+        )
+        least_walking = max(
+            items,
+            key=lambda item: (
+                model_scores.get(item.route_id, {}).get("walk_score", -item.walk_time_minutes),
+                -item.walk_time_minutes,
+            ),
+        )
+        least_transfer = max(
+            items,
+            key=lambda item: (
+                model_scores.get(item.route_id, {}).get("transfer_score", -item.transfer_count),
+                -item.transfer_count,
+            ),
+        )
         return {
             "best_experience": best.route_id,
             "fastest": fastest.route_id,
@@ -374,14 +653,53 @@ class RecommendationService:
 
     @staticmethod
     def _sort_by_preference(
-        items: list[RouteRecommendation], preference: Preference
+        items: list[RouteRecommendation],
+        preference: Preference,
+        model_scores: dict[str, dict[str, float]] | None = None,
     ) -> list[RouteRecommendation]:
+        model_scores = model_scores or {}
         if preference == Preference.FASTEST:
-            return sorted(items, key=lambda item: (item.total_time_minutes, -item.experience_score))
+            return sorted(
+                items,
+                key=lambda item: (
+                    -model_scores.get(item.route_id, {}).get("time_score", -item.total_time_minutes),
+                    item.total_time_minutes,
+                ),
+            )
         if preference in (Preference.COMFORT, Preference.LOW_LOAD):
-            return sorted(items, key=lambda item: (-item.predicted_load.load_score, item.total_time_minutes))
+            return sorted(
+                items,
+                key=lambda item: (
+                    -model_scores.get(item.route_id, {}).get(
+                        "comfort_score",
+                        item.predicted_load.load_score,
+                    ),
+                    item.total_time_minutes,
+                ),
+            )
         if preference == Preference.LESS_WALKING:
-            return sorted(items, key=lambda item: (item.walk_time_minutes, -item.experience_score))
+            return sorted(
+                items,
+                key=lambda item: (
+                    -model_scores.get(item.route_id, {}).get("walk_score", -item.walk_time_minutes),
+                    item.walk_time_minutes,
+                ),
+            )
         if preference == Preference.LESS_TRANSFER:
-            return sorted(items, key=lambda item: (item.transfer_count, -item.experience_score))
-        return sorted(items, key=lambda item: (-item.experience_score, item.total_time_minutes))
+            return sorted(
+                items,
+                key=lambda item: (
+                    -model_scores.get(item.route_id, {}).get(
+                        "transfer_score",
+                        -item.transfer_count,
+                    ),
+                    item.transfer_count,
+                ),
+            )
+        return sorted(
+            items,
+            key=lambda item: (
+                -model_scores.get(item.route_id, {}).get("recommend_score", item.experience_score),
+                item.total_time_minutes,
+            ),
+        )

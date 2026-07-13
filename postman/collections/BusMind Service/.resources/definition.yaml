@@ -1,5 +1,0 @@
-$kind: collection
-description: BusMind backend full API collection, including Service A and Service B endpoints.
-variables:
-  base_url: http://127.0.0.1:8000/api/v1
-  server_url: http://127.0.0.1:8000

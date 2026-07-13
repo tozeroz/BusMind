@@ -1,7 +1,13 @@
 <template>
   <section class="home-map-layout fullscreen-map-layout">
     <section class="home-map-panel real-map-panel fullscreen-map-panel">
-      <BusMap ref="busMapRef" @select-stop="selectMapStop" @select-route="selectMapRoute" @load-error="notice = $event" />
+      <BusMap
+        ref="busMapRef"
+        @select-stop="selectMapStop"
+        @select-route="selectMapRoute"
+        @load-error="notice = $event"
+        @initial-data-loaded="refreshArrivals"
+      />
 
       <button
         class="map-current-locate-button"
@@ -10,6 +16,15 @@
         @click="focusMapToCurrentLocation"
       >
         ▲
+      </button>
+
+      <button
+        class="map-reload-button"
+        type="button"
+        title="重新加载地图数据"
+        @click="reloadMapData"
+      >
+        ⟳
       </button>
 
       <Transition name="dock-pop" mode="out-in">
@@ -55,7 +70,9 @@
               <label class="search-box-row">
                 <span>目标地点</span>
                 <input v-model="query.end" placeholder="搜索地点、公交站、线路" />
-                <button class="search-submit-chip" type="submit">检索</button>
+                <button class="search-submit-chip" type="submit" :disabled="isSearching">
+                  {{ isSearching ? '检索中…' : '检索' }}
+                </button>
               </label>
               <p v-if="notice" class="form-tip">{{ notice }}</p>
             </form>
@@ -90,21 +107,43 @@
 
           <template v-else-if="panelMode === 'station'">
             <button class="ghost-button back-side-button" type="button" @click="resetPanel">返回检索</button>
-            <div class="info-list">
-              <p><span>经过线路</span><strong>{{ selectedInfo.routes }}</strong></p>
-              <p><span>下一班车</span><strong>{{ selectedInfo.eta }}</strong></p>
-              <p><span>当前客流</span><strong>{{ selectedInfo.crowd }}</strong></p>
-              <p><span>站点热度</span><strong>{{ selectedInfo.status }}</strong></p>
+            <div class="info-list info-list-station">
+              <header class="info-list-header">
+                <div class="info-list-header-line">
+                  <strong class="info-list-line-code">{{ selectedInfo.id || '路线' }}</strong>
+                </div>
+                <div class="info-list-header-route">
+                  <span class="info-list-route-label">目的地</span>
+                  <span class="info-list-route-divider" aria-hidden="true"></span>
+                  <span class="info-list-route-value">{{ selectedInfo.routes || '暂无线路关联' }}</span>
+                </div>
+              </header>
+              <div class="info-list-rows">
+                <p><span>始发站 · 末班车</span><strong>{{ selectedInfo.eta || '暂无末班信息' }}</strong></p>
+                <p><span>客流状态</span><strong>{{ selectedInfo.crowd || '暂无客流' }}</strong></p>
+                <p><span>发车间隔</span><strong>{{ selectedInfo.status || '数据接入中' }}</strong></p>
+              </div>
             </div>
           </template>
 
           <template v-else>
             <button class="ghost-button back-side-button" type="button" @click="resetPanel">返回检索</button>
-            <div class="info-list">
-              <p><span>路线编号</span><strong>{{ selectedInfo.id }}</strong></p>
-              <p><span>当前客流</span><strong>{{ selectedInfo.crowd }}</strong></p>
-              <p><span>预计到达</span><strong>{{ selectedInfo.eta }}</strong></p>
-              <p><span>运行状态</span><strong>{{ selectedInfo.status }}</strong></p>
+            <div class="info-list info-list-road">
+              <header class="info-list-header">
+                <div class="info-list-header-line">
+                  <strong class="info-list-line-code">{{ selectedInfo.id || '路线' }}</strong>
+                </div>
+                <div class="info-list-header-route">
+                  <span class="info-list-route-label">目的地</span>
+                  <span class="info-list-route-divider" aria-hidden="true"></span>
+                  <span class="info-list-route-value">{{ selectedInfo.name || '暂无目的地' }}</span>
+                </div>
+              </header>
+              <div class="info-list-rows">
+                <p><span>始发站 · 末班车</span><strong>{{ selectedInfo.eta || '暂无末班信息' }}</strong></p>
+                <p><span>客流状态</span><strong>{{ selectedInfo.crowd || '暂无客流' }}</strong></p>
+                <p><span>发车间隔</span><strong>{{ selectedInfo.status || '数据接入中' }}</strong></p>
+              </div>
             </div>
           </template>
 
@@ -204,15 +243,22 @@ import { computed, reactive, ref } from 'vue'
 import BusMap from '@/components/map/BusMap.vue'
 import { askAiTravel } from '@/api/ai'
 import { getNearbyLocations, searchLocations } from '@/api/location'
-import { getEta, recommendRoutes } from '@/api/intelligence'
+import { getEta } from '@/api/intelligence'
+import { getRouteRecommendations, RECOMMENDATION_PREFERENCES } from '@/api/recommendation'
 import { getPassengerFlowTrend } from '@/api/history'
 import { getRealtimeVehicles } from '@/api/vehicle'
 import { getApiErrorMessage, unwrapList } from '@/api/response'
+import { triggerArrivalRefresh } from '@/api/user'
+
+const refreshArrivals = () => {
+  triggerArrivalRefresh().catch(() => {})
+}
 
 const busMapRef = ref(null)
 const query = reactive({ start: '乌节站', end: '滨海湾' })
 const notice = ref('')
 const recommendation = ref(null)
+const isSearching = ref(false)
 const panelMode = ref('search')
 const isInfoPanelOpen = ref(false)
 const isAiChatOpen = ref(false)
@@ -418,6 +464,7 @@ const searchStation = async (keyword) => {
 }
 
 const searchRoutes = async () => {
+  if (isSearching.value) return
   busMapRef.value?.clearSelection()
   recommendation.value = null
   routeOptions.value = []
@@ -430,6 +477,7 @@ const searchRoutes = async () => {
   }
 
   notice.value = '正在搜索站点并生成推荐路线...'
+  isSearching.value = true
   try {
     const [startStation, endStation] = await Promise.all([
       searchStation(query.start),
@@ -444,18 +492,19 @@ const searchRoutes = async () => {
       return
     }
 
-    const response = await recommendRoutes({
-      start_station_id: startStation.station_id,
-      end_station_id: endStation.station_id,
-      preference: 'balanced',
-      allow_transfer: true,
-      max_transfer_count: 1
+    const result = await getRouteRecommendations({
+      startStationId: startStation.station_id,
+      endStationId: endStation.station_id,
+      preference: RECOMMENDATION_PREFERENCES.BALANCED,
+      allowTransfer: true,
+      maxTransferCount: 2
     })
-    rawRouteOptions.value = response.data?.items || []
+    rawRouteOptions.value = result.items
     routeOptions.value = rawRouteOptions.value.map(normalizeRecommendation)
     resolvedJourney.startStationId = Number(startStation.station_id)
     resolvedJourney.endStationId = Number(endStation.station_id)
-    const matchedRoute = findRouteForDestination()
+    const bestRoute = result.optimal.bestExperience || rawRouteOptions.value[0]
+    const matchedRoute = bestRoute ? normalizeRecommendation(bestRoute) : null
     if (!matchedRoute) {
       notice.value = '后端没有返回可用路线'
       return
@@ -467,6 +516,8 @@ const searchRoutes = async () => {
     notice.value = `已找到 ${routeOptions.value.length} 条候选路线`
   } catch (error) {
     notice.value = getApiErrorMessage(error, '路线检索失败，请检查后端服务和站点数据')
+  } finally {
+    isSearching.value = false
   }
 }
 
@@ -507,6 +558,16 @@ const focusMapToCurrentLocation = () => {
   }
 
   notice.value = `地图已定位到：${focusedStop.stop_name}`
+}
+
+const reloadMapData = async () => {
+  notice.value = '正在重新加载地图数据...'
+  try {
+    await busMapRef.value?.reloadMapData()
+    notice.value = '地图数据已重新加载'
+  } catch (error) {
+    notice.value = getApiErrorMessage(error, '地图数据重新加载失败')
+  }
 }
 
 const resetPanel = () => {

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 from typing import Any
 
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.models.bus_line import BusLine, BusStation, LineStation
@@ -23,8 +25,42 @@ from app.schemas.map_schema import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def _as_float(value, default: float = 0.0) -> float:
     return float(value) if value is not None else default
+
+
+def _is_schema_missing_error(exc: Exception) -> bool:
+    """Return True when the failure is a missing table/column, not a runtime bug.
+
+    Catching the schema error here lets the map endpoints return empty data
+    instead of 500 when the local database has not been migrated yet.
+    """
+
+    msg = str(exc).lower()
+    return (
+        "no such table" in msg
+        or "no such column" in msg
+        or "doesn't exist" in msg
+        or "table" in msg and "doesn't exist" in msg
+    )
+
+
+def _safe_query(db: Session, label: str, producer):
+    """Run a read query and return ``[]`` if the schema is incomplete.
+
+    Any other exception is re-raised so genuine bugs still surface as 500.
+    """
+
+    try:
+        return producer()
+    except (OperationalError, ProgrammingError) as exc:
+        if _is_schema_missing_error(exc):
+            logger.warning("map_service.%s: schema incomplete, returning empty (%s)", label, exc)
+            return []
+        raise
 
 
 def _normalize_path(value: Any) -> list[list[float]]:
@@ -84,13 +120,14 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 
 
 def get_map_stations(db: Session) -> MapStationResponse:
-    stations = db.query(BusStation).all()
-    line_stations = (
-        db.query(LineStation)
-        .order_by(LineStation.line_id, LineStation.order_index)
-        .all()
+    stations = _safe_query(db, "stations", lambda: db.query(BusStation).all())
+    line_stations = _safe_query(
+        db,
+        "line_stations",
+        lambda: db.query(LineStation).order_by(LineStation.line_id, LineStation.order_index).all(),
     )
-    line_map = _line_map_by_ids(db, [int(item.line_id) for item in line_stations])
+    line_ids = [int(item.line_id) for item in line_stations]
+    line_map = _safe_query(db, "lines_for_stations", lambda: _line_map_by_ids(db, line_ids))
     by_station: dict[int, list[LineStation]] = {}
     for item in line_stations:
         by_station.setdefault(int(item.station_id), []).append(item)
@@ -163,13 +200,16 @@ def _road_segment_dto(segment: MapRoadSegment) -> RoadSegmentDTO:
 
 
 def _synthesized_road_segments(db: Session) -> list[RoadSegmentDTO]:
-    lines = db.query(BusLine).all()
-    relations = (
-        db.query(LineStation)
-        .order_by(LineStation.line_id, LineStation.order_index)
-        .all()
+    lines = _safe_query(db, "synth_lines", lambda: db.query(BusLine).all())
+    relations = _safe_query(
+        db,
+        "synth_line_stations",
+        lambda: db.query(LineStation).order_by(LineStation.line_id, LineStation.order_index).all(),
     )
-    station_map = _station_map_by_ids(db, [int(item.station_id) for item in relations])
+    if not lines or not relations:
+        return []
+    station_ids = [int(item.station_id) for item in relations]
+    station_map = _safe_query(db, "synth_stations", lambda: _station_map_by_ids(db, station_ids))
     by_line: dict[int, list[LineStation]] = {}
     for item in relations:
         by_line.setdefault(int(item.line_id), []).append(item)
@@ -216,19 +256,31 @@ def _synthesized_road_segments(db: Session) -> list[RoadSegmentDTO]:
 
 
 def get_road_segments(db: Session) -> RoadSegmentResponse:
-    rows = db.query(MapRoadSegment).order_by(MapRoadSegment.line_id, MapRoadSegment.stop_sequence).all()
-    segments = [_road_segment_dto(row) for row in rows] if rows else _synthesized_road_segments(db)
+    rows = _safe_query(
+        db,
+        "road_segments",
+        lambda: db.query(MapRoadSegment).order_by(MapRoadSegment.line_id, MapRoadSegment.stop_sequence).all(),
+    )
+    if rows:
+        segments = [_road_segment_dto(row) for row in rows]
+    else:
+        segments = _synthesized_road_segments(db)
     return RoadSegmentResponse(segments=segments, total=len(segments))
 
 
 def get_map_lines(db: Session) -> MapLineResponse:
-    lines = db.query(BusLine).order_by(BusLine.line_code, BusLine.raw_direction).all()
-    relations = (
-        db.query(LineStation)
-        .order_by(LineStation.line_id, LineStation.order_index)
-        .all()
+    lines = _safe_query(
+        db,
+        "lines",
+        lambda: db.query(BusLine).order_by(BusLine.line_code, BusLine.raw_direction).all(),
     )
-    station_map = _station_map_by_ids(db, [int(item.station_id) for item in relations])
+    relations = _safe_query(
+        db,
+        "line_stations_for_lines",
+        lambda: db.query(LineStation).order_by(LineStation.line_id, LineStation.order_index).all(),
+    )
+    station_ids = [int(item.station_id) for item in relations]
+    station_map = _safe_query(db, "stations_for_lines", lambda: _station_map_by_ids(db, station_ids))
     by_line: dict[int, list[LineStation]] = {}
     for item in relations:
         by_line.setdefault(int(item.line_id), []).append(item)
@@ -261,14 +313,23 @@ def get_map_lines(db: Session) -> MapLineResponse:
 
 
 def get_map_stations_by_line(db: Session, line_id: int) -> MapStationResponse:
-    relations = (
-        db.query(LineStation)
+    relations = _safe_query(
+        db,
+        "stations_by_line_relations",
+        lambda: db.query(LineStation)
         .filter(LineStation.line_id == line_id)
         .order_by(LineStation.order_index)
-        .all()
+        .all(),
     )
-    station_map = _station_map_by_ids(db, [int(item.station_id) for item in relations])
-    line = db.query(BusLine).filter(BusLine.line_id == line_id).first()
+    if not relations:
+        return MapStationResponse(stations=[], total=0)
+    station_ids = [int(item.station_id) for item in relations]
+    station_map = _safe_query(db, "stations_by_line_stations", lambda: _station_map_by_ids(db, station_ids))
+    line = _safe_query(
+        db,
+        "stations_by_line_line",
+        lambda: db.query(BusLine).filter(BusLine.line_id == line_id).first(),
+    )
     items = []
     for relation in relations:
         station = station_map.get(int(relation.station_id))

@@ -1,197 +1,212 @@
 # BusMind 智行公交系统
 
-BusMind 是一个面向公交出行场景的智能推荐系统。项目围绕公交线路、站点、车辆实时状态、ETA 到站时间、车辆客载状态和出行体验评分，提供路线推荐、地图展示、历史趋势查询和 AI 出行助手等功能。
+BusMind 是一个面向公交出行体验的推荐系统。项目围绕新加坡 LTA DataMall 数据，完成公交站点、线路、实时到站、客载状态、道路速度热力图、历史客流和推荐评分等能力。
 
-当前项目使用新加坡 LTA DataMall 数据作为主要数据来源，已经包含原始数据采集、CSV 清洗、MySQL 导入、后端实时采集缓存、ETA/客载/推荐接口和前端页面展示。
-
-## 技术栈
-
-| 模块 | 技术 |
-|---|---|
-| 前端 | Vue 3、Vite、Axios、MapLibre |
-| 后端 | FastAPI、SQLAlchemy、Pydantic |
-| 数据库 | MySQL，开发时也可使用 SQLite |
-| 数据处理 | Python、Pandas |
-| 实时数据 | LTA DataMall Bus Arrival、Traffic Speed Bands |
-
-## 目录结构
+当前核心链路是：
 
 ```text
-frontend/      前端 Vue 项目
-backend/       后端 FastAPI 服务
-database/      MySQL 建表和导入脚本
-data/          LTA 原始数据、清洗后 CSV 和采集脚本
-algorithm/     ETA、客载和推荐相关算法
-docs/          接口文档、数据库文档和项目文档
-postman/       接口测试集合
+前端 5173 -> 后端 8001 -> SSH 隧道 3307 -> 远程 MySQL 3306
 ```
 
-目录唯一性约定：前端只维护根目录 `frontend/`，项目文档只维护根目录 `docs/`。不要在 `backend/` 下复制前端或文档镜像，否则会造成重复修改和合并冲突。
+后端负责生成候选路线并补齐业务字段，推荐模型负责对候选路线评分，前端负责展示推荐结果。
+
+## 目录职责
+
+```text
+frontend/      Vue 3 前端项目
+backend/       FastAPI 后端服务
+algorithm/     推荐模型、离线特征数据集和训练脚本
+data/          LTA 原始数据、采集脚本和 processed CSV 处理脚本
+database/      MySQL 初始化 SQL 和 CSV 导入脚本
+docs/          当前项目文档；旧 API 文档归档在 docs/api/deprecate
+postman/       当前保留的完整接口测试集合
+tools/         本地开发、校验和辅助脚本
+```
 
 ## 环境准备
 
 需要提前安装：
 
-- Python 3.12 左右
-- Node.js 18+ 或 20+
-- MySQL 8.x，若只看基础页面和部分接口，可先用默认 SQLite
+```text
+Python 3.11 或 3.12
+uv
+Node.js 18+
+npm
+OpenSSH Client
+```
 
-后端 `.env` 放在 `backend/` 目录（与启动命令的工作目录一致）：
+首次拉取项目后，在项目根目录执行：
+
+```powershell
+cd D:\SummerTraining\BusMind
+uv sync
+```
+
+之后所有 Python 命令统一使用：
+
+```powershell
+uv run python ...
+```
+
+`backend/requirements.txt` 仅保留作历史兼容说明，新的 Python 依赖以根目录 `pyproject.toml` 为准。
+
+## 环境变量
+
+真实 `.env` 不提交到 Git。请按模板创建：
+
+```powershell
+Copy-Item .env.example .env
+Copy-Item backend\.env.example backend\.env
+```
+
+根目录 `.env` 主要给模型、数据脚本和全局工具使用。`backend/.env` 给 FastAPI 后端使用。两者可以配置相同的数据库和 LTA / DeepSeek 信息。
+
+必须配置的变量：
 
 ```env
-DATABASE_URL=mysql+pymysql://busmind_dev:密码@127.0.0.1:3307/busmind?charset=utf8mb4
+DATABASE_URL=mysql+pymysql://用户名:密码@127.0.0.1:3307/busmind?charset=utf8mb4
 LTA_ACCOUNT_KEY=你的_LTA_DataMall_AccountKey
+DEEPSEEK_API_KEY=你的_DeepSeek_Key
+DEEPSEEK_MODEL=deepseek-chat
 ```
 
-`.env` 已被 `.gitignore` 忽略，不要把真实密钥提交到仓库。
+后端邮件验证码还需要：
 
-## 启动后端
+```env
+QQ_MAIL_HOST=smtp.qq.com
+QQ_MAIL_PORT=465
+QQ_MAIL_USERNAME=你的_QQ_邮箱
+QQ_MAIL_AUTH_CODE=你的_SMTP_授权码
+QQ_MAIL_FROM_NAME=BusMind
+EMAIL_CODE_EXPIRE_MINUTES=5
+EMAIL_CODE_RESEND_SECONDS=60
+```
+
+## 启动开发环境
+
+按顺序打开 3 个 PowerShell 窗口。
+
+也可以直接使用统一启动脚本，它会先执行 `uv sync`，再按顺序打开数据库隧道、后端、前端三个窗口：
 
 ```powershell
-cd path\to\BusMind\backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python start.py
+cd D:\SummerTraining\BusMind
+.\tools\dev\start-all-dev.ps1
 ```
 
-也可以直接使用 Uvicorn；项目入口会自动加载根目录下的 `algorithm` 和 `llm` 模块，无需手动设置 `PYTHONPATH`：
+### 1. 打开数据库 SSH 隧道
 
 ```powershell
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+ssh -N -L 3307:127.0.0.1:3306 training-server-backend
 ```
 
-后端默认启动在：
+这个窗口保持开启，没有输出是正常的。
+
+如果接口报数据库连接错误，先检查隧道：
+
+```powershell
+Test-NetConnection 127.0.0.1 -Port 3307
+```
+
+看到 `TcpTestSucceeded : True` 才表示隧道正常。
+
+### 2. 启动后端
+
+```powershell
+cd D:\SummerTraining\BusMind\backend
+uv run python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+```
+
+后端文档：
 
 ```text
-http://127.0.0.1:8000
+http://127.0.0.1:8001/docs
 ```
 
-接口文档：
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-## 启动前端
+### 3. 启动前端
 
 ```powershell
-cd path\to\BusMind\frontend
+cd D:\SummerTraining\BusMind\frontend
 npm install
 npm run dev
 ```
 
-前端默认启动在：
+打开：
 
 ```text
 http://127.0.0.1:5173
 ```
 
-前端开发环境默认请求：
+## 常用命令
 
-```text
-/api/v1
-```
-
-如需修改后端地址，可调整 `frontend/.env.development` 或 Vite 代理配置。
-
-## 初始化数据库和导入数据
-
-先在 MySQL 中创建数据库和用户，然后执行建表 SQL：
+检查 Python 环境：
 
 ```powershell
-mysql -u busmind_dev -p busmind < .\database\schema\init_busmind.sql
+uv run python --version
 ```
 
-如果需要重新生成 processed CSV：
+运行后端测试：
 
 ```powershell
-python .\data\processed\process_scripts\build_lta_processed_data.py
+cd D:\SummerTraining\BusMind
+uv run pytest backend\tests
 ```
 
-导入清洗后的 CSV：
+运行前端接口契约测试：
 
 ```powershell
-python .\database\import\import_processed_to_mysql.py --processed-dir .\data\processed --dry-run
-python .\database\import\import_processed_to_mysql.py --processed-dir .\data\processed
+cd D:\SummerTraining\BusMind\frontend
+npm run test:api-contract
 ```
 
-## LTA 实时采集接口
+运行推荐模型预测 smoke test：
 
-后端提供了第一阶段的手动刷新入口：
+```powershell
+cd D:\SummerTraining\BusMind
+uv run python algorithm\model\predictor.py --features algorithm\dataset\recommendation\v1\features.csv --preference balanced --top-routes 1
+```
+
+校验 processed 数据：
+
+```powershell
+cd D:\SummerTraining\BusMind
+uv run python tools\validate_processed_data.py --processed-dir data\processed
+```
+
+MySQL 导入 dry-run：
+
+```powershell
+cd D:\SummerTraining\BusMind
+uv run python database\import\import_processed_to_mysql.py --processed-dir data\processed --dry-run
+```
+
+## 文档入口
+
+当前 API 文档入口：
 
 ```text
-POST /api/v1/admin/lta/bus-arrival/refresh
-POST /api/v1/admin/lta/traffic-speed-bands/refresh
-```
-
-示例：
-
-```json
-{
-  "bus_stop_code": "83139",
-  "service_no": "15",
-  "sync_to_db": true
-}
-```
-
-```json
-{
-  "sync_to_db": true
-}
-```
-
-## 常用接口
-
-| 功能 | 接口 |
-|---|---|
-| 线路查询 | `GET /api/v1/lines` |
-| 站点查询 | `GET /api/v1/stations` |
-| 实时车辆 | `GET /api/v1/vehicles/realtime` |
-| ETA 计算 | `GET /api/v1/eta` |
-| 客载预测 | `POST /api/v1/passenger-load-prediction` |
-| 路线推荐 | `POST /api/v1/recommend-routes` |
-| AI 出行助手 | `POST /api/v1/ai/travel` |
-
-完整接口说明见：
-
-```text
+docs/api/README.md
 docs/api/BusMind项目接口文档.md
+docs/api/后端与推荐模型数据契约.md
 ```
 
-## 运行测试
-
-后端目标测试：
-
-```powershell
-cd path\to\BusMind\backend
-python -m pytest tests\test_lta_refresh_service.py tests\test_admin_lta_refresh_api.py
-python -m pytest tests\test_database_schema_alignment.py
-```
-
-注意：部分集成测试依赖本地 MySQL 已启动并且数据表已初始化。
-
-## 项目状态
-
-当前已完成第一阶段核心链路：
+历史接口草稿、联调记录和旧版交付文档统一归档在：
 
 ```text
-LTA DataMall
-  -> raw 数据采集
-  -> processed CSV 清洗
-  -> MySQL 导入
-  -> FastAPI 查询和推荐接口
-  -> 前端页面展示
+docs/api/deprecate/
 ```
 
-实时链路也已有基础实现：
+## 开发脚本归档
+
+后端根目录只保留正式应用目录、测试目录、环境模板和兼容启动入口。历史排查、修复和手工测试脚本已归档到：
 
 ```text
-LTA Bus Arrival / Traffic Speed Bands
-  -> MemoryCacheProvider
-  -> CacheSyncService
-  -> MySQL
-  -> ETA / Load / Recommend 服务读取
+backend/scripts/legacy/
 ```
 
-后续主要工作是继续完善真实 MySQL 联调、推荐算法中的路况拥堵分使用，以及生产环境鉴权和部署。
+## 注意事项
+
+不要提交真实 `.env`、数据库密码、LTA AccountKey、DeepSeek Key、QQ 邮箱授权码。
+
+不要把真实 raw / processed 大数据文件随意提交，仓库主要保留采集脚本、处理脚本和必要的小规模模型样例数据。
+
+推荐模型不负责生成候选路线。完整推荐链路是：后端寻路生成候选路线，后端补字段，模型预处理并评分，后端排序分组，前端展示。

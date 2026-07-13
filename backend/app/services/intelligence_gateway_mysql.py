@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
 from math import asin, cos, radians, sin, sqrt
 from typing import Any
@@ -17,7 +18,6 @@ from app.services.intelligence_gateway import (
     DemoIntelligenceGateway,
     EtaStatusData,
     LoadStatusData,
-    RouteSegmentData,
     StationData,
     VehicleData,
 )
@@ -248,61 +248,22 @@ class MySQLTransitGateway:
             end_station_id: int,
             max_transfer_count: int,
     ) -> list[CandidateRouteData]:
-        start_in_database = self.repository.get_station(start_station_id) is not None
-        end_in_database = self.repository.get_station(end_station_id) is not None
-
-        await self.get_station(start_station_id)
-        await self.get_station(end_station_id)
-
-        records = self.repository.get_candidate_routes(
+        graph_results = await self._run_with_lock(
+            self.graph_service.find_candidates,
             start_station_id,
             end_station_id,
             max_transfer_count,
         )
+        return [self._attach_first_line_vehicle(candidate) for candidate in graph_results]
 
-        if not records:
-            graph_results = await self._run_with_lock(
-                self.graph_service.find_candidates,
-                start_station_id,
-                end_station_id,
-                max_transfer_count,
-            )
-            if graph_results:
-                return graph_results
-
-            if start_in_database and end_in_database:
-                return []
-
-            return await self.fallback.get_candidate_routes(
-                start_station_id,
-                end_station_id,
-                max_transfer_count,
-            )
-
-        return [
-            CandidateRouteData(
-                route_id=record.route_id,
-                vehicle_id=record.vehicle_id,
-                line_ids=record.line_ids,
-                segments=tuple(
-                    RouteSegmentData(
-                        segment_order=segment.segment_order,
-                        line_id=segment.line_id,
-                        line_name=segment.line_name,
-                        boarding_station_id=segment.boarding_station_id,
-                        alighting_station_id=segment.alighting_station_id,
-                        ride_time_minutes=segment.ride_time_minutes,
-                    )
-                    for segment in record.segments
-                ),
-                boarding_station_id=record.boarding_station_id,
-                alighting_station_id=record.alighting_station_id,
-                walk_time_minutes=record.walk_time_minutes,
-                ride_time_minutes=record.ride_time_minutes,
-                transfer_count=record.transfer_count,
-            )
-            for record in records
-        ]
+    def _attach_first_line_vehicle(self, candidate: CandidateRouteData) -> CandidateRouteData:
+        """Fill the graph placeholder vehicle from the candidate's first line."""
+        if candidate.vehicle_id or not candidate.line_ids:
+            return candidate
+        vehicle = self.repository.get_latest_vehicle_for_line(candidate.line_ids[0])
+        if vehicle is None:
+            return candidate
+        return replace(candidate, vehicle_id=int(vehicle.vehicle_id))
 
     @staticmethod
     async def _run_with_lock(func, /, *args):

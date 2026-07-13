@@ -63,6 +63,10 @@ class TransitRepository:
     def get_vehicle(self, vehicle_id: int) -> BusVehicle | None:
         return self.db.query(BusVehicle).filter(BusVehicle.vehicle_id == vehicle_id).first()
 
+    def get_latest_vehicle_for_line(self, line_id: int) -> BusVehicle | None:
+        """Return the vehicle used to enrich a graph-search candidate."""
+        return self._latest_vehicle_for_line(line_id)
+
     def get_line(self, line_id: int) -> BusLine | None:
         return self.db.query(BusLine).filter(BusLine.line_id == line_id).first()
 

@@ -1,5 +1,7 @@
 import request from './request'
 
+export { recommendRoutes } from './recommendation'
+
 export const getEta = (params) => request.get('/eta', { params })
 
 export const predictPassengerLoad = (data) => request.post('/passenger-load-prediction', data)
@@ -10,5 +12,3 @@ export const estimateWalkingTime = (data) => request.post('/walking-time-estimat
 
 export const evaluateTravelExperience = (data) =>
   request.post('/travel-experience/evaluate', data)
-
-export const recommendRoutes = (data) => request.post('/recommend-routes', data)

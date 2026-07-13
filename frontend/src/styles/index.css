@@ -1229,6 +1229,28 @@ label {
   background: #fff;
 }
 
+.map-reload-button {
+  position: absolute;
+  top: 102px;
+  right: 10px;
+  z-index: 11;
+  width: 29px;
+  height: 29px;
+  border: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 0 0 4px 4px;
+  color: #2e3b46;
+  font-size: 16px;
+  line-height: 1;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+}
+
+.map-reload-button:hover {
+  color: #1f6f93;
+  background: #fff;
+}
+
 .map-mini-toggle {
   top: 22px;
   left: 22px;
@@ -1526,6 +1548,99 @@ label {
 
 .info-list span {
   color: var(--muted);
+}
+
+.info-list-header {
+  display: grid;
+  gap: 14px;
+  padding: 18px 18px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.info-list-header-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.info-list-header-line::before {
+  content: 'BUS';
+  font-weight: 600;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  letter-spacing: 0.12em;
+}
+
+.info-list-line-code {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  line-height: 1;
+  text-transform: none;
+}
+
+.info-list-header-route {
+  display: grid;
+  grid-template-columns: auto 1px 1fr;
+  align-items: center;
+  gap: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+
+.info-list-route-label {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.info-list-route-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--line);
+}
+
+.info-list-route-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.info-list-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.info-list-rows p {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+}
+
+.info-list-rows p span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.info-list-rows p strong {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
 }
 
 .ai-header-actions {
