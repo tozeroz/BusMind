@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
 from app.dependencies.auth import get_db, get_current_user
-from app.services.user_service import register_user, login_user, get_current_user as get_current_user_service, update_user, get_user_history, get_user_favorites, add_user_favorite, delete_user_favorite
+from app.services.email_service import EmailServiceConfigError, EmailServiceError
+from app.services.user_service import register_user, login_user, get_current_user as get_current_user_service, update_user, get_user_history, get_user_favorites, add_user_favorite, delete_user_favorite, send_register_email_code
 from app.schemas.user_schema import (
+    SendRegisterEmailCodeRequest,
     UserRegisterRequest,
     UserLoginRequest,
     UserUpdateRequest,
@@ -46,6 +48,45 @@ _USER_ERROR_MESSAGES = {
 }
 
 @router.post(
+    "/register/email-code",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Send Register Email Code",
+    responses={
+        200: {"description": "Verification code sent"},
+        409: {"description": "Email already registered"},
+        429: {"description": "Request too frequent"},
+        503: {"description": "Email service not configured"},
+        500: {"description": "Email service failed"}
+    }
+)
+async def send_register_code(
+    request: SendRegisterEmailCodeRequest,
+    db: Session = Depends(get_db)
+):
+    try:
+        send_register_email_code(db, request.email)
+        return build_response(0, "success", {"email": request.email})
+    except ValueError as e:
+        message = str(e)
+        status_code = 429 if message.startswith("Please wait ") else 409
+        error_code = 42900 if status_code == 429 else 40902
+        raise HTTPException(
+            status_code=status_code,
+            detail=build_response(error_code, message).model_dump()
+        )
+    except EmailServiceConfigError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=build_response(50300, str(e)).model_dump()
+        )
+    except EmailServiceError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=build_response(50001, str(e)).model_dump()
+        )
+
+@router.post(
     "/register",
     response_model=ApiResponse,
     status_code=201,
@@ -64,10 +105,10 @@ async def register(
         user = register_user(db, request)
         return build_response(0, "success", user.model_dump())
     except ValueError as e:
-        if str(e) == "Username already exists":
+        if str(e) in {"Username already exists", "Email already registered"}:
             raise HTTPException(
                 status_code=409,
-                detail=build_response(40900, _USER_ERROR_MESSAGES[str(e)]).model_dump()
+                detail=build_response(40900, _USER_ERROR_MESSAGES.get(str(e), str(e))).model_dump()
             )
         raise HTTPException(
             status_code=400,
