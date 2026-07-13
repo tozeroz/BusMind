@@ -6,6 +6,7 @@ import math
 from typing import Any
 
 from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.bus_line import BusLine, BusStation, LineStation
@@ -90,6 +91,15 @@ def _normalize_path(value: Any) -> list[list[float]]:
     return result
 
 
+def _split_pipe_values(value: Any) -> list[str]:
+    if value is None:
+        return []
+    text_value = str(value).strip()
+    if not text_value:
+        return []
+    return [item.strip() for item in text_value.split("|") if item and item.strip()]
+
+
 def _station_map_by_ids(db: Session, station_ids: list[int]) -> dict[int, BusStation]:
     ids = sorted(set(station_ids))
     if not ids:
@@ -120,6 +130,48 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 
 
 def get_map_stations(db: Session) -> MapStationResponse:
+    view_rows = _safe_query(
+        db,
+        "map_station_view",
+        lambda: db.execute(
+            text(
+                """
+                SELECT
+                    station_id,
+                    bus_stop_code,
+                    station_name,
+                    road_name,
+                    longitude,
+                    latitude,
+                    line_ids,
+                    line_names,
+                    service_nos
+                FROM v_map_station
+                ORDER BY station_id
+                """
+            )
+        ).mappings().all(),
+    )
+    if view_rows:
+        items = [
+            MapStationDTO(
+                station_id=int(row["station_id"]),
+                station_name=row["station_name"],
+                station_code=row["bus_stop_code"] or "",
+                bus_stop_code=row["bus_stop_code"],
+                latitude=_as_float(row["latitude"]),
+                longitude=_as_float(row["longitude"]),
+                address=row["road_name"],
+                road_name=row["road_name"],
+                zone=None,
+                line_ids=[int(item) for item in _split_pipe_values(row["line_ids"])],
+                line_names=_split_pipe_values(row["line_names"]),
+                service_nos=_split_pipe_values(row["service_nos"]),
+            )
+            for row in view_rows
+        ]
+        return MapStationResponse(stations=items, total=len(items))
+
     stations = _safe_query(db, "stations", lambda: db.query(BusStation).all())
     line_stations = _safe_query(
         db,
