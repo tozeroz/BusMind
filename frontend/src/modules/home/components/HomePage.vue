@@ -171,7 +171,12 @@
         <SelectedStationDetailCard
           v-else-if="isStationDetailOpen"
           :station="selectedInfo"
+          :is-routes-expanded="isRoutesExpanded"
           @close="isStationDetailOpen = false"
+          @show-routes="handleShowRoutes"
+          @show-eta="handleShowEta"
+          @close-routes="handleCloseRoutes"
+          @select-route="handleSelectRoute"
         />
       </Transition>
 
@@ -269,7 +274,8 @@ const selectedInfo = reactive({
   routes: '',
   chart: [42, 70, 56, 88, 64],
   flowSource: 'local',
-  flowSummary: ''
+  flowSummary: '',
+  routesList: []
 })
 const floatPosition = reactive({ x: window.innerWidth - 112, y: window.innerHeight - 120 })
 const dragState = reactive({
@@ -291,6 +297,7 @@ const localTips = [
 const routeOptions = ref([])
 const selectedRecommendedRoute = ref(null)
 const isStationDetailOpen = ref(false)
+const isRoutesExpanded = ref(false)
 const rawRouteOptions = ref([])
 const resolvedJourney = reactive({ startStationId: null, endStationId: null })
 
@@ -558,7 +565,10 @@ const resetPanel = () => {
   selectedInfo.chart = [42, 70, 56, 88, 64]
   selectedInfo.flowSource = 'local'
   selectedInfo.flowSummary = ''
+  selectedInfo.routesList = []
   isStationDetailOpen.value = false
+  isRoutesExpanded.value = false
+  busMapRef.value?.hideRoutes()
 }
 
 const openChartPanel = (mode) => {
@@ -573,6 +583,7 @@ const selectStation = (stop) => {
   isAiChatOpen.value = false
   selectedRecommendedRoute.value = null
   isStationDetailOpen.value = true
+  isRoutesExpanded.value = false
   selectedInfo.id = stop.stop_id
   selectedInfo.name = stop.stop_name
   selectedInfo.crowd = stop.crowd_level ? loadLevelText(stop.crowd_level) : '暂无实时客流'
@@ -584,6 +595,7 @@ const selectStation = (stop) => {
   selectedInfo.chart = stop.crowd_level === 'high' ? [68, 74, 82, 90, 76] : [34, 48, 56, 52, 44]
   selectedInfo.flowSource = 'local'
   selectedInfo.flowSummary = ''
+  selectedInfo.routesList = stop.routesList || []
   loadStationFlowChart(stop)
   loadStationRealtime(stop)
 }
@@ -607,6 +619,33 @@ const selectRoad = (route) => {
 
 const selectMapRoute = (route) => {
   selectRoad(route)
+}
+
+const handleShowRoutes = () => {
+  if (!selectedInfo.id) return
+  isRoutesExpanded.value = true
+  const routes = busMapRef.value?.getStopRoutes(selectedInfo.id) || []
+  selectedInfo.routesList = routes.map(route => ({
+    ...route.properties,
+    id: route.id,
+    color: route.properties.color || route.properties.display_color
+  }))
+  busMapRef.value?.showStationRoutes({ stop_id: selectedInfo.id, stop_name: selectedInfo.name })
+}
+
+const handleCloseRoutes = () => {
+  isRoutesExpanded.value = false
+  busMapRef.value?.hideRoutes()
+}
+
+const handleShowEta = () => {
+  notice.value = '正在获取实时到站信息...'
+}
+
+const handleSelectRoute = (route) => {
+  busMapRef.value?.focusRouteById(route.line_id || route.id)
+  selectMapRoute(route)
+  isRoutesExpanded.value = false
 }
 
 const applyRecommendedRoute = (route) => {

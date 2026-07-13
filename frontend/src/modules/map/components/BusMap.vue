@@ -39,6 +39,7 @@ let routesLoadPromise = null
 let isStopBoundsFitted = false
 let selectedStopForRoutes = null
 let selectedStopFeatureId = null
+let areRoutesVisible = false
 
 const emptyFeatureCollection = {
   type: 'FeatureCollection',
@@ -211,11 +212,19 @@ function findStopFeature(stopId) {
   return busStopsGeoJSON.features.find((feature) => String(feature.properties.stop_id) === String(stopId))
 }
 
+function getStopRoutes(stopId) {
+  const stopFeature = findStopFeature(stopId)
+  if (!stopFeature) return []
+  const stop = busStops.find((item) => String(item.stop_id) === String(stopId))
+  if (!stop) return []
+  return reachableRouteFeatures(stop)
+}
+
 function clearSelection() {
   selectedStopForRoutes = null
   setSelectedStopState(null)
   setStopsDimmed(false)
-  setSourceData('routes', busRoutesGeoJSON)
+  setSourceData('routes', emptyFeatureCollection)
   setSourceData('routes-path', emptyFeatureCollection)
   setSourceData('stops-highlight', emptyFeatureCollection)
   setSourceData('stops-highlight-selected', emptyFeatureCollection)
@@ -687,10 +696,8 @@ function bindStopLayerEvents() {
 
     if (!stop) return
 
-    const routes = highlightStopReachableRoutes(stop)
-    const routeCoordinates = routeFeatureCoordinates(routes)
     emit('select-stop', stop)
-    scheduleFocusOnCoordinates(routeCoordinates.length ? routeCoordinates : [[stop.lng, stop.lat]], routeCoordinates.length ? 13.6 : 15)
+    scheduleFocusOnCoordinates([[stop.lng, stop.lat]], 17)
   })
 }
 
@@ -887,9 +894,9 @@ async function loadRouteGeometryFallback(lines) {
 
     mapDataCache.routes = data
     busRoutesGeoJSON = data
-    if (selectedStopForRoutes) {
+    if (selectedStopForRoutes && areRoutesVisible) {
       highlightStopReachableRoutes(selectedStopForRoutes)
-    } else {
+    } else if (areRoutesVisible) {
       setSourceData('routes', busRoutesGeoJSON)
     }
     return data
@@ -939,12 +946,12 @@ async function loadRealBusRoutes() {
       if (!data) return
       busRoutesGeoJSON = data
       busRoutesLoaded = true
-
-      if (selectedStopForRoutes) {
-        highlightStopReachableRoutes(selectedStopForRoutes)
-      } else if (map && map.getSource('routes')) {
-        setSourceData('routes', busRoutesGeoJSON)
-      }
+      // 初始不显示路线，等待后续调用 showStationRoutes 或 showAllRoutes 再显示
+      // if (selectedStopForRoutes) {
+      //   highlightStopReachableRoutes(selectedStopForRoutes)
+      // } else if (map && map.getSource('routes')) {
+      //   setSourceData('routes', busRoutesGeoJSON)
+      // }
     } catch (error) {
       console.warn('map routes load failed', error?.message)
       emit('load-error', '地图线路加载失败，请检查后端和数据库。')
@@ -989,10 +996,12 @@ onMounted(() => {
       fitStopBounds()
       isStopBoundsFitted = true
     }
-    if (busRoutesGeoJSON.features.length && map.getSource('routes') && !selectedStopForRoutes) {
-      setSourceData('routes', busRoutesGeoJSON)
-    } else if (busRoutesGeoJSON.features.length && selectedStopForRoutes) {
-      highlightStopReachableRoutes(selectedStopForRoutes)
+    if (busRoutesGeoJSON.features.length && map.getSource('routes') && areRoutesVisible) {
+      if (selectedStopForRoutes) {
+        highlightStopReachableRoutes(selectedStopForRoutes)
+      } else {
+        setSourceData('routes', busRoutesGeoJSON)
+      }
     }
   })
 })
@@ -1021,17 +1030,55 @@ async function reloadMapData() {
   routesLoadPromise = null
   busRoutesLoaded = false
   isStopBoundsFitted = false
+  areRoutesVisible = false
   await Promise.allSettled([
     loadRealBusStops(),
     loadRealBusRoutes()
   ])
 }
 
+function showStationRoutes(stop) {
+  if (!map || !map.getSource('routes')) return
+  selectedStopForRoutes = stop
+  areRoutesVisible = true
+  highlightStopReachableRoutes(stop)
+  const feature = findStopFeature(stop.stop_id)
+  if (feature) {
+    scheduleFocusOnCoordinates([feature.geometry.coordinates], 15)
+  }
+}
+
+function showAllRoutes() {
+  if (!map || !map.getSource('routes')) return
+  selectedStopForRoutes = null
+  areRoutesVisible = true
+  setStopsDimmed(false)
+  setSelectedStopState(null)
+  setSourceData('routes', busRoutesGeoJSON)
+  setSourceData('routes-path', emptyFeatureCollection)
+  setSourceData('stops-highlight', emptyFeatureCollection)
+  setSourceData('stops-highlight-selected', emptyFeatureCollection)
+}
+
+function hideRoutes() {
+  if (!map || !map.getSource('routes')) return
+  selectedStopForRoutes = null
+  areRoutesVisible = false
+  setSourceData('routes', emptyFeatureCollection)
+  setSourceData('routes-path', emptyFeatureCollection)
+  setSourceData('stops-highlight', emptyFeatureCollection)
+  setSourceData('stops-highlight-selected', emptyFeatureCollection)
+}
+
 defineExpose({
   clearSelection,
   focusRouteById,
   focusStopByName,
-  reloadMapData
+  reloadMapData,
+  showStationRoutes,
+  showAllRoutes,
+  hideRoutes,
+  getStopRoutes
 })
 </script>
 
