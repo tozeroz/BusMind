@@ -56,10 +56,9 @@ uv run python ...
 
 ```powershell
 Copy-Item .env.example .env
-Copy-Item backend\.env.example backend\.env
 ```
 
-根目录 `.env` 主要给模型、数据脚本和全局工具使用。`backend/.env` 给 FastAPI 后端使用。两者可以配置相同的数据库和 LTA / DeepSeek 信息。
+根目录 `.env` 是整个项目的唯一共享配置，供 backend、algorithm、数据脚本和本地工具共同读取。不要再维护 `backend/.env` 的第二份配置，避免同名变量互相覆盖。
 
 必须配置的变量：
 

@@ -19,7 +19,6 @@ backend/
 │   ├── legacy/                     # 历史排查脚本，不作为正式入口
 │   └── README.md                   # 正式脚本用途和执行方式
 ├── tests/                          # Pytest 测试
-├── .env.example                    # 后端环境变量模板
 └── start.py                        # 本地启动入口
 ```
 
@@ -29,11 +28,11 @@ backend/
 
 ```powershell
 uv sync
-Copy-Item backend\.env.example backend\.env
+Copy-Item .env.example .env
 uv run python backend\start.py
 ```
 
-后端固定读取 `backend/.env`，不依赖 PowerShell 当前所在目录。仓库根目录的 `.env` 仅作为兼容回退，且 `backend/.env` 优先。
+后端固定读取仓库根目录 `.env`。该文件也是 algorithm、数据脚本和本地工具共用的唯一真实配置；不要再维护 `backend/.env` 的第二份配置。
 
 也可以进入后端目录后直接启动 Uvicorn：
 

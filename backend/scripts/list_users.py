@@ -1,9 +1,8 @@
 """List existing users in the MySQL user_account table.
 
-Run with the backend's own .env loaded:
+Run with the repository-level .env configured:
 
-    cd backend
-    python scripts/list_users.py
+    python backend/scripts/list_users.py
 """
 
 from __future__ import annotations

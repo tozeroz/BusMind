@@ -43,6 +43,7 @@ data/raw/lta
 | `scripts/recommendation_feature_contract.py` | 冻结 `features.csv` 字段、JSON 字段解析、业务字段转模型输入 |
 | `scripts/build_features.py` | 单一特征构建入口；默认用 `data/raw/collect_scripts/hot_bus_stops.txt` 筛选 OD，从本地 CSV 构建候选路线并输出 `features.csv` |
 | `scripts/build_labels.py` | 基于独立规则生成排序伪标签，不调用当前模型 scorer |
+| `scripts/llm_assisted_labels.py` | 生成 seed-conditioned LLM 标注请求，聚合多 seed 响应，并融合规则伪标签 |
 | `scripts/summarize_features.py` | 汇总训练特征的数据质量、来源覆盖和降级字段分布 |
 | `features.csv` / `pseudo_labels.csv` | 推荐模型离线训练数据产物 |
 
@@ -199,3 +200,81 @@ python .\algorithm\dataset\scripts\summarize_features.py --output .\algorithm\da
 python .\algorithm\dataset\scripts\build_labels.py
 python .\algorithm\model\linear_scoring\train.py
 ```
+
+## LLM-assisted 伪标签增强
+
+规则伪标签可以直接用于 baseline 训练；如果要引入大模型辅助标注，则使用 `llm_assisted_labels.py` 走三步：
+
+```powershell
+python .\algorithm\dataset\scripts\llm_assisted_labels.py generate-prompts --seed-count 3
+```
+
+该命令会读取 `features.csv`，按 `candidate_group_id` 生成多 seed 的 LLM 标注请求，默认输出：
+
+```text
+algorithm/dataset/llm_label_requests.jsonl
+```
+
+每一行包含 `messages`、`candidate_group_id`、`seed` 和候选路线 12 维特征。把这些请求交给大模型后，响应建议保存为：
+
+```text
+algorithm/dataset/llm_label_responses.jsonl
+```
+
+响应 JSON 需要包含：
+
+```text
+candidate_group_id
+seed
+labels[].route_id
+labels[].time_score
+labels[].comfort_score
+labels[].walk_score
+labels[].transfer_score
+labels[].reliability_score
+labels[].confidence
+labels[].reason
+```
+
+聚合多 seed 结果：
+
+```powershell
+python .\algorithm\dataset\scripts\llm_assisted_labels.py aggregate
+```
+
+默认输出：
+
+```text
+algorithm/dataset/llm_labels_aggregated.csv
+```
+
+融合规则伪标签和 LLM 聚合标签：
+
+```powershell
+python .\algorithm\dataset\scripts\llm_assisted_labels.py fuse
+```
+
+默认输出：
+
+```text
+algorithm/dataset/pseudo_labels_llm_fused.csv
+```
+
+融合后的文件保留 `pseudo_labels.csv` 的核心训练字段，并新增：
+
+```text
+sample_weight
+label_source
+rule_label_confidence
+llm_label_confidence
+llm_label_count
+rule_llm_agreement
+```
+
+训练时可以先显式指定融合标签文件：
+
+```powershell
+python .\algorithm\model\linear_scoring\train.py --labels .\algorithm\dataset\pseudo_labels_llm_fused.csv
+```
+
+`linear_scoring/train.py` 会自动读取融合标签中的 `sample_weight`，让高一致性、高置信度样本在训练中占更高权重；如果仍使用普通 `pseudo_labels.csv`，没有 `sample_weight` 时会退回等权训练。

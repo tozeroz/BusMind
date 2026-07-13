@@ -222,6 +222,21 @@ training_targets.csv
 当前模型 / XGBoost / TabPFN 对比训练
 ```
 
+当前代码侧已将该流程拆成三个可执行步骤：
+
+```powershell
+python .\algorithm\dataset\scripts\llm_assisted_labels.py generate-prompts --seed-count 3
+python .\algorithm\dataset\scripts\llm_assisted_labels.py aggregate
+python .\algorithm\dataset\scripts\llm_assisted_labels.py fuse
+```
+
+其中：
+
+- `generate-prompts` 读取 `features.csv`，为同一 `candidate_group_id` 生成多个 seed-conditioned LLM 标注请求
+- `aggregate` 读取大模型返回的 `llm_label_responses.jsonl`，按 `candidate_group_id + route_id` 聚合多 seed 的中位数、方差和置信度
+- `fuse` 将规则伪标签与 LLM 聚合标签融合，输出 `pseudo_labels_llm_fused.csv`
+- 当前训练脚本可以通过 `--labels algorithm/dataset/pseudo_labels_llm_fused.csv` 直接使用融合标签，并自动读取 `sample_weight` 进行加权训练
+
 其中 `training_targets.csv` 建议保存：
 
 ```text
