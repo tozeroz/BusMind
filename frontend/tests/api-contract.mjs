@@ -1,3 +1,9 @@
+/**
+ * 文件：tests/api-contract.mjs
+ * 用途：验证前端接口契约和集成行为。
+ * 存放内容：可执行断言、测试数据以及冒烟测试流程。
+ * 实现功能：在生产代码之外发现接口契约和真实联调回归。
+ */
 import assert from 'node:assert/strict'
 import { readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'

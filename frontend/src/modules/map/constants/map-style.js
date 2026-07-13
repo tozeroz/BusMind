@@ -1,3 +1,9 @@
+/**
+ * 文件：src/modules/map/constants/map-style.js
+ * 用途：定义地图业务模块使用的固定配置。
+ * 存放内容：底图样式、颜色、图层配置或其他不可变地图参数。
+ * 实现功能：为地图组件提供统一配置，避免在组件内重复声明固定数据。
+ */
 import { layers, namedFlavor } from '@protomaps/basemaps'
 
 const TILES_ROOT = '/tiles/'
