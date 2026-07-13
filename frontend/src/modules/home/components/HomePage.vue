@@ -172,7 +172,7 @@
           v-else-if="isStationDetailOpen"
           :station="selectedInfo"
           :is-routes-expanded="isRoutesExpanded"
-          @close="isStationDetailOpen = false"
+          @close="closeStationDetail"
           @show-routes="handleShowRoutes"
           @show-eta="handleShowEta"
           @close-routes="handleCloseRoutes"
@@ -237,7 +237,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import BusMap from '@/modules/map/components/BusMap.vue'
 import RouteResultsPopup from '@/modules/home/components/RouteResultsPopup.vue'
 import SelectedRouteDetailCard from '@/modules/home/components/SelectedRouteDetailCard.vue'
@@ -300,6 +300,9 @@ const isStationDetailOpen = ref(false)
 const isRoutesExpanded = ref(false)
 const rawRouteOptions = ref([])
 const resolvedJourney = reactive({ startStationId: null, endStationId: null })
+const stationEtaRefreshIntervalMs = 30000
+let stationEtaRefreshTimer = null
+let stationEtaRefreshStop = null
 
 const aiMessages = ref([
   {
@@ -392,6 +395,32 @@ const loadStationRealtime = async (station) => {
   }
 }
 
+const clearStationEtaRefreshTimer = () => {
+  if (stationEtaRefreshTimer) {
+    window.clearInterval(stationEtaRefreshTimer)
+    stationEtaRefreshTimer = null
+  }
+  stationEtaRefreshStop = null
+}
+
+const startStationEtaRefreshTimer = (station) => {
+  clearStationEtaRefreshTimer()
+  const stationId = station?.station_id ?? station?.stop_id
+  if (stationId === undefined || stationId === null) return
+
+  stationEtaRefreshStop = {
+    ...station,
+    line_ids: Array.isArray(station?.line_ids) ? [...station.line_ids] : station?.line_ids
+  }
+  stationEtaRefreshTimer = window.setInterval(() => {
+    if (!isStationDetailOpen.value || String(selectedInfo.id) !== String(stationId)) {
+      clearStationEtaRefreshTimer()
+      return
+    }
+    loadStationRealtime(stationEtaRefreshStop)
+  }, stationEtaRefreshIntervalMs)
+}
+
 function loadLevelText(level) {
   const map = {
     seats_available: '预计有座',
@@ -449,6 +478,7 @@ const searchRoutes = async () => {
   recommendation.value = null
   selectedRecommendedRoute.value = null
   isStationDetailOpen.value = false
+  clearStationEtaRefreshTimer()
   routeOptions.value = []
   rawRouteOptions.value = []
   resolvedJourney.startStationId = null
@@ -553,6 +583,7 @@ const reloadMapData = async () => {
 }
 
 const resetPanel = () => {
+  clearStationEtaRefreshTimer()
   busMapRef.value?.clearSelection()
   panelMode.value = 'search'
   isInfoPanelOpen.value = true
@@ -578,6 +609,7 @@ const openChartPanel = (mode) => {
 }
 
 const selectStation = (stop) => {
+  clearStationEtaRefreshTimer()
   panelMode.value = 'search'
   isInfoPanelOpen.value = true
   isAiChatOpen.value = false
@@ -598,6 +630,7 @@ const selectStation = (stop) => {
   selectedInfo.routesList = stop.routesList || []
   loadStationFlowChart(stop)
   loadStationRealtime(stop)
+  startStationEtaRefreshTimer(stop)
 }
 
 const selectMapStop = (stop) => {
@@ -605,6 +638,7 @@ const selectMapStop = (stop) => {
 }
 
 const selectRoad = (route) => {
+  clearStationEtaRefreshTimer()
   isStationDetailOpen.value = false
   selectedRecommendedRoute.value = null
   openChartPanel('road')
@@ -640,6 +674,7 @@ const handleCloseRoutes = () => {
 
 const handleShowEta = () => {
   notice.value = '正在获取实时到站信息...'
+  if (stationEtaRefreshStop) loadStationRealtime(stationEtaRefreshStop)
 }
 
 const handleSelectRoute = (route) => {
@@ -649,6 +684,7 @@ const handleSelectRoute = (route) => {
 }
 
 const applyRecommendedRoute = (route) => {
+  clearStationEtaRefreshTimer()
   isStationDetailOpen.value = false
   const focusedRoute = busMapRef.value?.focusRouteById(route.id || route.line_id)
   selectedRecommendedRoute.value = {
@@ -744,4 +780,14 @@ const toggleAiChat = () => {
     resetPanel()
   }
 }
+
+const closeStationDetail = () => {
+  isStationDetailOpen.value = false
+  isRoutesExpanded.value = false
+  clearStationEtaRefreshTimer()
+}
+
+onBeforeUnmount(() => {
+  clearStationEtaRefreshTimer()
+})
 </script>
