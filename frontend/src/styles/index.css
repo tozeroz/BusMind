@@ -621,7 +621,7 @@ label {
   padding: 24px;
   background:
     radial-gradient(rgba(0, 0, 0, 0.04) 0, rgba(0, 0, 0, 0.44) 100%),
-    url("/background/busmind-bg.jpg") center / cover fixed no-repeat;
+    url("frontend/public/background/busmind-bg.jpg") center / cover fixed no-repeat;
 }
 
 .auth-logo-panel {
