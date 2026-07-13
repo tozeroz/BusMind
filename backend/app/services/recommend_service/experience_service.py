@@ -84,6 +84,43 @@ def _reliability_score_from_value(reliability_score: float | None) -> float:
     return _clamp_score(reliability_score)
 
 
+def _default_experience_weights() -> ExperienceWeights:
+    weights = ExperienceWeights(
+        w_eta=settings.weight_eta,
+        w_load=settings.weight_load,
+        w_walk=settings.weight_walk,
+        w_transfer=settings.weight_transfer,
+        w_frequency=settings.weight_frequency,
+        w_flow=settings.weight_flow,
+        w_congestion=settings.weight_congestion,
+        w_reliability=settings.weight_reliability,
+    )
+    total_weight = (
+        weights.w_eta
+        + weights.w_load
+        + weights.w_walk
+        + weights.w_transfer
+        + weights.w_frequency
+        + weights.w_flow
+        + weights.w_congestion
+        + weights.w_reliability
+    )
+    if total_weight <= 0:
+        return ExperienceWeights()
+    if abs(total_weight - 1.0) <= 1e-6:
+        return weights
+    return ExperienceWeights(
+        w_eta=weights.w_eta / total_weight,
+        w_load=weights.w_load / total_weight,
+        w_walk=weights.w_walk / total_weight,
+        w_transfer=weights.w_transfer / total_weight,
+        w_frequency=weights.w_frequency / total_weight,
+        w_flow=weights.w_flow / total_weight,
+        w_congestion=weights.w_congestion / total_weight,
+        w_reliability=weights.w_reliability / total_weight,
+    )
+
+
 def _build_experience_reason(
     *,
     eta_minutes: float | None,
@@ -116,16 +153,7 @@ def _build_experience_reason(
 
 class TravelExperienceService:
     def evaluate(self, request: TravelExperienceRequest) -> TravelExperienceResult:
-        weights = request.weights or ExperienceWeights(
-            w_eta=settings.weight_eta,
-            w_load=settings.weight_load,
-            w_walk=settings.weight_walk,
-            w_transfer=settings.weight_transfer,
-            w_frequency=settings.weight_frequency,
-            w_flow=settings.weight_flow,
-            w_congestion=settings.weight_congestion,
-            w_reliability=settings.weight_reliability,
-        )
+        weights = request.weights or _default_experience_weights()
         total_weight = (
             weights.w_eta
             + weights.w_load

@@ -34,8 +34,12 @@ def build_response(code: int, message: str, data=None) -> ApiResponse:
     )
 
 
+def _dump_vehicle(item):
+    return item.model_dump() if hasattr(item, "model_dump") else item
+
+
 @router.get("", response_model=ApiResponse, summary="Get Vehicle List")
-async def list_vehicles(
+def list_vehicles(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     line_id: Optional[int] = Query(None, ge=1),
@@ -48,7 +52,7 @@ async def list_vehicles(
 # Static paths must be registered before /{vehicle_id}; otherwise FastAPI treats
 # "realtime" as a vehicle_id and returns a validation error.
 @router.get("/realtime", response_model=ApiResponse, summary="Get Real-time Vehicle Positions")
-async def get_realtime_vehicles(
+def get_realtime_vehicles(
     line_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db),
 ):
@@ -56,11 +60,11 @@ async def get_realtime_vehicles(
         vehicles = get_vehicles_by_line(db, line_id)
     else:
         vehicles = get_vehicle_list(db, page=1, limit=100).vehicles
-    return build_response(0, "success", {"vehicles": [item.model_dump() for item in vehicles]})
+    return build_response(0, "success", {"vehicles": [_dump_vehicle(item) for item in vehicles]})
 
 
 @bus_vehicles_router.get("/realtime", response_model=ApiResponse, summary="Get Real-time Bus Vehicle Positions")
-async def get_bus_realtime_vehicles(
+def get_bus_realtime_vehicles(
     line_id: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db),
 ):
@@ -68,17 +72,17 @@ async def get_bus_realtime_vehicles(
         vehicles = get_vehicles_by_line(db, line_id)
     else:
         vehicles = get_vehicle_list(db, page=1, limit=100).vehicles
-    return build_response(0, "success", {"vehicles": [item.model_dump() for item in vehicles]})
+    return build_response(0, "success", {"vehicles": [_dump_vehicle(item) for item in vehicles]})
 
 
 @router.get("/line/{line_id}", response_model=ApiResponse, summary="Get Vehicles by Line")
-async def get_vehicles_for_line(line_id: int, db: Session = Depends(get_db)):
+def get_vehicles_for_line(line_id: int, db: Session = Depends(get_db)):
     vehicles = get_vehicles_by_line(db, line_id)
-    return build_response(0, "success", {"vehicles": [item.model_dump() for item in vehicles]})
+    return build_response(0, "success", {"vehicles": [_dump_vehicle(item) for item in vehicles]})
 
 
 @router.get("/{vehicle_id}", response_model=ApiResponse, summary="Get Vehicle Detail")
-async def get_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
+def get_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
     vehicle = get_vehicle_by_id(db, vehicle_id)
     if not vehicle:
         raise HTTPException(

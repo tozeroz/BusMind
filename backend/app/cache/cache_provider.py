@@ -14,6 +14,8 @@ class CacheProvider(Protocol):
 
     def delete(self, key: str) -> None: ...
 
+    def delete_prefix(self, prefix: str) -> None: ...
+
     def get_or_set(
         self,
         key: str,

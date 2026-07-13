@@ -62,6 +62,9 @@ class MapLineDTO(BaseModel):
     end_station: str
     color: str = "#3B82F6"
     path_coordinates: List[List[float]] = Field(default_factory=list)
+    crowd_level: Optional[str] = None
+    load_code: Optional[str] = None
+    load_score: Optional[float] = None
 
 
 class MapLineResponse(BaseModel):

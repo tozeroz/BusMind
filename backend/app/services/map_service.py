@@ -5,12 +5,14 @@ import logging
 import math
 from typing import Any
 
+from sqlalchemy import and_, func, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.cache import memory_cache_provider
+from app.cache.cache_keys import map_lines, map_road_segments, map_stations
 from app.models.bus_line import BusLine, BusStation, LineStation
-from app.models.transit_extra import MapRoadSegment
+from app.models.transit_extra import LtaBusArrival, MapRoadSegment
 from app.schemas.map_schema import (
     GeoJSONLineStringDTO,
     LineGeometryFeatureDTO,
@@ -27,6 +29,11 @@ from app.schemas.map_schema import (
 
 
 logger = logging.getLogger(__name__)
+MAP_CACHE_TTL_SECONDS = 600
+
+
+def invalidate_map_cache() -> None:
+    memory_cache_provider.delete_prefix("map:")
 
 
 def _as_float(value, default: float = 0.0) -> float:
@@ -129,7 +136,7 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return radius * 2 * math.atan2(math.sqrt(value), math.sqrt(1 - value))
 
 
-def get_map_stations(db: Session) -> MapStationResponse:
+def _get_map_stations_uncached(db: Session) -> MapStationResponse:
     view_rows = _safe_query(
         db,
         "map_station_view",
@@ -214,6 +221,16 @@ def get_map_stations(db: Session) -> MapStationResponse:
             )
         )
     return MapStationResponse(stations=items, total=len(items))
+
+
+def get_map_stations(db: Session) -> MapStationResponse:
+    cache_key = map_stations()
+    cached = memory_cache_provider.get(cache_key)
+    if isinstance(cached, MapStationResponse):
+        return cached
+    result = _get_map_stations_uncached(db)
+    memory_cache_provider.set(cache_key, result, ttl_seconds=MAP_CACHE_TTL_SECONDS)
+    return result
 
 
 def _road_segment_dto(segment: MapRoadSegment) -> RoadSegmentDTO:
@@ -307,20 +324,98 @@ def _synthesized_road_segments(db: Session) -> list[RoadSegmentDTO]:
     return result
 
 
-def get_road_segments(db: Session) -> RoadSegmentResponse:
+def _filter_segments(
+    segments: list[RoadSegmentDTO],
+    line_ids: tuple[int, ...] = (),
+    bbox: tuple[float, float, float, float] | None = None,
+) -> list[RoadSegmentDTO]:
+    if line_ids:
+        allowed_line_ids = set(line_ids)
+        segments = [segment for segment in segments if segment.line_id in allowed_line_ids]
+    if bbox is None:
+        return segments
+
+    min_lon, min_lat, max_lon, max_lat = bbox
+    filtered: list[RoadSegmentDTO] = []
+    for segment in segments:
+        points = segment.path_coordinates or []
+        if any(min_lon <= point[0] <= max_lon and min_lat <= point[1] <= max_lat for point in points):
+            filtered.append(segment)
+    return filtered
+
+
+def get_road_segments(
+    db: Session,
+    line_ids: tuple[int, ...] = (),
+    bbox: tuple[float, float, float, float] | None = None,
+) -> RoadSegmentResponse:
+    normalized_line_ids = tuple(sorted(set(int(line_id) for line_id in line_ids)))
+    cache_key = map_road_segments(normalized_line_ids, bbox)
+    cached = memory_cache_provider.get(cache_key)
+    if isinstance(cached, RoadSegmentResponse):
+        return cached
+
     rows = _safe_query(
         db,
         "road_segments",
-        lambda: db.query(MapRoadSegment).order_by(MapRoadSegment.line_id, MapRoadSegment.stop_sequence).all(),
+        lambda: (
+            db.query(MapRoadSegment)
+            .filter(MapRoadSegment.line_id.in_(normalized_line_ids))
+            if normalized_line_ids
+            else db.query(MapRoadSegment)
+        )
+        .order_by(MapRoadSegment.line_id, MapRoadSegment.stop_sequence)
+        .all(),
     )
     if rows:
         segments = [_road_segment_dto(row) for row in rows]
     else:
         segments = _synthesized_road_segments(db)
-    return RoadSegmentResponse(segments=segments, total=len(segments))
+    segments = _filter_segments(segments, normalized_line_ids, bbox)
+    result = RoadSegmentResponse(segments=segments, total=len(segments))
+    memory_cache_provider.set(cache_key, result, ttl_seconds=MAP_CACHE_TTL_SECONDS)
+    return result
+
+
+def _latest_line_load_map(db: Session, line_ids: list[int]) -> dict[int, LtaBusArrival]:
+    ids = sorted(set(line_ids))
+    if not ids:
+        return {}
+
+    latest = (
+        db.query(
+            LtaBusArrival.line_id.label("line_id"),
+            func.max(LtaBusArrival.query_time).label("query_time"),
+        )
+        .filter(LtaBusArrival.line_id.in_(ids))
+        .filter(LtaBusArrival.load_code.isnot(None))
+        .group_by(LtaBusArrival.line_id)
+        .subquery()
+    )
+    rows = (
+        db.query(LtaBusArrival)
+        .join(
+            latest,
+            and_(
+                LtaBusArrival.line_id == latest.c.line_id,
+                LtaBusArrival.query_time == latest.c.query_time,
+            ),
+        )
+        .all()
+    )
+    result: dict[int, LtaBusArrival] = {}
+    for row in rows:
+        if row.line_id is not None and int(row.line_id) not in result:
+            result[int(row.line_id)] = row
+    return result
 
 
 def get_map_lines(db: Session) -> MapLineResponse:
+    cache_key = map_lines()
+    cached = memory_cache_provider.get(cache_key)
+    if isinstance(cached, MapLineResponse):
+        return cached
+
     lines = _safe_query(
         db,
         "lines",
@@ -333,6 +428,11 @@ def get_map_lines(db: Session) -> MapLineResponse:
     )
     station_ids = [int(item.station_id) for item in relations]
     station_map = _safe_query(db, "stations_for_lines", lambda: _station_map_by_ids(db, station_ids))
+    line_load_map = _safe_query(
+        db,
+        "latest_line_load",
+        lambda: _latest_line_load_map(db, [int(line.line_id) for line in lines]),
+    )
     by_line: dict[int, list[LineStation]] = {}
     for item in relations:
         by_line.setdefault(int(item.line_id), []).append(item)
@@ -350,6 +450,7 @@ def get_map_lines(db: Session) -> MapLineResponse:
                 start_name = station.station_name
             end_name = station.station_name
             path.append([_as_float(station.longitude), _as_float(station.latitude)])
+        load = line_load_map.get(int(line.line_id)) if isinstance(line_load_map, dict) else None
         items.append(
             MapLineDTO(
                 line_id=int(line.line_id),
@@ -359,12 +460,22 @@ def get_map_lines(db: Session) -> MapLineResponse:
                 start_station=start_name or line.start_station or "",
                 end_station=end_name or line.end_station or "",
                 path_coordinates=path,
+                crowd_level=load.load_level if load else None,
+                load_code=load.load_code if load else None,
+                load_score=_as_float(load.load_score) if load and load.load_score is not None else None,
             )
         )
-    return MapLineResponse(lines=items, total=len(items))
+    result = MapLineResponse(lines=items, total=len(items))
+    memory_cache_provider.set(cache_key, result, ttl_seconds=MAP_CACHE_TTL_SECONDS)
+    return result
 
 
 def get_map_stations_by_line(db: Session, line_id: int) -> MapStationResponse:
+    cache_key = map_stations(line_id)
+    cached = memory_cache_provider.get(cache_key)
+    if isinstance(cached, MapStationResponse):
+        return cached
+
     relations = _safe_query(
         db,
         "stations_by_line_relations",
@@ -403,7 +514,9 @@ def get_map_stations_by_line(db: Session, line_id: int) -> MapStationResponse:
                 service_nos=[line.line_code if line else ""],
             )
         )
-    return MapStationResponse(stations=items, total=len(items))
+    result = MapStationResponse(stations=items, total=len(items))
+    memory_cache_provider.set(cache_key, result, ttl_seconds=MAP_CACHE_TTL_SECONDS)
+    return result
 
 
 def _get_line_stations_and_polyline(db: Session, line_id: int) -> tuple[list[MapStationDTO], list[list[float]]]:
