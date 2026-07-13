@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 
 
 # 默认配置：可直接在这里改起点、终点和偏好。Aft Braddell Rd
+# 运行命令：
+# cd ./backend
+# uv run python ./scripts/inspect_recommendation_chain.py
 DEFAULT_START_STATION_NAME = "Aft Braddell Rd"
 DEFAULT_END_STATION_NAME = "New Tech Pk"
 DEFAULT_PREFERENCE = "balanced"
