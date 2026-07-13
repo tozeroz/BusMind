@@ -9,5 +9,5 @@
 </template>
 
 <script setup>
-import AdminPage from '@/modules/admin/components/AdminPage.vue'
+import AdminPage from '@/modules/admin/components/AdminOperationsPage.vue'
 </script>

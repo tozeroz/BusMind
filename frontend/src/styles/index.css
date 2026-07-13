@@ -210,6 +210,15 @@ p {
   gap: 18px;
 }
 
+/* 普通内容页在固定高度的主区域内独立滚动，不影响首页地图的全屏布局。 */
+.content-scroll-page {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  align-content: start;
+  scrollbar-gutter: stable;
+}
+
 .panel,
 .auth-card,
 .stat-card,
