@@ -245,10 +245,11 @@ import SelectedStationDetailCard from '@/modules/home/components/SelectedStation
 import { askAiTravel } from '@/api/ai'
 import { getNearbyLocations, searchLocations } from '@/api/location'
 import { getEta } from '@/api/intelligence'
+import { getCachedBusArrival } from '@/api/map'
 import { getRouteRecommendations, RECOMMENDATION_PREFERENCES } from '@/api/recommendation'
 import { getPassengerFlowTrend } from '@/api/history'
 import { getRealtimeVehicles } from '@/api/vehicle'
-import { getApiErrorMessage, unwrapList } from '@/api/response'
+import { getApiErrorMessage, unwrapData, unwrapList } from '@/api/response'
 import { triggerArrivalRefresh } from '@/api/user'
 import { INJECTED_LOCATION } from '@/utils/location'
 
@@ -376,12 +377,37 @@ const loadStationFlowChart = async (station) => {
     selectedInfo.flowSummary = ''
   }
 }
+
+const firstStationServiceNo = (station) => {
+  const serviceNos = station?.service_nos
+  if (Array.isArray(serviceNos)) return serviceNos.find(Boolean) || ''
+  return String(serviceNos || '').split('|').map((item) => item.trim()).find(Boolean) || ''
+}
+
 const loadStationRealtime = async (station) => {
   const stationId = Number(station?.station_id ?? station?.stop_id)
   const lineId = Number(station?.line_ids?.[0] ?? station?.line_id)
-  if (!Number.isFinite(stationId) || !Number.isFinite(lineId)) return
+  const busStopCode = String(station?.bus_stop_code || station?.station_code || '').trim()
+  const serviceNo = firstStationServiceNo(station)
 
   try {
+    if (busStopCode) {
+      const arrivalResponse = await getCachedBusArrival({
+        bus_stop_code: busStopCode,
+        ...(serviceNo ? { service_no: serviceNo } : {})
+      })
+      if (String(selectedInfo.id) !== String(stationId)) return
+
+      const arrival = unwrapData(arrivalResponse, {})?.next_arrival
+      const eta = arrival?.eta_minutes
+      if (Number.isFinite(Number(eta))) {
+        selectedInfo.eta = `\u7ea6 ${Number(eta).toFixed(1)} \u5206\u949f`
+        if (arrival?.load_code) selectedInfo.crowd = loadLevelText(arrival.load_code)
+        return
+      }
+    }
+
+    if (!Number.isFinite(stationId) || !Number.isFinite(lineId)) return
     const vehicleResponse = await getRealtimeVehicles({ line_id: lineId })
     const vehicle = unwrapList(vehicleResponse, 'vehicles')[0]
     if (!vehicle?.vehicle_id) return

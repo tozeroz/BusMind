@@ -21,6 +21,9 @@ export async function getMapStations(params) {
 export const getRoadSegments = (params) =>
   request.get('/map/road-segments', { params, timeout: 60000 })
 
+export const getCachedBusArrival = (params) =>
+  request.get('/map/bus-arrival', { params, timeout: 12000 })
+
 export async function getMapLines(params = {}) {
   try {
     return await request.get('/map/lines', { params, timeout: 12000 })

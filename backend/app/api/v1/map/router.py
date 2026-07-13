@@ -2,8 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
+from app.cache import memory_cache_provider
+from app.cache.cache_keys import bus_arrival_service, bus_arrival_stop
+from app.core.time_utils import now_local
 from app.dependencies.auth import get_db
+from app.services.collector_service.service import LtaCollectorService
+from app.services.lta_service import LtaDataMallClient, LtaDataMallConfig, LtaDataMallError
 from app.services.map_service import (
     get_map_stations,
     get_road_segments,
@@ -42,6 +47,83 @@ def build_response(code: int, message: str, data=None) -> ApiResponse:
         timestamp=get_timestamp()
     )
 
+
+def _payload_value(payload: Any, key: str):
+    if isinstance(payload, dict):
+        return payload.get(key)
+    return getattr(payload, key, None)
+
+
+def _parse_arrival_time(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=now_local().tzinfo)
+        return parsed
+    except ValueError:
+        return None
+
+
+def _eta_minutes_from_payload(payload: Any) -> float | None:
+    estimated_arrival = _parse_arrival_time(_payload_value(payload, "estimated_arrival"))
+    if estimated_arrival is not None:
+        remaining_seconds = (estimated_arrival - now_local()).total_seconds()
+        return round(max(0.0, remaining_seconds / 60), 1)
+    try:
+        return round(float(_payload_value(payload, "eta_minutes")), 1)
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_bus_arrival(payload: Any) -> dict[str, Any] | None:
+    eta_minutes = _eta_minutes_from_payload(payload)
+    if eta_minutes is None:
+        return None
+    return {
+        "bus_stop_code": _payload_value(payload, "bus_stop_code"),
+        "service_no": _payload_value(payload, "service_no"),
+        "operator": _payload_value(payload, "operator"),
+        "visit_order": _payload_value(payload, "visit_order"),
+        "estimated_arrival": _payload_value(payload, "estimated_arrival"),
+        "eta_minutes": eta_minutes,
+        "load_code": _payload_value(payload, "load_code"),
+        "query_time": _payload_value(payload, "query_time"),
+        "source": "memory_cache",
+    }
+
+
+def _arrival_items(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, dict) and isinstance(value.get("Services"), list):
+        return value["Services"]
+    return [value]
+
+
+async def _refresh_bus_arrival_cache(
+    bus_stop_code: str,
+    service_no: str | None,
+) -> list[dict[str, object]]:
+    from app.core.intelligence_settings import settings as intelligence_settings
+
+    if not intelligence_settings.lta_account_key:
+        return []
+    client = LtaDataMallClient(
+        LtaDataMallConfig(
+            account_key=intelligence_settings.lta_account_key,
+            base_url=intelligence_settings.lta_base_url,
+            timeout_seconds=intelligence_settings.lta_timeout_seconds,
+        )
+    )
+    collector = LtaCollectorService(client)
+    return await collector.refresh_bus_arrival(bus_stop_code, service_no)
+
 @router.get(
     "/stations",
     response_model=ApiResponse,
@@ -60,6 +142,63 @@ def list_map_stations(
     else:
         result = get_map_stations(db)
     return build_response(0, "success", result.model_dump())
+
+
+@router.get(
+    "/bus-arrival",
+    response_model=ApiResponse,
+    status_code=200,
+    summary="Get Cached Bus Arrival",
+)
+async def get_cached_bus_arrival(
+    bus_stop_code: str = Query(..., min_length=1),
+    service_no: Optional[str] = Query(None, min_length=1),
+):
+    normalized_stop_code = bus_stop_code.strip()
+    normalized_service_no = service_no.strip() if service_no else None
+    cached = memory_cache_provider.get(bus_arrival_stop(normalized_stop_code))
+    if normalized_service_no:
+        cached = memory_cache_provider.get(
+            bus_arrival_service(normalized_stop_code, normalized_service_no)
+        ) or cached
+    arrivals = [
+        item
+        for item in (_normalize_bus_arrival(payload) for payload in _arrival_items(cached))
+        if item is not None
+    ]
+    if normalized_service_no:
+        arrivals = [
+            item for item in arrivals
+            if str(item.get("service_no") or "") == normalized_service_no
+        ]
+    if not arrivals:
+        try:
+            fresh_payloads = await _refresh_bus_arrival_cache(
+                normalized_stop_code,
+                normalized_service_no,
+            )
+            arrivals = [
+                item
+                for item in (
+                    _normalize_bus_arrival(payload)
+                    for payload in _arrival_items(fresh_payloads)
+                )
+                if item is not None
+            ]
+        except LtaDataMallError:
+            arrivals = []
+    arrivals.sort(key=lambda item: float(item["eta_minutes"]))
+    return build_response(
+        0,
+        "success",
+        {
+            "bus_stop_code": normalized_stop_code,
+            "service_no": normalized_service_no,
+            "arrivals": arrivals,
+            "next_arrival": arrivals[0] if arrivals else None,
+            "source": "memory_cache_or_lta" if arrivals else "cache_miss",
+        },
+    )
 
 @router.get(
     "/road-segments",
