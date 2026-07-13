@@ -250,6 +250,7 @@ import { getPassengerFlowTrend } from '@/api/history'
 import { getRealtimeVehicles } from '@/api/vehicle'
 import { getApiErrorMessage, unwrapList } from '@/api/response'
 import { triggerArrivalRefresh } from '@/api/user'
+import { INJECTED_LOCATION } from '@/utils/location'
 
 const refreshArrivals = () => {
   triggerArrivalRefresh().catch(() => {})
@@ -508,34 +509,30 @@ const searchRoutes = async () => {
   }
 }
 
-const getCurrentLocation = () => {
-  if (!navigator.geolocation) {
-    notice.value = '当前浏览器不支持定位'
-    return
-  }
-  notice.value = '正在获取当前位置...'
-  navigator.geolocation.getCurrentPosition(async ({ coords }) => {
-    try {
-      const response = await getNearbyLocations({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        radius_km: 2,
-        active_only: true
-      })
-      const nearest = response.data?.stations?.[0]
-      if (!nearest) {
-        notice.value = '当前位置附近 2 公里内没有公交站'
-        return
-      }
-      query.start = nearest.station_name
-      notice.value = `已定位到最近站点：${nearest.station_name}`
-      busMapRef.value?.focusStopByName(nearest.station_name)
-    } catch (error) {
-      notice.value = getApiErrorMessage(error, '附近站点查询失败')
+const getCurrentLocation = async () => {
+  const { name, latitude, longitude, radiusKm } = INJECTED_LOCATION
+  notice.value = `正在定位到：${name}...`
+
+  try {
+    const response = await getNearbyLocations({
+      latitude,
+      longitude,
+      radius_km: radiusKm,
+      active_only: true
+    })
+    const stations = response.data?.stations || response.data?.items || []
+    const targetStation = stations.find((station) => station.station_name === name) || stations[0]
+    if (!targetStation) {
+      notice.value = `${name} 附近 ${radiusKm} 公里内没有公交站`
+      return
     }
-  }, () => {
-    notice.value = '无法获取位置，请检查浏览器定位权限'
-  }, { enableHighAccuracy: true, timeout: 10000 })
+
+    query.start = targetStation.station_name
+    busMapRef.value?.focusStopByName(targetStation.station_name)
+    notice.value = `已定位到站点：${targetStation.station_name}`
+  } catch (error) {
+    notice.value = getApiErrorMessage(error, `无法定位到站点：${name}`)
+  }
 }
 
 const focusMapToCurrentLocation = () => {
