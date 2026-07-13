@@ -24,6 +24,7 @@ export const RECOMMEND_TYPES = Object.freeze({
 })
 
 const PREFERENCE_VALUES = new Set(Object.values(RECOMMENDATION_PREFERENCES))
+const RECOMMENDATION_TIMEOUT = Number(import.meta.env.VITE_RECOMMENDATION_TIMEOUT || 60000)
 
 const positiveInteger = (value, field) => {
   const number = Number(value)
@@ -86,16 +87,19 @@ export function buildRecommendRoutesPayload(options = {}) {
 }
 
 /** 保留统一响应外壳，兼容现有页面：response.data.items。 */
-export const recommendRoutes = (options) =>
-  request.post('/recommend-routes', buildRecommendRoutesPayload(options))
+export const recommendRoutes = (options, config = {}) =>
+  request.post('/recommend-routes', buildRecommendRoutesPayload(options), {
+    timeout: RECOMMENDATION_TIMEOUT,
+    ...config
+  })
 
 const routeById = (items, routeId) => items.find((route) => route.route_id === routeId) || null
 
 /**
  * 返回适合组件直接消费的推荐结果，并将五种最优 route_id 解析成路线对象。
  */
-export async function getRouteRecommendations(options) {
-  const response = await recommendRoutes(options)
+export async function getRouteRecommendations(options, config = {}) {
+  const response = await recommendRoutes(options, config)
   const data = unwrapData(response, {})
   const items = Array.isArray(data.items) ? data.items : []
 
@@ -110,4 +114,32 @@ export async function getRouteRecommendations(options) {
       leastTransfer: routeById(items, data.least_transfer_route_id)
     }
   }
+}
+const isNoRouteError = (error) =>
+  error?.response?.status === 404 || Number(error?.code) === 40400
+
+/**
+ * 优先执行零换乘直达检索，避免相邻站点也进入大范围换乘候选枚举。
+ * 仅当后端明确表示没有直达路线时，才回退到调用方允许的换乘范围。
+ */
+export async function getProgressiveRouteRecommendations(options, config = {}) {
+  const transferOptions = {
+    ...options,
+    allowTransfer: options.allowTransfer ?? options.allow_transfer ?? true,
+    maxTransferCount: options.maxTransferCount ?? options.max_transfer_count ?? 2
+  }
+
+  try {
+    const result = await getRouteRecommendations({
+      ...transferOptions,
+      allowTransfer: false,
+      maxTransferCount: 0
+    }, config)
+    return { result, searchMode: 'direct' }
+  } catch (error) {
+    if (!isNoRouteError(error) || !transferOptions.allowTransfer) throw error
+  }
+
+  const result = await getRouteRecommendations(transferOptions, config)
+  return { result, searchMode: 'transfer' }
 }

@@ -83,21 +83,6 @@
               <p v-if="notice" class="form-tip">{{ notice }}</p>
             </form>
 
-            <Transition name="card-pop">
-              <article v-if="recommendation" class="recommend-preview">
-                <p class="eyebrow">推荐结果</p>
-                <h3>{{ recommendation.title }}</h3>
-                <div class="recommend-meta">
-                  <span>ETA {{ recommendation.eta }} 分钟</span>
-                  <span>体验分 {{ recommendation.score }}</span>
-                  <span>{{ recommendation.load }}</span>
-                </div>
-                <button class="primary-button" type="button" @click="applyRecommendedRoute(recommendation)">
-                  查看推荐路线
-                </button>
-              </article>
-            </Transition>
-
             <div class="home-waterfall-cards">
               <article
                 v-for="item in localTips"
@@ -157,6 +142,14 @@
       </Transition>
 
 
+      <Transition name="card-pop">
+        <RouteResultsPopup
+          v-if="panelMode === 'search' && recommendation && routeOptions.length"
+          :routes="routeOptions"
+          @select="applyRecommendedRoute"
+          @close="recommendation = null"
+        />
+      </Transition>
       <Transition name="side-card">
         <aside v-if="isInfoPanelOpen" class="map-player-panel map-player-slot">
           <div>
@@ -170,22 +163,16 @@
         </aside>
       </Transition>
       <Transition name="side-card">
-        <article v-if="panelMode !== 'search'" :class="['map-chart-card', `chart-${chartTone}`]">
-          <div class="section-title">
-            <div>
-              <p class="eyebrow">{{ panelMode === 'station' ? '站点图表' : '路线图表' }}</p>
-              <h3>{{ selectedInfo.name }}</h3>
-            </div>
-            <button class="ghost-button compact-ghost" type="button" @click="resetPanel">关闭</button>
-          </div>
-          <div class="map-passenger-info">
-            <p v-for="item in passengerInfoItems" :key="item.label" class="passenger-info-row">
-              <span>{{ item.label }}</span>
-              <strong>{{ item.value }}</strong>
-            </p>
-          </div>
-          <p class="muted">{{ chartCaption }}</p>
-        </article>
+        <SelectedRouteDetailCard
+          v-if="selectedRecommendedRoute"
+          :route="selectedRecommendedRoute"
+          @close="selectedRecommendedRoute = null"
+        />
+        <SelectedStationDetailCard
+          v-else-if="isStationDetailOpen"
+          :station="selectedInfo"
+          @close="isStationDetailOpen = false"
+        />
       </Transition>
 
       <Transition name="side-card">
@@ -247,6 +234,9 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import BusMap from '@/modules/map/components/BusMap.vue'
+import RouteResultsPopup from '@/modules/home/components/RouteResultsPopup.vue'
+import SelectedRouteDetailCard from '@/modules/home/components/SelectedRouteDetailCard.vue'
+import SelectedStationDetailCard from '@/modules/home/components/SelectedStationDetailCard.vue'
 import { askAiTravel } from '@/api/ai'
 import { getNearbyLocations, searchLocations } from '@/api/location'
 import { getEta } from '@/api/intelligence'
@@ -261,7 +251,7 @@ const refreshArrivals = () => {
 }
 
 const busMapRef = ref(null)
-const query = reactive({ start: '乌节站', end: '滨海湾' })
+const query = reactive({ start: 'Aft Braddell Rd', end: 'New Tech Pk' })
 const notice = ref('')
 const recommendation = ref(null)
 const isSearching = ref(false)
@@ -299,6 +289,8 @@ const localTips = [
 ]
 
 const routeOptions = ref([])
+const selectedRecommendedRoute = ref(null)
+const isStationDetailOpen = ref(false)
 const rawRouteOptions = ref([])
 const resolvedJourney = reactive({ startStationId: null, endStationId: null })
 
@@ -332,36 +324,11 @@ const weatherTone = computed(() => {
   return 'mild'
 })
 
-const chartTone = computed(() => {
-  const crowdText = `${selectedInfo.crowd} ${selectedInfo.status}`
-  if (crowdText.includes('拥挤') || crowdText.includes('较高')) return 'heavy'
-  if (crowdText.includes('适中') || crowdText.includes('可站立') || crowdText.includes('建议关注')) return 'medium'
-  return 'light'
-})
-
 const chartCaption = computed(() => {
   if (selectedInfo.flowSource === 'backend') {
     return `\u6570\u636e\u6765\u6e90\uff1a\u540e\u7aef\u5386\u53f2\u5ba2\u6d41\u63a5\u53e3${selectedInfo.flowSummary ? ` · ${selectedInfo.flowSummary}` : ''}`
   }
   return '\u6682\u65e0\u540e\u7aef\u5ba2\u6d41\u6570\u636e\uff0c\u5148\u663e\u793a\u5730\u56fe\u7ad9\u70b9\u4fe1\u606f\u3002'
-})
-
-const passengerInfoItems = computed(() => {
-  if (panelMode.value === 'station') {
-    return [
-      { label: '\u4e0b\u4e00\u73ed\u8f66', value: selectedInfo.eta || '\u6682\u65e0\u5b9e\u65f6\u5230\u7ad9' },
-      { label: '\u5f53\u524d\u5ba2\u6d41', value: selectedInfo.crowd || '\u6682\u65e0\u5ba2\u6d41' },
-      { label: '\u7ad9\u70b9\u70ed\u5ea6', value: selectedInfo.status || '\u6570\u636e\u63a5\u5165\u4e2d' },
-      { label: '\u7ecf\u8fc7\u7ebf\u8def', value: selectedInfo.routes || '\u6682\u65e0\u7ebf\u8def\u5173\u8054' }
-    ]
-  }
-
-  return [
-    { label: '\u7ebf\u8def\u7f16\u53f7', value: selectedInfo.id || '--' },
-    { label: '\u9884\u8ba1\u5230\u8fbe', value: selectedInfo.eta || '\u6682\u65e0\u5230\u8fbe\u65f6\u95f4' },
-    { label: '\u5ba2\u6d41\u72b6\u6001', value: selectedInfo.crowd || '\u6682\u65e0\u5ba2\u6d41' },
-    { label: '\u8fd0\u884c\u72b6\u6001', value: selectedInfo.status || '\u8fd0\u884c\u4e2d' }
-  ]
 })
 
 const buildChartFromFlow = (items, maxValue) => {
@@ -473,6 +440,8 @@ const searchRoutes = async () => {
   if (isSearching.value) return
   busMapRef.value?.clearSelection()
   recommendation.value = null
+  selectedRecommendedRoute.value = null
+  isStationDetailOpen.value = false
   routeOptions.value = []
   rawRouteOptions.value = []
   resolvedJourney.startStationId = null
@@ -589,6 +558,7 @@ const resetPanel = () => {
   selectedInfo.chart = [42, 70, 56, 88, 64]
   selectedInfo.flowSource = 'local'
   selectedInfo.flowSummary = ''
+  isStationDetailOpen.value = false
 }
 
 const openChartPanel = (mode) => {
@@ -598,13 +568,19 @@ const openChartPanel = (mode) => {
 }
 
 const selectStation = (stop) => {
-  openChartPanel('station')
+  panelMode.value = 'search'
+  isInfoPanelOpen.value = true
+  isAiChatOpen.value = false
+  selectedRecommendedRoute.value = null
+  isStationDetailOpen.value = true
   selectedInfo.id = stop.stop_id
   selectedInfo.name = stop.stop_name
-  selectedInfo.crowd = stop.crowd_level ? loadLevelText(stop.crowd_level) : '\u6682\u65e0\u5b9e\u65f6\u5ba2\u6d41'
-  selectedInfo.status = '\u6b63\u5728\u8bfb\u53d6\u5386\u53f2\u5ba2\u6d41'
-  selectedInfo.eta = Number.isFinite(Number(stop.eta_minutes)) ? `\u7ea6 ${stop.eta_minutes} \u5206\u949f` : '\u6682\u65e0\u5b9e\u65f6\u5230\u7ad9'
-  selectedInfo.routes = stop.passing_routes?.join(' / ') || '\u6682\u65e0\u7ebf\u8def\u5173\u8054'
+  selectedInfo.crowd = stop.crowd_level ? loadLevelText(stop.crowd_level) : '暂无实时客流'
+  selectedInfo.status = '正在读取历史客流'
+  selectedInfo.eta = stop.eta_minutes != null && Number.isFinite(Number(stop.eta_minutes))
+    ? `约 ${Number(stop.eta_minutes).toFixed(1)} 分钟`
+    : '暂无实时到站'
+  selectedInfo.routes = stop.passing_routes?.join(' / ') || '暂无线路关联'
   selectedInfo.chart = stop.crowd_level === 'high' ? [68, 74, 82, 90, 76] : [34, 48, 56, 52, 44]
   selectedInfo.flowSource = 'local'
   selectedInfo.flowSummary = ''
@@ -617,6 +593,8 @@ const selectMapStop = (stop) => {
 }
 
 const selectRoad = (route) => {
+  isStationDetailOpen.value = false
+  selectedRecommendedRoute.value = null
   openChartPanel('road')
   selectedInfo.id = route.line_id || route.id
   selectedInfo.name = route.line_name || route.title
@@ -632,13 +610,16 @@ const selectMapRoute = (route) => {
 }
 
 const applyRecommendedRoute = (route) => {
+  isStationDetailOpen.value = false
   const focusedRoute = busMapRef.value?.focusRouteById(route.id || route.line_id)
-  selectRoad({
-    ...route,
+  selectedRecommendedRoute.value = {
     ...(focusedRoute || {}),
+    ...route,
     id: route.id || focusedRoute?.line_id,
-    line_name: route.title || focusedRoute?.line_name
-  })
+    title: route.title || focusedRoute?.line_name || '推荐路线',
+    journeyTitle: `${query.start} → ${query.end}`
+  }
+  notice.value = `已在地图中定位：${selectedRecommendedRoute.value.title}`
 }
 
 const sendAiMessage = async () => {

@@ -37,6 +37,9 @@ function validationDetailText(detail) {
 }
 
 export function getApiErrorMessage(error, fallback = '请求失败，请稍后重试') {
+  if (error?.code === 'ECONNABORTED' || /timeout/i.test(error?.message || '')) {
+    return '请求处理超时，请稍后重试；首次路线计算可能需要更长时间'
+  }
   const payload = error?.response?.data
   const detail = payload?.detail
 

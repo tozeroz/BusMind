@@ -6,8 +6,29 @@
  */
 import request from './request'
 
-export const getMapStations = (params) => request.get('/map/stations', { params })
+const shouldUseFallback = (error) =>
+  !error?.response || error.response.status >= 500
 
-export const getRoadSegments = () => request.get('/map/road-segments')
+export async function getMapStations(params) {
+  try {
+    return await request.get('/map/stations', { params, timeout: 12000 })
+  } catch (error) {
+    if (!shouldUseFallback(error)) throw error
+    return request.get('/locations/map/stations', { params, timeout: 30000 })
+  }
+}
 
-export const getMapLines = () => request.get('/map/lines')
+export const getRoadSegments = () =>
+  request.get('/map/road-segments', { timeout: 60000 })
+
+export async function getMapLines(params = {}) {
+  try {
+    return await request.get('/map/lines', { params, timeout: 12000 })
+  } catch (error) {
+    if (!shouldUseFallback(error)) throw error
+    return request.get('/lines', {
+      params: { page: 1, limit: 100, ...params },
+      timeout: 30000
+    })
+  }
+}
