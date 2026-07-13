@@ -94,89 +94,113 @@ defineProps({
 
 <style scoped>
 .station-action-buttons {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .station-action-button {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 12px;
-  border: none;
+  gap: 8px;
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 8px;
+  color: #fff;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
+  line-height: 1.2;
+  backdrop-filter: blur(14px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
 }
 
 .primary-action-button {
-  background: #e11d2e;
-  color: #ffffff;
+  background: linear-gradient(135deg, rgba(45, 104, 151, 0.62), rgba(45, 145, 137, 0.5));
 }
 
 .primary-action-button:hover {
-  background: #c91927;
+  border-color: rgba(255, 255, 255, 0.42);
+  background: linear-gradient(135deg, rgba(45, 104, 151, 0.78), rgba(45, 145, 137, 0.66));
+  transform: translateY(-1px);
 }
 
 .secondary-action-button {
-  background: #f3f4f6;
-  color: #374151;
+  background: rgba(255, 255, 255, 0.11);
 }
 
 .secondary-action-button:hover {
-  background: #e5e7eb;
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .action-icon {
-  font-size: 14px;
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 7px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .station-routes-expanded {
-  margin-top: 16px;
-  padding: 12px;
-  background: #f9fafb;
+  margin-top: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(16px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .routes-expanded-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.78);
   font-size: 12px;
-  color: #6b7280;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .routes-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   max-height: 200px;
+  margin: 0;
+  padding: 0 3px 0 0;
   overflow-y: auto;
+  list-style: none;
+  scrollbar-color: rgba(255, 255, 255, 0.48) rgba(255, 255, 255, 0.08);
 }
 
 .route-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 10px minmax(66px, auto) minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  margin-bottom: 4px;
-  background: #ffffff;
+  margin-bottom: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.08);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .route-item:hover {
-  background: #f3f4f6;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateX(2px);
 }
 
 .route-item:last-child {
@@ -188,28 +212,29 @@ defineProps({
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
 }
 
 .route-name {
-  font-weight: 600;
-  font-size: 14px;
-  color: #1f2937;
-  min-width: 60px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .route-direction {
-  font-size: 11px;
-  color: #6b7280;
+  min-width: 0;
   overflow: hidden;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .routes-empty {
-  text-align: center;
-  color: #9ca3af;
-  font-size: 13px;
   padding: 20px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+  text-align: center;
 }
 
 .routes-expand-enter-active,
@@ -230,5 +255,11 @@ defineProps({
 .routes-expand-leave-from {
   opacity: 1;
   max-height: 300px;
+}
+
+@media (max-width: 520px) {
+  .station-action-buttons {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

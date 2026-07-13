@@ -5,7 +5,7 @@
   实现功能：集中承载模块业务功能，并与路由入口、公共层和 API 层保持职责分离。
 -->
 <template>
-  <section class="page-grid">
+  <section class="page-grid content-scroll-page">
     <div class="panel">
       <div class="section-title">
         <div>
