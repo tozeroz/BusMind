@@ -18,6 +18,7 @@ from app.services.sync_service.service import CacheSyncService
 
 
 logger = logging.getLogger(__name__)
+server_logger = logging.getLogger("uvicorn.error")
 
 
 def _env_int(name: str, default: int) -> int:
@@ -215,10 +216,39 @@ class BusArrivalRefreshScheduler:
         self._refresh_task: asyncio.Task[None] | None = None
         self._last_triggered_at: float | None = None
         self._stop_event = asyncio.Event()
+        self.started_at: str | None = None
+        self.last_tick_started_at: str | None = None
+        self.last_tick_finished_at: str | None = None
+        self.last_tick_jobs: int = 0
+        self.last_tick_processed: int = 0
+        self.last_tick_skipped: int = 0
+        self.last_tick_error: str | None = None
+        self.last_tick_failures: list[str] = []
 
     @property
     def enabled(self) -> bool:
         return self.lta_client is not None and self.interval_seconds > 0
+
+    def status(self) -> dict[str, object]:
+        return {
+            "enabled": self.enabled,
+            "running": self._task is not None and not self._task.done(),
+            "refresh_running": self._refresh_task is not None
+            and not self._refresh_task.done(),
+            "interval_seconds": self.interval_seconds,
+            "max_lines": self.max_lines,
+            "stops_per_line": self.stops_per_line,
+            "concurrency": self.concurrency,
+            "per_job_deadline_seconds": self.per_job_deadline_seconds,
+            "started_at": self.started_at,
+            "last_tick_started_at": self.last_tick_started_at,
+            "last_tick_finished_at": self.last_tick_finished_at,
+            "last_tick_jobs": self.last_tick_jobs,
+            "last_tick_processed": self.last_tick_processed,
+            "last_tick_skipped": self.last_tick_skipped,
+            "last_tick_error": self.last_tick_error,
+            "last_tick_failures": self.last_tick_failures[-10:],
+        }
 
     async def start(self) -> None:
         if not self.enabled:
@@ -228,12 +258,25 @@ class BusArrivalRefreshScheduler:
                 self.lta_client is not None,
                 self.interval_seconds,
             )
+            server_logger.warning(
+                "BusArrivalRefreshScheduler disabled "
+                "(lta_client=%s, interval=%ds)",
+                self.lta_client is not None,
+                self.interval_seconds,
+            )
             return
         if self._task is not None and not self._task.done():
             return
         self._stop_event.clear()
+        self.started_at = now_local().isoformat()
         self._task = asyncio.create_task(self._run(), name="bus-arrival-refresh")
         logger.info(
+            "BusArrivalRefreshScheduler started: interval=%ds, max_lines=%d, stops_per_line=%d",
+            self.interval_seconds,
+            self.max_lines,
+            self.stops_per_line,
+        )
+        server_logger.info(
             "BusArrivalRefreshScheduler started: interval=%ds, max_lines=%d, stops_per_line=%d",
             self.interval_seconds,
             self.max_lines,
@@ -306,8 +349,11 @@ class BusArrivalRefreshScheduler:
         while not self._stop_event.is_set():
             try:
                 await self._tick(collector, sync)
-            except Exception:  # pragma: no cover - keep scheduler alive
+            except Exception as exc:  # pragma: no cover - keep scheduler alive
+                self.last_tick_error = f"{type(exc).__name__}: {exc}"
+                self.last_tick_finished_at = now_local().isoformat()
                 logger.exception("BusArrivalRefreshScheduler tick failed")
+                server_logger.exception("BusArrivalRefreshScheduler tick failed")
             try:
                 await asyncio.wait_for(
                     self._stop_event.wait(), timeout=self.interval_seconds
@@ -320,6 +366,15 @@ class BusArrivalRefreshScheduler:
         collector: LtaCollectorService,
         sync: CacheSyncService,
     ) -> None:
+        tick_started_at = now_local()
+        self.last_tick_started_at = tick_started_at.isoformat()
+        self.last_tick_finished_at = None
+        self.last_tick_jobs = 0
+        self.last_tick_processed = 0
+        self.last_tick_skipped = 0
+        self.last_tick_error = None
+        self.last_tick_failures = []
+
         # SQLAlchemy's synchronous driver can wait on a database connection.
         # Keep it off FastAPI's event loop so one slow refresh cannot freeze
         # login, health checks, or unrelated API requests.
@@ -332,14 +387,22 @@ class BusArrivalRefreshScheduler:
                 )
 
         jobs = await asyncio.to_thread(_load_jobs)
+        self.last_tick_jobs = len(jobs)
         if not jobs:
+            self.last_tick_error = "no refresh jobs built from line_station"
+            self.last_tick_finished_at = now_local().isoformat()
+            server_logger.warning(
+                "bus_arrival refresh tick %s jobs=0: no line_station anchors found",
+                tick_started_at.isoformat(),
+            )
             return
 
         processed = 0
         skipped = 0
+        failures: list[str] = []
         semaphore = asyncio.Semaphore(self.concurrency)
 
-        async def _run(job: RefreshJob) -> None:
+        async def _run(job: RefreshJob) -> tuple[str, int, int] | None:
             if self._stop_event.is_set():
                 return
             async with semaphore:
@@ -362,11 +425,23 @@ class BusArrivalRefreshScheduler:
 
                     result = await asyncio.to_thread(_sync_result)
                     return ("ok", result.processed, result.skipped)
-                except Exception:
+                except Exception as exc:
+                    failure = (
+                        f"{job.bus_stop_code}/{job.service_no}: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+                    failures.append(failure)
                     logger.warning(
                         "refresh_bus_arrival failed for %s/%s",
                         job.bus_stop_code,
                         job.service_no,
+                        exc_info=True,
+                    )
+                    server_logger.warning(
+                        "refresh_bus_arrival failed for %s/%s: %s",
+                        job.bus_stop_code,
+                        job.service_no,
+                        failure,
                     )
                     return ("fail", 0, 1)
 
@@ -383,7 +458,25 @@ class BusArrivalRefreshScheduler:
                 skipped += skip
             else:
                 skipped += 1
+        self.last_tick_processed = processed
+        self.last_tick_skipped = skipped
+        self.last_tick_failures = failures
+        self.last_tick_finished_at = now_local().isoformat()
+        if processed <= 0:
+            self.last_tick_error = (
+                "refresh tick completed but no rows were synced; "
+                f"skipped={skipped}, failures={len(failures)}"
+            )
         logger.info(
+            "bus_arrival refresh tick %s processed=%d skipped=%d jobs=%d concurrency=%d deadline=%.1fs",
+            now_local().isoformat(),
+            processed,
+            skipped,
+            len(jobs),
+            self.concurrency,
+            self.per_job_deadline_seconds,
+        )
+        server_logger.info(
             "bus_arrival refresh tick %s processed=%d skipped=%d jobs=%d concurrency=%d deadline=%.1fs",
             now_local().isoformat(),
             processed,

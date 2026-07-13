@@ -1,6 +1,19 @@
 from fastapi.testclient import TestClient
 
+from backend.app import main as main_module
 from backend.app.main import app
+
+
+class RecordingRefreshScheduler:
+    def __init__(self) -> None:
+        self.started = False
+        self.stopped = False
+
+    async def start(self) -> None:
+        self.started = True
+
+    async def stop(self) -> None:
+        self.stopped = True
 
 
 def test_service_b_routes_are_mounted_in_formal_application():
@@ -18,3 +31,14 @@ def test_service_b_routes_are_mounted_in_formal_application():
     )
     assert update.status_code == 200
     assert update.json()["data"]["vehicle_id"] == 101
+
+
+def test_formal_application_starts_refresh_scheduler(monkeypatch):
+    scheduler = RecordingRefreshScheduler()
+    monkeypatch.setattr(main_module, "_refresh_scheduler", scheduler)
+
+    with TestClient(app):
+        assert scheduler.started is True
+        assert scheduler.stopped is False
+
+    assert scheduler.stopped is True
