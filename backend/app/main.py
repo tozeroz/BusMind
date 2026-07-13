@@ -46,6 +46,8 @@ async def lifespan(_: FastAPI):
 
         logger.info("Database schema validation passed")
 
+    await _refresh_scheduler.start()
+
     try:
         yield
     finally:
