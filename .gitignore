@@ -1,90 +1,120 @@
-# OS files
+# BusMind gitignore
+# Commit source code, scripts, docs, config templates, and small hand-written assets.
+# Do not commit local secrets, raw/processed data, generated datasets, caches, or build outputs.
+
+# OS / editor
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# IDE / editor
 .idea/
 .vscode/
 *.swp
 *.swo
 *.tmp
 
-# Environment files
+# Local environment and secrets
 .env
 .env.*
 !.env.example
+!backend/.env.example
+*.pem
+*.key
+*.crt
+credentials.json
+token.json
+service-b.env
+/service-b.env
 
-# Logs
-*.log
-logs/
-backend/logs/
+# Python runtime
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.venv/
+venv/
+env/
+.pytest_cache/
+pytest-cache-files-*/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# uv
+.uv-cache/
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+dist/
+build/
+frontend/dist/
+frontend/build/
+.vite/
+frontend/.vite/
+.cache/
+coverage/
+frontend/coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-.venv/
-venv/
-env/
+# Logs
+*.log
+logs/
+backend/logs/
 
-# Jupyter
-.ipynb_checkpoints/
-
-# Node / frontend
-node_modules/
-dist/
-build/
-.vite/
-.cache/
-coverage/
-frontend/node_modules/
-frontend/dist/
-frontend/build/
-
-# Database / local runtime
+# Local database/runtime files
 *.sqlite
 *.sqlite3
 *.db
 *.dump
 *.sql.gz
 
-# Generated data and model artifacts
+# LTA raw data: keep collectors and docs, ignore downloaded payloads/snapshots
 data/raw/*
+!data/raw/README.md
 !data/raw/.gitkeep
 !data/raw/collect_lta_realtime_server.py
 !data/raw/collect_scripts/
 !data/raw/collect_scripts/**
+data/raw/lta/
 data/raw/collect_scripts/__pycache__/
 data/raw/collect_scripts/**/*.pyc*
+
+# Processed data: keep processing scripts/docs, ignore generated CSV outputs
 data/processed/*
+!data/processed/README.md
 !data/processed/.gitkeep
 !data/processed/process_scripts/
 !data/processed/process_scripts/**
-database/backup/*
+data/processed/process_scripts/__pycache__/
+data/processed/process_scripts/**/*.pyc*
+data/processed/*.csv
+
+# Recommendation model datasets: keep builders/docs, ignore generated training data
+algorithm/dataset/recommendation/*/
+!algorithm/dataset/recommendation/*/.gitkeep
+algorithm/dataset/**/*.csv
+algorithm/dataset/**/*.jsonl
+algorithm/dataset/**/*.parquet
+algorithm/dataset/**/*.pkl
+
+# Model artifacts: keep code, ignore trained/generated artifacts
+algorithm/model/artifacts/*
+!algorithm/model/artifacts/.gitkeep
 algorithm/model_files/*
+!algorithm/model_files/.gitkeep
 *.pkl
 *.joblib
 *.model
 *.onnx
 
-# Keep empty directories
+# Database generated backups/exports
+database/backup/
+database/mock/
+database/seed/
+
+# Keep intentional empty directories when they are still used
 !**/.gitkeep
-
-# Local secrets and credentials
-*.pem
-*.key
-*.crt
-credentials.json
-token.json
-
-/service-b.env
