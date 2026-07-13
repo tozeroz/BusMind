@@ -1,0 +1,24 @@
+$kind: http-request
+url: "{{base_url}}/realtime-passenger-load"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "line_id": {{line_id}},
+      "station_id": {{station_id}},
+      "vehicle_id": {{vehicle_id}},
+      "current_onboard_count": 40,
+      "capacity": 60,
+      "weather": "rain"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 422, 503]); });
+      pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });
+      pm.test('Realtime load fields', function () { const d=pm.response.json().data; pm.expect(d).to.include.all.keys('line_id','station_id','onboard_count','capacity','load_rate','load_level','query_time'); });
+    language: text/javascript
+order: 1000

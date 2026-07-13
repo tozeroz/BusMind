@@ -1,0 +1,27 @@
+$kind: http-request
+url: "{{base_url}}/lines/{{line_id}}/stations"
+method: POST
+headers:
+  Authorization: "Bearer {{access_token}}"
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "line_id": {{line_id}},
+      "station_id": {{station_id}},
+      "order_index": 1,
+      "direction": "forward",
+      "route_distance_km": 0.8
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([201, 400, 401, 403, 409, 422]); });
+      if (pm.response.code === 201) {
+        const j = pm.response.json();
+        const id = j.data && (j.data.line_station_id || j.data.id);
+        if (id) pm.environment.set('line_station_id', id);
+      }
+    language: text/javascript
+order: 7000

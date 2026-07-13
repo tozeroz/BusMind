@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{base_url}}/map/traffic-heatmap?line_id={{line_id}}&match_radius_m=120&stale_after_minutes=15"
+method: GET
+headers:
+  Accept: "application/json"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 422, 503]); });
+      pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });
+      pm.test('Traffic heatmap schema', function () { const d=pm.response.json().data; pm.expect(d.route_segments).to.be.an('array'); pm.expect(d.traffic_segments).to.be.an('array'); if (d.traffic_segments.length) { pm.expect(d.traffic_segments[0]).to.include.all.keys('link_id','road_name','coordinates','speed_band','minimum_speed_kmh','maximum_speed_kmh','congestion_score','congestion_level','heat_color','observed_at','query_time'); } });
+    language: text/javascript
+order: 4000

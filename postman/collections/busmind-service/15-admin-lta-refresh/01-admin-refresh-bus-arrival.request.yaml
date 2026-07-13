@@ -1,0 +1,21 @@
+$kind: http-request
+url: "{{base_url}}/admin/lta/bus-arrival/refresh"
+method: POST
+headers:
+  Authorization: "Bearer {{access_token}}"
+  Content-Type: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "bus_stop_code": "{{lta_bus_stop_code}}",
+      "service_no": "{{lta_service_no}}",
+      "sync_to_db": true
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201, 400, 401, 403, 404, 405, 409, 422, 503]); });
+      if (pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').includes('application/json')) { const j = pm.response.json(); pm.expect(j).to.have.property('code'); pm.expect(j).to.have.property('message'); }
+    language: text/javascript
+order: 1000

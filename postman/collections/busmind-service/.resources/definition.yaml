@@ -3,3 +3,15 @@ description: BusMind backend full API collection, including Service A and Servic
 variables:
   base_url: http://127.0.0.1:8001/api/v1
   server_url: http://127.0.0.1:8001
+  line_id: 1
+  start_station_id: 1
+  end_station_id: 12
+  best_route_id: route_001
+  test_username: postman_user
+  test_password: postman_password_123
+  test_email: postman_user@example.com
+  verification_code: 123456
+  access_token: ""
+  favorite_id: 1
+  station_id: 3
+  vehicle_id: 101

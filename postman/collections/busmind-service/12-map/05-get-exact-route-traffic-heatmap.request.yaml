@@ -1,0 +1,29 @@
+$kind: http-request
+url: "{{base_url}}/map/traffic-heatmap"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "route_id": "{{best_route_id}}",
+      "route_segments": [
+        {
+          "segment_order": 1,
+          "line_id": {{line_id}},
+          "boarding_station_id": {{start_station_id}},
+          "alighting_station_id": {{end_station_id}}
+        }
+      ],
+      "match_radius_m": 120,
+      "stale_after_minutes": 15
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP status is expected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 422, 503]); });
+      pm.test('Unified response envelope', function () { const j = pm.response.json(); pm.expect(j).to.have.all.keys('code','message','data','trace_id','timestamp'); });
+      pm.test('Exact route heatmap schema', function () { const d=pm.response.json().data; pm.expect(d.route_id).to.be.a('string'); pm.expect(d.route_segments).to.be.an('array'); pm.expect(d.traffic_segments).to.be.an('array'); d.traffic_segments.forEach(function (s) { pm.expect(s.coordinates).to.be.an('array').that.is.not.empty; pm.expect(['free_flow','slow','congested','severe','no_data']).to.include(s.congestion_level); }); });
+    language: text/javascript
+order: 5000
