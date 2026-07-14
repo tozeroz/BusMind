@@ -1,4 +1,4 @@
-"""Generate rule-based pseudo labels from frozen backend-style route features."""
+"""基于候选路线冻结特征生成规则伪标签。"""
 
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ if __package__ in {None, ""}:
 
 import pandas as pd
 
-from algorithm.dataset.scripts.recommendation_data import default_dataset_dir
-from algorithm.dataset.scripts.recommendation_feature_contract import (
+from algorithm.dataset.scripts.feature_contract import (
     model_input_route_from_feature_row,
     read_frozen_features,
 )
+from algorithm.dataset.scripts.paths import features_path, rule_labels_path
 from algorithm.model.contracts import PREFERENCE_NAMES, RouteFeatures
 
 
@@ -92,8 +92,8 @@ TRANSFER_BASE_SCORE = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, default=default_dataset_dir() / "features.csv")
-    parser.add_argument("--output", type=Path, default=default_dataset_dir() / "rule_pseudo_labels.csv")
+    parser.add_argument("--input", type=Path, default=features_path())
+    parser.add_argument("--output", type=Path, default=rule_labels_path())
     parser.add_argument("--max-routes-per-group", type=int, default=10)
     return parser.parse_args()
 

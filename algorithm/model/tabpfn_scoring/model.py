@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -26,6 +27,20 @@ from algorithm.model.utils.score_mixing import PREFERENCE_MIX, SCORE_NAMES, mix_
 
 ARTIFACT_DIR = Path(__file__).resolve().parent / "artifacts"
 METADATA_PATH = ARTIFACT_DIR / "tabpfn_route_scoring.json"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _load_project_env() -> None:
+    env_path = PROJECT_ROOT / ".env"
+    if not env_path.is_file():
+        return
+    try:
+        from dotenv import dotenv_values
+    except ImportError:
+        return
+    for key, value in dotenv_values(env_path, encoding="utf-8").items():
+        if value is not None and not os.getenv(key):
+            os.environ[key] = value
 
 
 class TabPFNArtifactError(RuntimeError):
@@ -33,6 +48,7 @@ class TabPFNArtifactError(RuntimeError):
 
 
 def _import_tabpfn_regressor():
+    _load_project_env()
     try:
         from tabpfn import TabPFNRegressor
     except ImportError as exc:  # pragma: no cover - depends on local environment
@@ -71,6 +87,7 @@ def _context_path(metadata_path: Path, metadata: dict[str, Any]) -> Path:
 
 
 def _fit_regressors(metadata_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    # TabPFN 推理依赖训练上下文，因此 artifact 会保存拟合后的上下文样本。
     metadata = _read_metadata(metadata_path)
     context = np.load(_context_path(metadata_path, metadata), allow_pickle=False)
     feature_names = list(NUMERIC_FEATURE_NAMES)
@@ -98,7 +115,7 @@ def _feature_frame(route: RouteFeatures) -> pd.DataFrame:
 
 
 def _predict_contributions(preference: str) -> dict[str, float]:
-    # TabPFN does not expose cheap per-row feature attributions in the core package.
+    # TabPFN 官方核心包没有提供轻量的逐样本特征归因。
     return {feature: 0.0 for feature in NUMERIC_FEATURE_NAMES}
 
 
@@ -113,14 +130,18 @@ class TabPFNRouteScoringModel:
     def _artifact(self) -> tuple[dict[str, Any], dict[str, Any]]:
         return _load_artifact(str(self.artifact_path))
 
-    def score_route(self, route: RouteFeatures, *, preference: str) -> ScoreResult:
+    def predict_feature_frame(self, features: pd.DataFrame) -> np.ndarray:
+        # 批量预测比逐条路线调用 predict 更快，尤其是在 GPU 环境下。
         _metadata, models = self._artifact()
+        x = features[list(NUMERIC_FEATURE_NAMES)].astype(float)
+        predictions = np.zeros((len(x), len(SCORE_NAMES)), dtype=float)
+        for index, score_name in enumerate(SCORE_NAMES):
+            predictions[:, index] = np.asarray(models[score_name].predict(x), dtype=float)
+        return np.clip(predictions, 0.0, 100.0)
+
+    def score_route(self, route: RouteFeatures, *, preference: str) -> ScoreResult:
         x = _feature_frame(route)
-        five_scores = np.array(
-            [float(models[score_name].predict(x)[0]) for score_name in SCORE_NAMES],
-            dtype=float,
-        )
-        five_scores = np.clip(five_scores, 0.0, 100.0)
+        five_scores = self.predict_feature_frame(x)[0]
         recommend_score = mix_recommend_score(five_scores, preference=preference)
 
         return ScoreResult(

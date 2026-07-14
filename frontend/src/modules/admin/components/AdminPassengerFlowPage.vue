@@ -74,6 +74,11 @@
             </div>
             <span>&#x5B9E;&#x9A8C;&#x6027;&#x517C;&#x5BB9;&#x63A5;&#x53E3;</span>
           </div>
+          <div v-if="predictionItems.length" class="prediction-meta">
+            <span>{{ predictionRange }}</span>
+            <span>{{ predictionModel }}</span>
+            <span>{{ predictionConfidence }}</span>
+          </div>
           <PassengerFlowChart
             eyebrow="Passenger Flow Prediction"
             title="&#x9884;&#x6D4B;&#x5BA2;&#x6D41;&#x66F2;&#x7EBF;"
@@ -123,6 +128,24 @@ const predictionSeries = [
 ]
 
 const formatNumber = (value) => new Intl.NumberFormat('zh-CN').format(Number(value) || 0)
+const formatPredictionTime = (value) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '--' : date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit' })
+}
+const predictionRange = computed(() => {
+  if (!predictionItems.value.length) return ''
+  return `${formatPredictionTime(predictionItems.value[0]?.predict_time)} - ${formatPredictionTime(predictionItems.value.at(-1)?.predict_time)}`
+})
+const predictionModel = computed(() => {
+  const model = predictionItems.value.find((item) => item?.model_version)?.model_version
+  return model ? `模型 ${model}` : '预测模型未标注'
+})
+const predictionConfidence = computed(() => {
+  const values = predictionItems.value.map((item) => Number(item?.confidence)).filter(Number.isFinite)
+  if (!values.length) return '置信度未标注'
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length
+  return `平均置信度 ${Math.round(average * 100)}%`
+})
 const normalizedLevel = computed(() => String(summary.value.dominant_flow_level || '').toLowerCase())
 const comfortText = computed(() => ({
   low: '\u8212\u9002',
@@ -134,15 +157,17 @@ const isSelected = (station) => String(selectedStation.value?.station_id) === St
 </script>
 
 <style scoped>
-.admin-flow-page { min-height:0; display:grid; grid-template-columns:minmax(260px,310px) minmax(0,1fr); overflow:hidden; border:1px solid rgba(255,255,255,.18); border-radius:10px; background:rgba(255,255,255,.045); box-shadow:0 18px 42px rgba(9,28,49,.14); }
-.station-filter-panel { min-height:0; display:grid; grid-template-rows:auto auto auto minmax(0,1fr); gap:14px; padding:18px; overflow:hidden; border-right:1px solid rgba(255,255,255,.16); background:rgba(8,32,54,.18); }
+.admin-flow-page { min-height:0; display:grid; grid-template-columns:minmax(260px,310px) minmax(0,1fr); gap:18px; overflow:hidden; }
+.station-filter-panel,.history-flow-section,.prediction-flow-section,.flow-detail-empty { border:1px solid rgba(255,255,255,.2); border-radius:10px; background:linear-gradient(145deg,rgba(255,255,255,.11),rgba(69,107,147,.26)); box-shadow:inset 0 1px rgba(255,255,255,.11),0 18px 42px rgba(9,28,49,.14); backdrop-filter:blur(18px) saturate(125%); -webkit-backdrop-filter:blur(18px) saturate(125%); }
+.station-filter-panel { min-height:0; display:grid; grid-template-rows:auto auto auto minmax(0,1fr); gap:14px; padding:18px; overflow:hidden; }
 .station-filter-panel>header,.detail-heading,.prediction-note { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }.station-filter-panel p,.station-filter-panel h2,.detail-heading p,.detail-heading h2,.prediction-note p,.prediction-note h2 { margin:0; }.station-filter-panel h2 { margin-top:4px; font-size:21px; }.station-filter-panel>header>span { color:rgba(255,255,255,.58); font-size:11px; }
 .station-search { display:grid; gap:7px; }.station-search span { color:rgba(255,255,255,.7); font-size:12px; }.station-search input { width:100%; border:1px solid rgba(255,255,255,.18); border-radius:8px; padding:11px 12px; color:#fff; background:rgba(9,33,55,.34); outline:none; }.station-search input:focus { border-color:#8de4ce; box-shadow:0 0 0 3px rgba(141,228,206,.12); }
 .form-tip { margin:0; color:#ffd4bd; font-size:12px; }.station-list-scroll { min-height:0; display:grid; align-content:start; gap:9px; overflow-y:auto; padding-right:5px; scrollbar-width:thin; scrollbar-color:rgba(141,228,206,.7) rgba(255,255,255,.06); }
 .station-row { display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:11px; background:rgba(9,33,55,.18); }.station-row.is-selected { border-color:#8de4ce; background:rgba(83,190,164,.16); }.station-row>div { min-width:0; display:grid; gap:3px; }.station-row strong,.station-row span,.station-row small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.station-row span { color:#aee9dc; font-size:11px; }.station-row small { color:rgba(255,255,255,.5); font-size:10px; }.station-row button { flex:0 0 auto; padding:7px 10px; font-size:11px; }.station-state { padding:24px 8px; text-align:center; color:rgba(255,255,255,.58); }
-.flow-detail-workspace { min-width:0; min-height:0; overflow-y:auto; padding:18px; scrollbar-width:thin; scrollbar-color:rgba(141,228,206,.7) rgba(255,255,255,.06); }.history-flow-section,.prediction-flow-section { display:grid; gap:16px; }.prediction-flow-section { margin-top:18px; padding-top:18px; border-top:1px solid rgba(255,255,255,.14); }
+.flow-detail-workspace { min-width:0; min-height:0; overflow-y:auto; padding-right:3px; scrollbar-width:thin; scrollbar-color:rgba(141,228,206,.7) rgba(255,255,255,.06); }.history-flow-section,.prediction-flow-section { display:grid; gap:16px; padding:18px; }.prediction-flow-section { margin-top:18px; }
 .detail-heading h2,.prediction-note h2 { margin-top:4px; font-size:24px; }.detail-heading div>span { display:block; margin-top:5px; color:rgba(255,255,255,.58); font-size:12px; }.loading-chip,.prediction-note>span { border-radius:999px; padding:7px 11px; color:#17334a; font-size:10px; font-weight:700; background:#aef0de; }.prediction-note>span { color:#6a4420; background:#ffd09c; }
-.flow-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }.flow-summary-grid article { border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:13px 15px; background:rgba(8,32,54,.25); }.flow-summary-grid span { display:block; color:rgba(255,255,255,.55); font-size:11px; }.flow-summary-grid strong { display:block; margin-top:6px; font-size:20px; }.comfort-level.is-low { color:#8de4ce; }.comfort-level.is-medium { color:#ffd09c; }.comfort-level.is-high { color:#ffad9f; }.comfort-level.is-unknown { color:rgba(255,255,255,.62); }
+.prediction-meta { display:flex; flex-wrap:wrap; gap:8px; }.prediction-meta span { border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:6px 10px; color:rgba(255,255,255,.72); font-size:10px; background:rgba(8,32,54,.22); }
+.flow-summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }.flow-summary-grid article { border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:13px 15px; background:linear-gradient(145deg,rgba(255,255,255,.08),rgba(8,32,54,.18)); backdrop-filter:blur(12px); }.flow-summary-grid span { display:block; color:rgba(255,255,255,.55); font-size:11px; }.flow-summary-grid strong { display:block; margin-top:6px; font-size:20px; }.comfort-level.is-low { color:#8de4ce; }.comfort-level.is-medium { color:#ffd09c; }.comfort-level.is-high { color:#ffad9f; }.comfort-level.is-unknown { color:rgba(255,255,255,.62); }
 .flow-detail-empty { min-height:100%; display:grid; place-content:center; justify-items:center; padding:40px; text-align:center; }.empty-mark { border-radius:8px; padding:12px 15px; color:#17334a; font-size:12px; font-weight:900; letter-spacing:.12em; background:#aef0de; }.flow-detail-empty h2 { margin:18px 0 8px; }.flow-detail-empty p { max-width:480px; margin:0; color:rgba(255,255,255,.58); }
 @media(max-width:900px){.admin-flow-page{grid-template-columns:1fr;overflow:visible}.station-filter-panel{max-height:480px;border-right:0;border-bottom:1px solid rgba(255,255,255,.16)}.flow-detail-workspace{overflow:visible}}
 @media(max-width:560px){.flow-summary-grid{grid-template-columns:1fr}.detail-heading,.prediction-note{flex-direction:column}}

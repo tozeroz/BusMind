@@ -7,6 +7,14 @@
 <template>
   <div class="bus-map-wrapper">
     <div ref="mapContainer" class="bus-map"></div>
+    <div v-if="isTrafficHeatmapVisible" class="traffic-heatmap-legend" aria-label="交通拥堵热力图图例">
+      <strong>道路拥堵</strong>
+      <span><i class="is-free"></i>畅通</span>
+      <span><i class="is-slow"></i>缓行</span>
+      <span><i class="is-congested"></i>拥堵</span>
+      <span><i class="is-severe"></i>严重</span>
+      <span><i class="is-no-data"></i>暂无数据</span>
+    </div>
   </div>
 </template>
 
@@ -23,6 +31,7 @@ import { PRIORITY_BUS_STOP_CODES } from '@/modules/map/constants/priority-stops'
 const emit = defineEmits(['select-stop', 'select-stop-destination', 'select-route', 'load-error', 'initial-data-loaded'])
 
 const mapContainer = ref(null)
+const isTrafficHeatmapVisible = ref(false)
 let map = null
 let pmtilesProtocol = null
 let busStops = []
@@ -254,6 +263,7 @@ function getStopRoutes(stopId) {
 }
 
 function clearSelection() {
+  hideTrafficHeatmap()
   selectedStopForRoutes = null
   areRoutesVisible = false
   setSelectedStopState(null)
@@ -265,6 +275,7 @@ function clearSelection() {
 }
 
 function highlightRoute(feature, options = {}) {
+  hideTrafficHeatmap()
   const preservedStopId = options.preserveStopId ?? null
   const preservedStopFeature = preservedStopId !== null
     ? findStopFeature(preservedStopId)
@@ -284,6 +295,7 @@ function highlightRoute(feature, options = {}) {
 }
 
 function highlightStop(stopId) {
+  hideTrafficHeatmap()
   selectedStopForRoutes = null
   setSelectedStopState(stopId)
   setStopsDimmed(false)
@@ -295,6 +307,7 @@ function highlightStop(stopId) {
 }
 
 function highlightStopReachableRoutes(stop) {
+  hideTrafficHeatmap()
   const resolvedStop = resolveStop(stop)
   if (!resolvedStop) return []
 
@@ -405,6 +418,16 @@ function normalizeCoordinates(coordinates) {
   return coordinates
     .filter(isValidCoordinate)
     .map((coordinate) => [Number(coordinate[0]), Number(coordinate[1])])
+    .filter((coordinate, index, items) => {
+      if (index === 0) return true
+      const previous = items[index - 1]
+      return coordinate[0] !== previous[0] || coordinate[1] !== previous[1]
+    })
+}
+
+function coordinatesConnect(first, second) {
+  if (!first || !second) return false
+  return Math.abs(first[0] - second[0]) < 0.000001 && Math.abs(first[1] - second[1]) < 0.000001
 }
 
 function interpolateCatmullRom(p0, p1, p2, p3, t) {
@@ -417,18 +440,23 @@ function interpolateCatmullRom(p0, p1, p2, p3, t) {
   ]
 }
 
-function smoothRouteCoordinates(coordinates) {
+function smoothRouteCoordinates(coordinates, options = {}) {
   const points = normalizeCoordinates(coordinates)
-  if (points.length < 3) return points
+  if (points.length < 2) return points
+  if (points.length < 3 && !options.previousPoint && !options.nextPoint) return points
 
   const smoothed = [points[0]]
-  const segmentSteps = 8
+  const segmentSteps = Number(options.segmentSteps) || 8
 
   for (let index = 0; index < points.length - 1; index += 1) {
-    const p0 = points[Math.max(0, index - 1)]
+    const p0 = index === 0
+      ? (options.previousPoint || points[0])
+      : points[index - 1]
     const p1 = points[index]
     const p2 = points[index + 1]
-    const p3 = points[Math.min(points.length - 1, index + 2)]
+    const p3 = index + 2 < points.length
+      ? points[index + 2]
+      : (options.nextPoint || points[points.length - 1])
 
     for (let step = 1; step <= segmentSteps; step += 1) {
       smoothed.push(interpolateCatmullRom(p0, p1, p2, p3, step / segmentSteps))
@@ -450,6 +478,11 @@ function addRouteSources() {
   map.addSource('routes-path', {
     type: 'geojson',
     promoteId: 'line_id',
+    data: emptyFeatureCollection
+  })
+
+  map.addSource('traffic-heatmap', {
+    type: 'geojson',
     data: emptyFeatureCollection
   })
 }
@@ -575,6 +608,40 @@ function addRouteLayers() {
       'text-halo-color': '#ffffff',
       'text-halo-width': 1,
       'text-opacity': 1
+    }
+  })
+}
+
+function addTrafficHeatmapLayers() {
+  map.addLayer({
+    id: 'traffic-heatmap-bg',
+    type: 'line',
+    source: 'traffic-heatmap',
+    layout: {
+      'line-cap': 'round',
+      'line-join': 'round'
+    },
+    paint: {
+      'line-color': '#ffffff',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5.2, 14, 7.8, 17, 10.5],
+      'line-opacity': 0.92,
+      'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 0.08, 17, 0.16]
+    }
+  })
+
+  map.addLayer({
+    id: 'traffic-heatmap',
+    type: 'line',
+    source: 'traffic-heatmap',
+    layout: {
+      'line-cap': 'round',
+      'line-join': 'round'
+    },
+    paint: {
+      'line-color': ['coalesce', ['get', 'heat_color'], '#9CA3AF'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.6, 14, 4.5, 17, 6.4],
+      'line-opacity': ['case', ['boolean', ['get', 'is_stale'], false], 0.64, 0.98],
+      'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 0.02, 17, 0.06]
     }
   })
 }
@@ -1058,6 +1125,7 @@ onMounted(() => {
     addRouteSources()
     addStopSources()
     addRouteLayers()
+    addTrafficHeatmapLayers()
     addStopLayers()
     bindRouteLayerEvents()
     bindStopLayerEvents()
@@ -1123,6 +1191,7 @@ function showStationRoutes(stop) {
 
 function showAllRoutes() {
   if (!map || !map.getSource('routes')) return
+  hideTrafficHeatmap()
   selectedStopForRoutes = null
   areRoutesVisible = true
   setStopsDimmed(false)
@@ -1135,12 +1204,72 @@ function showAllRoutes() {
 
 function hideRoutes() {
   if (!map || !map.getSource('routes')) return
+  hideTrafficHeatmap()
   selectedStopForRoutes = null
   areRoutesVisible = false
   setSourceData('routes', emptyFeatureCollection)
   setSourceData('routes-path', emptyFeatureCollection)
   setSourceData('stops-highlight', emptyFeatureCollection)
   setSourceData('stops-highlight-selected', emptyFeatureCollection)
+}
+
+function showTrafficHeatmap(segments = []) {
+  if (!map || !map.getSource('traffic-heatmap')) return 0
+  const preparedSegments = segments.map((segment) => ({
+    segment,
+    coordinates: normalizeCoordinates(Array.isArray(segment?.coordinates) ? segment.coordinates : [])
+  }))
+
+  const features = preparedSegments.flatMap(({ segment, coordinates }, index) => {
+    if (coordinates.length < 2) return []
+
+    const previousCoordinates = preparedSegments[index - 1]?.coordinates || []
+    const nextCoordinates = preparedSegments[index + 1]?.coordinates || []
+    const previousPoint = previousCoordinates.length >= 2
+      && coordinatesConnect(previousCoordinates[previousCoordinates.length - 1], coordinates[0])
+      ? previousCoordinates[previousCoordinates.length - 2]
+      : null
+    const nextPoint = nextCoordinates.length >= 2
+      && coordinatesConnect(coordinates[coordinates.length - 1], nextCoordinates[0])
+      ? nextCoordinates[1]
+      : null
+    const smoothedCoordinates = smoothRouteCoordinates(coordinates, {
+      previousPoint,
+      nextPoint,
+      segmentSteps: 8
+    })
+
+    return [{
+      type: 'Feature',
+      id: segment.route_segment_id || segment.link_id || `traffic-${index}`,
+      geometry: { type: 'LineString', coordinates: smoothedCoordinates },
+      properties: {
+        route_segment_id: segment.route_segment_id || '',
+        line_id: Number(segment.line_id) || 0,
+        link_id: Number(segment.link_id) || 0,
+        road_name: segment.road_name || '',
+        speed_band: Number(segment.speed_band) || 0,
+        minimum_speed_kmh: Number(segment.minimum_speed_kmh) || 0,
+        maximum_speed_kmh: Number(segment.maximum_speed_kmh) || 0,
+        congestion_score: Number(segment.congestion_score) || 0,
+        congestion_label: segment.congestion_label || '',
+        data_status: segment.data_status || 'no_data',
+        heat_color: segment.heat_color || '#9CA3AF',
+        congestion_level: segment.congestion_level || 'no_data',
+        is_stale: Boolean(segment.is_stale)
+      }
+    }]
+  })
+  setSourceData('traffic-heatmap', createFeatureCollection(features))
+  isTrafficHeatmapVisible.value = features.length > 0
+  return features.length
+}
+
+function hideTrafficHeatmap() {
+  if (map?.getSource('traffic-heatmap')) {
+    setSourceData('traffic-heatmap', emptyFeatureCollection)
+  }
+  isTrafficHeatmapVisible.value = false
 }
 
 defineExpose({
@@ -1151,12 +1280,15 @@ defineExpose({
   showStationRoutes,
   showAllRoutes,
   hideRoutes,
+  showTrafficHeatmap,
+  hideTrafficHeatmap,
   getStopRoutes
 })
 </script>
 
 <style scoped>
 .bus-map-wrapper {
+  position: relative;
   width: 100%;
   height: 100%;
   min-height: 600px;
@@ -1165,5 +1297,62 @@ defineExpose({
 .bus-map {
   width: 100%;
   height: 100%;
+}
+
+.traffic-heatmap-legend {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  bottom: 22px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100% - 40px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+  transform: translateX(-50%);
+}
+
+.traffic-heatmap-legend strong,
+.traffic-heatmap-legend span {
+  white-space: nowrap;
+}
+
+.traffic-heatmap-legend strong {
+  margin-right: 2px;
+  color: #0f172a;
+  font-size: 10px;
+}
+
+.traffic-heatmap-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+}
+
+.traffic-heatmap-legend i {
+  width: 15px;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.traffic-heatmap-legend .is-free { background: #22C55E; }
+.traffic-heatmap-legend .is-slow { background: #EAB308; }
+.traffic-heatmap-legend .is-congested { background: #F97316; }
+.traffic-heatmap-legend .is-severe { background: #EF4444; }
+.traffic-heatmap-legend .is-no-data { background: #9CA3AF; }
+
+@media (max-width: 720px) {
+  .traffic-heatmap-legend {
+    gap: 6px;
+    overflow-x: auto;
+    border-radius: 12px;
+  }
 }
 </style>

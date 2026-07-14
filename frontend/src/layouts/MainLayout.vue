@@ -8,7 +8,7 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <span class="brand-mark">B</span>
+        <img class="brand-mark brand-logo" src="/logo/busmind-bus-logo.png" alt="智行公交 Logo" />
         <div>
           <strong>{{ $route.path === '/profile' ? '个人中心' : '智行公交' }}</strong>
           <small>{{ $route.path === '/profile' ? 'Profile' : 'BusMind' }}</small>

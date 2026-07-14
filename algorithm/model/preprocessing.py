@@ -78,7 +78,7 @@ def congestion_score_from_speed_band(speed_band: Any) -> float | None:
     band = int(number)
     if band <= 0:
         return None
-    # LTA SpeedBand: 1 is slowest, 8 is fastest. Model uses a 0-100 smoothness score.
+    # LTA SpeedBand 中 1 最慢、8 最快；模型侧统一映射为 0-100 的通畅度分数。
     return _clip_score(30.0 + (max(1, min(8, band)) - 1) * 10.0)
 
 
