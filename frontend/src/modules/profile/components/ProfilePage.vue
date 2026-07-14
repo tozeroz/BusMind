@@ -14,11 +14,9 @@
         <div v-else class="profile-dashboard-grid">
           <div class="profile-column">
             <ProfileAccountCard :user="user" :form="profileForm" :editing="editing" :saving="saving" @edit="editing=true" @cancel="cancelEdit" @save="saveProfile" />
-            <TravelStatsCard :favorite-count="favoriteCount" :query-count="queryCount" :average-wait="averageWait" />
           </div>
           <div class="profile-column">
             <FavoriteRoutesCard :favorites="favorites" @remove="removeFavorite" />
-            <PreferenceWeightsCard :preference="preference" />
           </div>
           <div class="profile-column">
             <RecentActivityCard :histories="histories" />
@@ -33,14 +31,12 @@
 import { useProfilePage } from '@/modules/profile/composables/useProfilePage'
 import ProfileHero from './ProfileHero.vue'
 import ProfileAccountCard from './ProfileAccountCard.vue'
-import TravelStatsCard from './TravelStatsCard.vue'
 import FavoriteRoutesCard from './FavoriteRoutesCard.vue'
 import RecentActivityCard from './RecentActivityCard.vue'
-import PreferenceWeightsCard from './PreferenceWeightsCard.vue'
 
 const {
-  user, favorites, histories, loading, saving, editing, message, profileForm, preference,
-  displayName, avatarText, roleText, favoriteCount, queryCount, averageWait,
+  user, favorites, histories, loading, saving, editing, message, profileForm,
+  displayName, avatarText, roleText,
   saveProfile, cancelEdit, removeFavorite
 } = useProfilePage()
 </script>
@@ -55,20 +51,21 @@ const {
 }
 .profile-scroll-area { height:100%; min-height:0; overflow-y:auto; scrollbar-gutter:stable; scrollbar-color:rgba(255,255,255,.76) rgba(15,39,67,.18); }
 .profile-content { width:100%; margin:0 auto; padding:18px 22px 30px; }
-.profile-dashboard-grid { display:grid; grid-template-columns:minmax(300px,1fr) minmax(340px,1fr) minmax(310px,1fr); gap:18px; align-items:start; }
-.profile-column { display:grid; gap:18px; min-width:0; }
+.profile-dashboard-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; align-items:stretch; }
+.profile-column { display:grid; min-width:0; }
 .profile-message,.profile-loading { margin:0 0 16px; border:1px solid rgba(255,255,255,.28); border-radius:10px; padding:12px 16px; background:rgba(52,91,130,.55); backdrop-filter:blur(16px); }
 .profile-loading { min-height:180px; display:grid; place-items:center; font-weight:700; }
 :deep(.profile-hero),:deep(.profile-card) { border:1px solid rgba(255,255,255,.25); border-radius:11px; background:rgba(106,145,187,.54); backdrop-filter:blur(20px); box-shadow:0 18px 46px rgba(12,38,70,.16); }
-:deep(.profile-hero) { display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,425px); align-items:center; gap:28px; min-height:164px; margin-bottom:18px; padding:20px 24px; background:rgba(106,145,187,.54); }
+:deep(.profile-hero) { display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,400px); align-items:center; gap:22px; min-height:124px; margin-bottom:18px; padding:14px 20px; background:rgba(106,145,187,.54); }
 :deep(.profile-identity) { display:flex; align-items:center; gap:22px; min-width:0; }
-:deep(.profile-avatar) { display:grid; flex:0 0 78px; width:78px; height:88px; place-items:center; border-radius:50%; color:#1b2c42; font-size:34px; font-weight:900; background:rgba(247,251,255,.94); box-shadow:0 12px 30px rgba(14,46,82,.15); }
+:deep(.profile-avatar) { display:grid; flex:0 0 68px; width:68px; height:68px; aspect-ratio:1; place-items:center; border-radius:50%; color:#1b2c42; font-size:30px; font-weight:900; background:rgba(247,251,255,.94); box-shadow:0 12px 30px rgba(14,46,82,.15); }
 :deep(.profile-kicker),:deep(.profile-card-header p) { margin:0 0 8px; color:rgba(255,255,255,.76); font-size:15px; font-weight:800; }
 :deep(.profile-identity h1) { margin:0 0 8px; font-size:36px; line-height:1.08; }
 :deep(.profile-identity p:last-child),:deep(.today-preference p) { margin:0; color:rgba(255,255,255,.7); font-size:17px; }
-:deep(.today-preference) { display:grid; gap:9px; border:1px solid rgba(255,255,255,.22); border-radius:10px; padding:16px 18px; background:rgba(255,255,255,.12); }
+:deep(.today-preference) { display:grid; gap:5px; border:1px solid rgba(255,255,255,.22); border-radius:10px; padding:10px 14px; background:rgba(255,255,255,.12); }
 :deep(.today-preference span) { color:rgba(255,255,255,.7); font-size:16px; }
 :deep(.today-preference strong) { font-size:24px; }
+:deep(.profile-column > .profile-card) { height:100%; }
 :deep(.profile-card) { padding:26px 22px; }
 :deep(.profile-card-header) { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:22px; }
 :deep(.profile-card-header h2) { margin:0; font-size:27px; }
@@ -97,5 +94,5 @@ const {
 :deep(.preference-card input) { width:100%; accent-color:#e8f2f8; }
 :deep(.preference-card label strong) { text-align:right; }
 @media(max-width:1100px){.profile-dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.profile-column:last-child{grid-column:1/-1}:deep(.activity-list){grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:760px){.profile-content{padding:14px}.profile-dashboard-grid{grid-template-columns:1fr}.profile-column:last-child{grid-column:auto}:deep(.profile-hero){grid-template-columns:1fr;padding:22px 18px}:deep(.profile-identity){align-items:flex-start}:deep(.profile-avatar){flex-basis:74px;width:74px;height:82px;font-size:30px}:deep(.profile-identity h1){font-size:34px}:deep(.today-preference){padding:18px}:deep(.profile-stats-grid),:deep(.activity-list){grid-template-columns:1fr}}
+@media(max-width:760px){.profile-content{padding:14px}.profile-dashboard-grid{grid-template-columns:1fr}.profile-column:last-child{grid-column:auto}:deep(.profile-hero){grid-template-columns:1fr;padding:14px 16px}:deep(.profile-identity){align-items:center}:deep(.profile-avatar){flex-basis:62px;width:62px;height:62px;font-size:28px}:deep(.profile-identity h1){font-size:32px}:deep(.today-preference){padding:10px 14px}:deep(.activity-list){grid-template-columns:1fr}}
 </style>
