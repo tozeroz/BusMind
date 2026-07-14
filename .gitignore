@@ -1,6 +1,6 @@
 # BusMind gitignore
-# Commit source code, scripts, docs, config templates, and small hand-written assets.
-# Do not commit local secrets, raw/processed data, generated datasets, caches, or build outputs.
+# Commit source code, scripts, docs, config templates, algorithm datasets, and small hand-written assets.
+# Do not commit local secrets, raw/processed LTA dumps, caches, or build outputs.
 
 # OS / editor
 .DS_Store
@@ -92,11 +92,6 @@ data/processed/process_scripts/__pycache__/
 data/processed/process_scripts/**/*.pyc*
 data/processed/*.csv
 
-# Algorithm dataset and model artifacts are committed for reproducible demos.
-!algorithm/dataset/**/*.csv
-!algorithm/dataset/**/*.jsonl
-!algorithm/dataset/**/*.parquet
-
 # Legacy model files outside algorithm/model stay local unless explicitly moved.
 algorithm/model_files/*
 !algorithm/model_files/.gitkeep
@@ -114,6 +109,15 @@ algorithm/model_files/*
 database/backup/
 database/mock/
 database/seed/
+
+# Algorithm dataset snapshots are part of the algorithm deliverable.
+# Keep data, labels, prompts, responses, summaries, and evaluation-ready files versionable.
+!algorithm/dataset/
+!algorithm/dataset/**
+algorithm/dataset/**/__pycache__/
+algorithm/dataset/**/*.py[cod]
+algorithm/dataset/**/*.log
+algorithm/dataset/**/*.tmp
 
 # Keep intentional empty directories when they are still used
 !**/.gitkeep
