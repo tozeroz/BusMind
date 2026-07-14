@@ -69,6 +69,17 @@ DEEPSEEK_API_KEY=你的_DeepSeek_Key
 DEEPSEEK_MODEL=deepseek-chat
 ```
 
+可选 Redis 缓存配置（服务器有 Redis 时建议开启）：
+
+```env
+CACHE_BACKEND=redis
+REDIS_URL=redis://Redis主机:6379/0
+REDIS_KEY_PREFIX=busmind
+REDIS_SOCKET_TIMEOUT_SECONDS=2
+```
+
+未配置 `REDIS_URL` 或 Redis 暂时不可用时，后端会自动回退到进程内存缓存。
+
 后端邮件验证码还需要：
 
 ```env

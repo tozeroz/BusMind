@@ -638,8 +638,8 @@ function addStopLayers() {
     minzoom: 9,
     maxzoom: 15,
     paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 0.6, 11, 1, 13, 2, 14, 3.5, 15, ['case', ['boolean', ['feature-state', 'selected'], false], 7, 5]],
-      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', stopPriorityColorExpression],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 0.6, 11, 1, 13, 2, 14, 3.5, 15, 5],
+      'circle-color': stopPriorityColorExpression,
       'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], stopStroke, '#ffffff'],
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 9, 0, 12, 0.5, 15, 1.5],
       'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0, 12, 0.35, 15, 0.85],
@@ -653,8 +653,8 @@ function addStopLayers() {
     source: 'stops',
     minzoom: 13.5,
     paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 2, 15, ['case', ['boolean', ['feature-state', 'selected'], false], 9, 5], 17, ['case', ['boolean', ['feature-state', 'selected'], false], 12, 7]],
-      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', stopPriorityColorExpression],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 2, 15, 5, 17, 7],
+      'circle-color': stopPriorityColorExpression,
       'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], stopStroke, '#ffffff'],
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 14, 1, 15, 2, 17, 3],
       'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, 0.62, 17, 0.9],
@@ -741,6 +741,7 @@ function bindStopLayerEvents() {
 
     if (!stop) return
 
+    highlightStop(stop.stop_id)
     emit('select-stop', stop)
     scheduleFocusOnCoordinates([[stop.lng, stop.lat]], 17)
   })
