@@ -1,0 +1,148 @@
+{
+  "model_version": "0.1.0",
+  "architecture": "12_feature_xgboost_5_regression_heads",
+  "feature_names": [
+    "eta_minutes",
+    "ride_time_minutes",
+    "walk_time_minutes",
+    "walk_distance_meters",
+    "transfer_count",
+    "load_score",
+    "history_flow_score",
+    "congestion_score",
+    "data_freshness_seconds",
+    "monitored_score",
+    "completeness_score",
+    "avg_service_frequency_minutes"
+  ],
+  "score_names": [
+    "time_score",
+    "comfort_score",
+    "walk_score",
+    "transfer_score",
+    "reliability_score"
+  ],
+  "model_files": {
+    "time_score": "xgboost_time_score.json",
+    "comfort_score": "xgboost_comfort_score.json",
+    "walk_score": "xgboost_walk_score.json",
+    "transfer_score": "xgboost_transfer_score.json",
+    "reliability_score": "xgboost_reliability_score.json"
+  },
+  "training_rows": 8000,
+  "validation_rows": 2000,
+  "features_path": "D:\\SummerTraining\\BusMind\\algorithm\\dataset\\features.csv",
+  "labels_path": "algorithm\\dataset\\rule_llm_fused_pseudo_labels.csv",
+  "sample_weight_column": "sample_weight",
+  "params": {
+    "n_estimators": 320,
+    "max_depth": 4,
+    "learning_rate": 0.04,
+    "subsample": 0.9,
+    "colsample_bytree": 0.9,
+    "reg_lambda": 2.0,
+    "min_child_weight": 2.0,
+    "tree_method": "hist",
+    "random_state": 42
+  },
+  "metrics": {
+    "scores": {
+      "time_score": {
+        "train": {
+          "rmse": 8.973422,
+          "mae": 7.156371
+        },
+        "eval": {
+          "rmse": 10.433338,
+          "mae": 8.350517
+        }
+      },
+      "comfort_score": {
+        "train": {
+          "rmse": 4.505175,
+          "mae": 3.555619
+        },
+        "eval": {
+          "rmse": 5.498822,
+          "mae": 4.403505
+        }
+      },
+      "walk_score": {
+        "train": {
+          "rmse": 6.726814,
+          "mae": 4.834452
+        },
+        "eval": {
+          "rmse": 7.845673,
+          "mae": 5.74716
+        }
+      },
+      "transfer_score": {
+        "train": {
+          "rmse": 4.100899,
+          "mae": 3.10647
+        },
+        "eval": {
+          "rmse": 4.795129,
+          "mae": 3.680637
+        }
+      },
+      "reliability_score": {
+        "train": {
+          "rmse": 0.929534,
+          "mae": 0.704926
+        },
+        "eval": {
+          "rmse": 1.189441,
+          "mae": 0.915061
+        }
+      }
+    },
+    "recommend_score": {
+      "train": {
+        "balanced": {
+          "rmse": 3.722856,
+          "mae": 2.920116
+        },
+        "fastest": {
+          "rmse": 5.814909,
+          "mae": 4.620758
+        },
+        "comfort": {
+          "rmse": 3.163274,
+          "mae": 2.483939
+        },
+        "less_walking": {
+          "rmse": 4.632478,
+          "mae": 3.477945
+        },
+        "less_transfer": {
+          "rmse": 3.700995,
+          "mae": 2.866818
+        }
+      },
+      "eval": {
+        "balanced": {
+          "rmse": 4.239522,
+          "mae": 3.366388
+        },
+        "fastest": {
+          "rmse": 6.665648,
+          "mae": 5.329486
+        },
+        "comfort": {
+          "rmse": 3.697499,
+          "mae": 2.935751
+        },
+        "less_walking": {
+          "rmse": 5.323331,
+          "mae": 4.084794
+        },
+        "less_transfer": {
+          "rmse": 4.245213,
+          "mae": 3.337704
+        }
+      }
+    }
+  }
+}
