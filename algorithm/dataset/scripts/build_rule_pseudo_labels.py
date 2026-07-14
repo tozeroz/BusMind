@@ -93,7 +93,7 @@ TRANSFER_BASE_SCORE = {
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=default_dataset_dir() / "features.csv")
-    parser.add_argument("--output", type=Path, default=default_dataset_dir() / "pseudo_labels.csv")
+    parser.add_argument("--output", type=Path, default=default_dataset_dir() / "rule_pseudo_labels.csv")
     parser.add_argument("--max-routes-per-group", type=int, default=10)
     return parser.parse_args()
 

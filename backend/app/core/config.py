@@ -8,12 +8,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_ROOT.parent
 
-# Load the repository-level .env as a compatibility fallback, then load
-# backend/.env as the canonical runtime configuration.
-# When the same variable exists in both files, backend/.env takes precedence.
+# The repository-level .env is the canonical runtime configuration shared by
+# backend, algorithm, data scripts, and local tools.
 ENV_FILES = (
     str(PROJECT_ROOT / ".env"),
-    str(BACKEND_ROOT / ".env"),
 )
 
 

@@ -1,7 +1,8 @@
 """Configuration for service-side intelligence modules.
 
-Secrets are read from environment variables or a dedicated ``service-b.env``
-file.  The loader intentionally runs before ``IntelligenceSettings`` is
+Secrets are read from environment variables or the repository-level ``.env``.
+Legacy ``service-b.env`` files are still accepted as a fallback for older local
+setups. The loader intentionally runs before ``IntelligenceSettings`` is
 instantiated so values such as ``DEEPSEEK_API_KEY`` are available during
 application import.
 """
@@ -23,11 +24,10 @@ BACKEND_ROOT = PROJECT_ROOT / "backend"
 
 
 def _candidate_env_files() -> list[Path]:
-    """Return supported service-B env locations in priority order.
+    """Return supported intelligence env locations in priority order.
 
-    ``service-b.env`` in the project root remains the canonical location.  The
-    backend directory and the common misspelling ``sevice-b.env`` are accepted
-    to make local startup less fragile.  ``BUSMIND_SERVICE_B_ENV_FILE`` can be
+    The project root ``.env`` is the canonical shared config. ``service-b.env``
+    remains as a legacy fallback. ``BUSMIND_SERVICE_B_ENV_FILE`` can still be
     used to select an explicit path.
     """
 
@@ -40,12 +40,8 @@ def _candidate_env_files() -> list[Path]:
     candidates.extend(
         [
             PROJECT_ROOT / ".env",
-            BACKEND_ROOT / ".env",
-            cwd / ".env",
             PROJECT_ROOT / "service-b.env",
             PROJECT_ROOT / "sevice-b.env",
-            BACKEND_ROOT / "service-b.env",
-            BACKEND_ROOT / "sevice-b.env",
             cwd / "service-b.env",
             cwd / "sevice-b.env",
         ]
@@ -113,9 +109,11 @@ def _api_key(name: str) -> str | None:
     lowered = value.lower()
     placeholders = (
         "请填写",
+        "你的",
         "your_api_key",
         "your-api-key",
         "replace_me",
+        "change_me",
         "changeme",
     )
     if any(marker in lowered for marker in placeholders):

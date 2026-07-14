@@ -26,10 +26,14 @@ def __getattr__(name: str):
         from algorithm.model.preprocessing import preprocess_route_payload
 
         return preprocess_route_payload
-    if name in {"PREFERENCE_MIX", "score_routes", "score_routes_typed"}:
-        from algorithm.model import scorer
+    if name == "PREFERENCE_MIX":
+        from algorithm.model.utils.score_mixing import PREFERENCE_MIX
 
-        return getattr(scorer, name)
+        return PREFERENCE_MIX
+    if name in {"score_routes", "score_routes_typed"}:
+        from algorithm.model import register
+
+        return getattr(register, name)
     raise AttributeError(f"module 'algorithm.model' has no attribute {name!r}")
 
 __all__ = [

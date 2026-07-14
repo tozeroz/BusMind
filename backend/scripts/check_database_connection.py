@@ -13,7 +13,7 @@ PROJECT_ROOT = BACKEND_ROOT.parent
 sys.path.insert(0, str(BACKEND_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.core.config import BACKEND_ROOT as CONFIG_BACKEND_ROOT  # noqa: E402
+from app.core.config import PROJECT_ROOT as CONFIG_PROJECT_ROOT  # noqa: E402
 from app.core.config import settings  # noqa: E402
 
 
@@ -26,9 +26,9 @@ def _masked_database_target(database_url: str) -> str:
 
 
 def main() -> int:
-    env_file = CONFIG_BACKEND_ROOT / ".env"
-    print(f"backend_root: {CONFIG_BACKEND_ROOT}")
-    print(f"backend_env_exists: {env_file.is_file()}")
+    env_file = CONFIG_PROJECT_ROOT / ".env"
+    print(f"project_root: {CONFIG_PROJECT_ROOT}")
+    print(f"shared_env_exists: {env_file.is_file()}")
     print(f"database_target: {_masked_database_target(settings.DATABASE_URL)}")
 
     connect_args: dict[str, object] = {}

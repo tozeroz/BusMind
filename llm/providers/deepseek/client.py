@@ -26,7 +26,11 @@ class DeepSeekClient:
     def __init__(self, config: DeepSeekConfig) -> None:
         self.config = config
 
-    async def chat(self, messages: list[dict[str, str]]) -> str:
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        response_format: dict[str, str] | None = None,
+    ) -> str:
         url = f"{self.config.base_url.rstrip('/')}/chat/completions"
         payload: dict[str, Any] = {
             "model": self.config.model,
@@ -36,6 +40,8 @@ class DeepSeekClient:
             "temperature": self.config.temperature,
             "thinking": {"type": "disabled"},
         }
+        if response_format is not None:
+            payload["response_format"] = response_format
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",

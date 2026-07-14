@@ -104,7 +104,7 @@
 
 ### 7.2 配置后端
 
-在 `backend/` 目录创建 `.env`（即 `backend/.env`），至少配置：
+在项目根目录创建 `.env`，至少配置：
 
 ```env
 DATABASE_URL=mysql+pymysql://busmind_dev:你的密码@127.0.0.1:3307/busmind?charset=utf8mb4

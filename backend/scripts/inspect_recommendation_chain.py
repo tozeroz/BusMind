@@ -28,8 +28,8 @@ for path in (PROJECT_ROOT, BACKEND_ROOT):
     if path_text not in sys.path:
         sys.path.insert(0, path_text)
 
-# 当前后端运行配置统一放在 backend/.env。
-load_dotenv(BACKEND_ROOT / ".env", override=False)
+# Runtime configuration is shared from the repository-level .env.
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 from app.core.time_utils import ensure_local_datetime, now_local
 from app.db.session import SessionLocal

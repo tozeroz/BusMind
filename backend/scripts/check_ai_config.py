@@ -51,7 +51,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    print(f"service-B env file: {SERVICE_B_ENV_FILE}")
+    print(f"intelligence env file: {SERVICE_B_ENV_FILE}")
     print(f"env file exists: {SERVICE_B_ENV_FILE.is_file()}")
     print(f"DEEPSEEK_API_KEY configured: {bool(settings.deepseek_api_key)}")
     if settings.deepseek_api_key:
