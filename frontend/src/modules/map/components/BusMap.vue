@@ -20,7 +20,7 @@ import { getMapLines, getMapStations, getRoadSegments } from '@/api/map'
 import { createProtomapsStyle } from '@/modules/map/constants/map-style'
 import { PRIORITY_BUS_STOP_CODES } from '@/modules/map/constants/priority-stops'
 
-const emit = defineEmits(['select-stop', 'select-route', 'load-error', 'initial-data-loaded'])
+const emit = defineEmits(['select-stop', 'select-stop-destination', 'select-route', 'load-error', 'initial-data-loaded'])
 
 const mapContainer = ref(null)
 let map = null
@@ -743,6 +743,19 @@ function bindStopLayerEvents() {
 
     highlightStop(stop.stop_id)
     emit('select-stop', stop)
+    scheduleFocusOnCoordinates([[stop.lng, stop.lat]], 17)
+  })
+
+  map.on('contextmenu', 'stops-hit', (event) => {
+    event.preventDefault()
+    event.originalEvent?.preventDefault()
+    const feature = event.features && event.features[0]
+    const stopId = feature && feature.properties ? feature.properties.stop_id : ''
+    const stop = busStops.find((item) => String(item.stop_id) === String(stopId))
+    if (!stop) return
+
+    highlightStop(stop.stop_id)
+    emit('select-stop-destination', stop)
     scheduleFocusOnCoordinates([[stop.lng, stop.lat]], 17)
   })
 }

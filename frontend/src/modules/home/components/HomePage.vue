@@ -10,6 +10,7 @@
       <BusMap
         ref="busMapRef"
         @select-stop="selectMapStop"
+        @select-stop-destination="selectMapDestination"
         @select-route="selectMapRoute"
         @load-error="notice = $event"
         @initial-data-loaded="refreshArrivals"
@@ -81,6 +82,9 @@
                 </button>
               </label>
               <p v-if="notice" class="form-tip">{{ notice }}</p>
+              <p class="muted map-selection-tip">
+                &#x5730;&#x56FE;&#x5FEB;&#x6377;&#x64CD;&#x4F5C;&#xFF1A;&#x5DE6;&#x952E;&#x8BBE;&#x4E3A;&#x8D77;&#x70B9; &middot; &#x53F3;&#x952E;&#x8BBE;&#x4E3A;&#x76EE;&#x7684;&#x5730;
+              </p>
             </form>
 
             <div class="home-waterfall-cards">
@@ -674,8 +678,37 @@ const selectStation = (stop) => {
   startStationEtaRefreshTimer(stop)
 }
 
+const clearJourneyResults = () => {
+  recommendation.value = null
+  routeOptions.value = []
+  rawRouteOptions.value = []
+  selectedRecommendedRoute.value = null
+}
+
 const selectMapStop = (stop) => {
+  const stopName = stop?.stop_name || stop?.station_name || ''
+  const stopId = Number(stop?.stop_id ?? stop?.station_id)
+  if (stopName) query.start = stopName
+  resolvedJourney.startStationId = Number.isInteger(stopId) && stopId > 0 ? stopId : null
+  clearJourneyResults()
+  notice.value = stopName ? `\u5df2\u5c06 ${stopName} \u8bbe\u4e3a\u8d77\u70b9` : ''
   selectStation(stop)
+}
+
+const selectMapDestination = (stop) => {
+  const stopName = stop?.stop_name || stop?.station_name || ''
+  const stopId = Number(stop?.stop_id ?? stop?.station_id)
+  if (!stopName) return
+  query.end = stopName
+  resolvedJourney.endStationId = Number.isInteger(stopId) && stopId > 0 ? stopId : null
+  clearJourneyResults()
+  panelMode.value = 'search'
+  isInfoPanelOpen.value = true
+  isAiChatOpen.value = false
+  isStationDetailOpen.value = false
+  isRoutesExpanded.value = false
+  clearStationEtaRefreshTimer()
+  notice.value = `\u5df2\u5c06 ${stopName} \u8bbe\u4e3a\u76ee\u7684\u5730\uff0c\u53ef\u76f4\u63a5\u70b9\u51fb\u68c0\u7d22`
 }
 
 const selectRoad = (route) => {
