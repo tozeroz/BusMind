@@ -33,6 +33,21 @@ def test_service_b_routes_are_mounted_in_formal_application():
     assert update.json()["data"]["vehicle_id"] == 101
 
 
+def test_ai_travel_route_is_mounted_in_formal_application():
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/ai/travel",
+        json={"mode": "qa", "question": "下一班车多久到？"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["status"] == "needs_clarification"
+    assert data["missing_fields"] == ["context.items"]
+    assert data["used_tools"] == []
+
+
 def test_formal_application_starts_refresh_scheduler(monkeypatch):
     scheduler = RecordingRefreshScheduler()
     monkeypatch.setattr(main_module, "_refresh_scheduler", scheduler)

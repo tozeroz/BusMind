@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import sys
 from pathlib import Path
@@ -11,7 +10,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.core.intelligence_settings import settings
-from app.schemas.ai_travel import AiMode, AiTravelRequest, AiTravelResult
+from app.schemas.ai_travel import (
+    AiMode,
+    AiTravelRequest,
+    AiTravelResult,
+    AiTravelStatus,
+)
 from app.schemas.recommendation import RecommendRoutesRequest, RouteRecommendation
 from app.services.recommend_service import RecommendationService
 from llm.prompts.travel_assistant import SYSTEM_PROMPT, build_user_prompt
@@ -32,9 +36,16 @@ class AiTravelService:
     async def answer(self, request: AiTravelRequest) -> AiTravelResult:
         routes = _extract_routes_from_context(request.context)
         used_tools: list[str] = []
+        evidence_source = "request_context" if routes else "none"
 
         if request.mode == AiMode.SUGGEST and not routes:
-            assert request.start_station_id is not None and request.end_station_id is not None
+            missing_fields = _missing_station_fields(request)
+            if missing_fields:
+                return self._clarification_result(
+                    request,
+                    missing_fields,
+                    "请提供完整的起点和终点，我才能查询候选路线、预计到站时间和客载情况。",
+                )
             recommendation = await self.recommendation_service.recommend(
                 RecommendRoutesRequest(
                     start_station_id=request.start_station_id,
@@ -49,15 +60,33 @@ class AiTravelService:
                 "travel_experience_evaluate",
                 "recommend_routes",
             ]
+            evidence_source = "recommendation_service"
         elif routes:
-            used_tools = ["recommend_routes"]
+            used_tools = ["provided_route_context"]
 
         if request.mode == AiMode.EXPLAIN and request.route_id:
             matched = [route for route in routes if route.route_id == request.route_id]
-            if matched:
-                routes = matched
+            if not matched:
+                return self._clarification_result(
+                    request,
+                    ["route_id"],
+                    "当前推荐结果中没有找到指定路线，请重新选择一条候选路线后再询问。",
+                    related_routes=routes[:5],
+                )
+            routes = matched
 
-        context_text = _routes_to_context(routes) if routes else "[]"
+        if request.mode == AiMode.QA and not routes:
+            return self._clarification_result(
+                request,
+                ["context.items"],
+                "当前没有可核验的路线、ETA 或客载数据。请先提供起点和终点并查询路线。",
+            )
+
+        evidence_context = _build_evidence_context(
+            request,
+            routes,
+            source=evidence_source,
+        )
         reminders = self._build_reminders(routes)
 
         if self.client is not None:
@@ -70,7 +99,7 @@ class AiTravelService:
                             "content": build_user_prompt(
                                 request.mode.value,
                                 request.question,
-                                context_text,
+                                evidence_context,
                             ),
                         },
                     ]
@@ -78,6 +107,7 @@ class AiTravelService:
                 return AiTravelResult(
                     answer=answer,
                     mode=request.mode,
+                    status=AiTravelStatus.COMPLETED,
                     used_tools=[*used_tools, "deepseek"],
                     related_routes=routes[:5],
                     reminders=reminders,
@@ -92,10 +122,30 @@ class AiTravelService:
         return AiTravelResult(
             answer=self._fallback_answer(request, routes),
             mode=request.mode,
+            status=AiTravelStatus.DEGRADED,
             used_tools=used_tools,
             related_routes=routes[:5],
             reminders=reminders,
             fallback=True,
+        )
+
+    @staticmethod
+    def _clarification_result(
+        request: AiTravelRequest,
+        missing_fields: list[str],
+        answer: str,
+        *,
+        related_routes: list[RouteRecommendation] | None = None,
+    ) -> AiTravelResult:
+        return AiTravelResult(
+            answer=answer,
+            mode=request.mode,
+            status=AiTravelStatus.NEEDS_CLARIFICATION,
+            missing_fields=missing_fields,
+            used_tools=[],
+            related_routes=related_routes or [],
+            reminders=[],
+            fallback=False,
         )
 
     @staticmethod
@@ -154,8 +204,8 @@ class AiTravelService:
         return reminders
 
 
-def _routes_to_context(routes: list[RouteRecommendation]) -> str:
-    payload = [
+def _routes_to_evidence(routes: list[RouteRecommendation]) -> list[dict[str, Any]]:
+    return [
         {
             "route_id": route.route_id,
             "line_names": [segment.line_name for segment in route.segments],
@@ -173,7 +223,43 @@ def _routes_to_context(routes: list[RouteRecommendation]) -> str:
         }
         for route in routes
     ]
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def _build_evidence_context(
+    request: AiTravelRequest,
+    routes: list[RouteRecommendation],
+    *,
+    source: str,
+) -> dict[str, Any]:
+    return {
+        "contract_version": "1.0",
+        "mode": request.mode.value,
+        "query": {
+            "preference": request.preference.value,
+            "start_station_id": request.start_station_id,
+            "end_station_id": request.end_station_id,
+            "route_id": request.route_id,
+        },
+        "evidence": {
+            "source": source,
+            "routes": _routes_to_evidence(routes),
+        },
+        "missing_information": [],
+        "constraints": {
+            "route_facts_are_authoritative": True,
+            "model_must_not_recalculate_metrics": True,
+            "model_must_not_invent_realtime_data": True,
+        },
+    }
+
+
+def _missing_station_fields(request: AiTravelRequest) -> list[str]:
+    missing: list[str] = []
+    if request.start_station_id is None:
+        missing.append("start_station_id")
+    if request.end_station_id is None:
+        missing.append("end_station_id")
+    return missing
 
 
 def _extract_routes_from_context(
