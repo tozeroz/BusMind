@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -20,7 +21,24 @@ from algorithm.model.tabpfn_scoring.model import METADATA_PATH
 from algorithm.model.utils.score_mixing import PREFERENCE_MIX, SCORE_NAMES
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _load_project_env() -> None:
+    env_path = PROJECT_ROOT / ".env"
+    if not env_path.is_file():
+        return
+    try:
+        from dotenv import dotenv_values
+    except ImportError:
+        return
+    for key, value in dotenv_values(env_path, encoding="utf-8").items():
+        if value is not None and not os.getenv(key):
+            os.environ[key] = value
+
+
 def _import_tabpfn_regressor():
+    _load_project_env()
     try:
         from tabpfn import TabPFNRegressor
     except ImportError as exc:

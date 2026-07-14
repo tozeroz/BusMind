@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 algorithm = [
+    "matplotlib>=3.8,<4.0",
     "numpy>=1.24,<3.0",
     "pandas>=2.0,<3.0",
     "xgboost>=3.2.0",
@@ -28,6 +29,12 @@ tabpfn = [
     "tabpfn>=8.1,<9.0",
 ]
 
+cuda = [
+    "torch==2.6.0",
+    "torchvision==0.21.0",
+    "torchaudio==2.6.0",
+]
+
 dev = [
     "pytest>=8,<10",
     "pytest-asyncio>=0.23.0",
@@ -35,6 +42,16 @@ dev = [
 
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
+torchaudio = { index = "pytorch-cu124" }
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
 
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
