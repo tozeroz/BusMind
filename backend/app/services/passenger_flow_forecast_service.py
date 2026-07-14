@@ -292,23 +292,169 @@ def generate_station_predictions(
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
     horizon_days: int = DEFAULT_HORIZON_DAYS,
     min_history_points: int = DEFAULT_MIN_HISTORY_POINTS,
+    retry_deadlock: bool = True,
 ) -> list[PassengerFlowForecastResult]:
+    """生成站点客流预测，每个站点单独 commit 避免死锁。"""
     base_time = _base_time(now)
     results: list[PassengerFlowForecastResult] = []
-    for station_id in station_ids or list_station_ids_with_history(db):
-        results.append(
-            ensure_station_prediction(
+    
+    target_station_ids = station_ids or list_station_ids_with_history(db)
+    
+    for station_id in target_station_ids:
+        try:
+            result = _generate_single_station(
                 db,
                 station_id,
-                now=base_time,
+                base_time=base_time,
                 lookback_days=lookback_days,
                 horizon_days=horizon_days,
                 min_history_points=min_history_points,
-                commit=False,
+            )
+            results.append(result)
+        except Exception as e:
+            # 死锁重试：重新查询并生成该站点
+            if retry_deadlock and "Deadlock" in str(e):
+                db.rollback()
+                try:
+                    result = _generate_single_station(
+                        db,
+                        station_id,
+                        base_time=base_time,
+                        lookback_days=lookback_days,
+                        horizon_days=horizon_days,
+                        min_history_points=min_history_points,
+                    )
+                    results.append(result)
+                except Exception:
+                    results.append(PassengerFlowForecastResult(
+                        station_id=station_id,
+                        created=0,
+                        deleted=0,
+                        reused=0,
+                        skipped=True,
+                        reason=f"deadlock_retry_failed:{str(e)[:50]}",
+                        model_version=None,
+                    ))
+            else:
+                results.append(PassengerFlowForecastResult(
+                    station_id=station_id,
+                    created=0,
+                    deleted=0,
+                    reused=0,
+                    skipped=True,
+                    reason=f"error:{str(e)[:50]}",
+                    model_version=None,
+                ))
+    
+    return results
+
+
+def _generate_single_station(
+    db: Session,
+    station_id: int,
+    *,
+    base_time: datetime,
+    lookback_days: int,
+    horizon_days: int,
+    min_history_points: int,
+) -> PassengerFlowForecastResult:
+    """为单个站点生成预测，每次成功操作后立即 commit。"""
+    horizon_hours = max(1, horizon_days * 24)
+    horizon_end = base_time + timedelta(hours=horizon_hours)
+    target_id = str(station_id)
+
+    # 检查是否已有足够的新预测
+    existing_query = db.query(PassengerFlowPrediction).filter(
+        PassengerFlowPrediction.target_type == "station",
+        PassengerFlowPrediction.target_id == target_id,
+        PassengerFlowPrediction.predict_time >= base_time,
+        PassengerFlowPrediction.predict_time < horizon_end,
+    )
+    existing_rows = existing_query.order_by(PassengerFlowPrediction.predict_time.asc()).all()
+    
+    if len(existing_rows) >= horizon_hours:
+        last_predict_time = existing_rows[-1].predict_time
+        if last_predict_time >= horizon_end - timedelta(hours=1):
+            return PassengerFlowForecastResult(
+                station_id=station_id,
+                created=0,
+                deleted=0,
+                reused=len(existing_rows),
+                skipped=False,
+                reason="up_to_date",
+                model_version=existing_rows[-1].model_version,
+            )
+
+    # 查询历史数据
+    history_rows = (
+        db.query(
+            PassengerFlowTrend.record_time,
+            PassengerFlowTrend.total_flow,
+        )
+        .filter(
+            PassengerFlowTrend.target_type == "station",
+            PassengerFlowTrend.target_id == station_id,
+            PassengerFlowTrend.record_time >= base_time - timedelta(days=max(1, lookback_days)),
+            PassengerFlowTrend.record_time < base_time,
+        )
+        .order_by(PassengerFlowTrend.record_time.asc())
+        .all()
+    )
+    
+    if not history_rows:
+        return PassengerFlowForecastResult(
+            station_id=station_id,
+            created=0,
+            deleted=0,
+            reused=0,
+            skipped=True,
+            reason="no_history",
+            model_version=None,
+        )
+
+    # 训练模型
+    try:
+        model = (
+            _train_ridge_model(history_rows)
+            if len(history_rows) >= max(_FEATURE_DIMENSIONS, min_history_points)
+            else _HistoricalAverageModel(history_rows)
+        )
+    except ValueError:
+        model = _HistoricalAverageModel(history_rows)
+
+    # 删除旧预测并写入新预测
+    deleted = existing_query.delete(synchronize_session=False)
+    created = 0
+    
+    for offset in range(horizon_hours):
+        predict_time = base_time + timedelta(hours=offset)
+        predicted_flow = model.predict(predict_time)
+        db.add(
+            PassengerFlowPrediction(
+                target_type="station",
+                target_id=target_id,
+                prediction_time=base_time,
+                predict_time=predict_time,
+                predicted_flow=predicted_flow,
+                crowd_level=_crowd_level(predicted_flow),
+                confidence=model.confidence,
+                model_version=model.model_version,
             )
         )
+        created += 1
+
+    # 每个站点单独 commit，避免长时间锁表
     db.commit()
-    return results
+
+    return PassengerFlowForecastResult(
+        station_id=station_id,
+        created=created,
+        deleted=int(deleted or 0),
+        reused=0,
+        skipped=False,
+        reason="generated",
+        model_version=model.model_version,
+    )
 
 
 __all__ = [

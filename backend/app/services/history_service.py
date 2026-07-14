@@ -290,10 +290,20 @@ def get_passenger_flow_prediction(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ) -> list[PassengerFlowPredictionDTO]:
+    # 只在有具体时间范围时才尝试生成预测，否则直接读取已有数据
     if target_type == "station" and target_id and start_time is None and end_time is None:
-        try:
-            ensure_station_prediction(db, int(target_id))
-        except ValueError:
+        # 检查是否已有未来预测数据，避免每次请求都重新计算
+        latest_prediction = (
+            db.query(PassengerFlowPrediction)
+            .filter(
+                PassengerFlowPrediction.target_type == "station",
+                PassengerFlowPrediction.target_id == target_id,
+            )
+            .order_by(PassengerFlowPrediction.predict_time.desc())
+            .first()
+        )
+        if latest_prediction is None or latest_prediction.predict_time < datetime.now():
+            # 未来无预测，跳过生成（由定时任务负责更新）
             pass
 
     query = db.query(PassengerFlowPrediction)
