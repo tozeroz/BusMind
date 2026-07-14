@@ -8,9 +8,7 @@
   <main class="auth-page">
     <section class="auth-logo-panel">
       <div class="logo-slot">
-        <!-- 后续将 logo 图片放到 frontend/public/logo/ 目录后，把下面注释打开并修改文件名即可 -->
-        <!-- <img src="/logo/busmind-logo.png" alt="智行公交 Logo" /> -->
-        <span>Logo</span>
+        <img src="/logo/busmind-bus-logo.png" alt="智行公交公交车标识" />
       </div>
       <div>
         <p class="eyebrow">BusMind</p>
