@@ -418,6 +418,16 @@ function normalizeCoordinates(coordinates) {
   return coordinates
     .filter(isValidCoordinate)
     .map((coordinate) => [Number(coordinate[0]), Number(coordinate[1])])
+    .filter((coordinate, index, items) => {
+      if (index === 0) return true
+      const previous = items[index - 1]
+      return coordinate[0] !== previous[0] || coordinate[1] !== previous[1]
+    })
+}
+
+function coordinatesConnect(first, second) {
+  if (!first || !second) return false
+  return Math.abs(first[0] - second[0]) < 0.000001 && Math.abs(first[1] - second[1]) < 0.000001
 }
 
 function interpolateCatmullRom(p0, p1, p2, p3, t) {
@@ -430,18 +440,23 @@ function interpolateCatmullRom(p0, p1, p2, p3, t) {
   ]
 }
 
-function smoothRouteCoordinates(coordinates) {
+function smoothRouteCoordinates(coordinates, options = {}) {
   const points = normalizeCoordinates(coordinates)
-  if (points.length < 3) return points
+  if (points.length < 2) return points
+  if (points.length < 3 && !options.previousPoint && !options.nextPoint) return points
 
   const smoothed = [points[0]]
-  const segmentSteps = 8
+  const segmentSteps = Number(options.segmentSteps) || 8
 
   for (let index = 0; index < points.length - 1; index += 1) {
-    const p0 = points[Math.max(0, index - 1)]
+    const p0 = index === 0
+      ? (options.previousPoint || points[0])
+      : points[index - 1]
     const p1 = points[index]
     const p2 = points[index + 1]
-    const p3 = points[Math.min(points.length - 1, index + 2)]
+    const p3 = index + 2 < points.length
+      ? points[index + 2]
+      : (options.nextPoint || points[points.length - 1])
 
     for (let step = 1; step <= segmentSteps; step += 1) {
       smoothed.push(interpolateCatmullRom(p0, p1, p2, p3, step / segmentSteps))
@@ -608,8 +623,9 @@ function addTrafficHeatmapLayers() {
     },
     paint: {
       'line-color': '#ffffff',
-      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 6, 14, 9, 17, 12],
-      'line-opacity': 0.86
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5.2, 14, 7.8, 17, 10.5],
+      'line-opacity': 0.92,
+      'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 0.08, 17, 0.16]
     }
   })
 
@@ -623,8 +639,9 @@ function addTrafficHeatmapLayers() {
     },
     paint: {
       'line-color': ['coalesce', ['get', 'heat_color'], '#9CA3AF'],
-      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3.5, 14, 6, 17, 8.5],
-      'line-opacity': ['case', ['boolean', ['get', 'is_stale'], false], 0.64, 0.96]
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.6, 14, 4.5, 17, 6.4],
+      'line-opacity': ['case', ['boolean', ['get', 'is_stale'], false], 0.64, 0.98],
+      'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 0.02, 17, 0.06]
     }
   })
 }
@@ -1198,15 +1215,34 @@ function hideRoutes() {
 
 function showTrafficHeatmap(segments = []) {
   if (!map || !map.getSource('traffic-heatmap')) return 0
-  const features = segments.flatMap((segment, index) => {
-    const coordinates = Array.isArray(segment?.coordinates)
-      ? segment.coordinates.filter((point) => Array.isArray(point) && point.length >= 2 && point.every((value) => Number.isFinite(Number(value))))
-      : []
+  const preparedSegments = segments.map((segment) => ({
+    segment,
+    coordinates: normalizeCoordinates(Array.isArray(segment?.coordinates) ? segment.coordinates : [])
+  }))
+
+  const features = preparedSegments.flatMap(({ segment, coordinates }, index) => {
     if (coordinates.length < 2) return []
+
+    const previousCoordinates = preparedSegments[index - 1]?.coordinates || []
+    const nextCoordinates = preparedSegments[index + 1]?.coordinates || []
+    const previousPoint = previousCoordinates.length >= 2
+      && coordinatesConnect(previousCoordinates[previousCoordinates.length - 1], coordinates[0])
+      ? previousCoordinates[previousCoordinates.length - 2]
+      : null
+    const nextPoint = nextCoordinates.length >= 2
+      && coordinatesConnect(coordinates[coordinates.length - 1], nextCoordinates[0])
+      ? nextCoordinates[1]
+      : null
+    const smoothedCoordinates = smoothRouteCoordinates(coordinates, {
+      previousPoint,
+      nextPoint,
+      segmentSteps: 8
+    })
+
     return [{
       type: 'Feature',
       id: segment.route_segment_id || segment.link_id || `traffic-${index}`,
-      geometry: { type: 'LineString', coordinates: coordinates.map(([lng, lat]) => [Number(lng), Number(lat)]) },
+      geometry: { type: 'LineString', coordinates: smoothedCoordinates },
       properties: {
         route_segment_id: segment.route_segment_id || '',
         line_id: Number(segment.line_id) || 0,
