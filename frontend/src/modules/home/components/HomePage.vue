@@ -736,7 +736,7 @@ const handleSelectRoute = (route) => {
   if (selectedInfo.id) {
     busMapRef.value?.showStationRoutes({ stop_id: selectedInfo.id, stop_name: selectedInfo.name })
   }
-  busMapRef.value?.focusRouteById(route.line_id || route.id)
+  busMapRef.value?.focusRouteById(route.line_id || route.id, { preserveStopId: selectedInfo.id })
   selectMapRoute(route)
   isRoutesExpanded.value = false
 }

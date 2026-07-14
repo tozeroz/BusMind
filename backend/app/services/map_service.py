@@ -457,6 +457,7 @@ def get_map_lines(db: Session) -> MapLineResponse:
                 line_name=line.line_name,
                 line_code=line.line_code,
                 service_no=line.line_code,
+                direction=int(line.raw_direction or 1),
                 start_station=start_name or line.start_station or "",
                 end_station=end_name or line.end_station or "",
                 path_coordinates=path,

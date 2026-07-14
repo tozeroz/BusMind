@@ -58,6 +58,7 @@ class MapLineDTO(BaseModel):
     line_name: str
     line_code: str
     service_no: Optional[str] = None
+    direction: Optional[int] = None
     start_station: str
     end_station: str
     color: str = "#3B82F6"
