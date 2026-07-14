@@ -18,6 +18,13 @@ from app.schemas.ai_travel import (
 )
 from app.schemas.recommendation import RecommendRoutesRequest, RouteRecommendation
 from app.services.recommend_service import RecommendationService
+from app.services.ai_service.orchestration import (
+    ConversationSnapshot,
+    ConversationStore,
+    IntentResolution,
+    RuleBasedTravelOrchestrator,
+    conversation_store,
+)
 from llm.prompts.travel_assistant import SYSTEM_PROMPT, build_user_prompt
 from llm.providers.deepseek import DeepSeekClient, DeepSeekConfig, DeepSeekError
 
@@ -29,28 +36,72 @@ class AiTravelService:
         self,
         recommendation_service: RecommendationService,
         client: DeepSeekClient | Any | None = None,
+        store: ConversationStore | None = None,
+        orchestrator: RuleBasedTravelOrchestrator | None = None,
     ) -> None:
         self.recommendation_service = recommendation_service
         self.client = client if client is not None else self._build_default_client()
+        self.store = store or conversation_store
+        self.orchestrator = orchestrator or RuleBasedTravelOrchestrator()
 
     async def answer(self, request: AiTravelRequest) -> AiTravelResult:
+        snapshot = self.store.get(request.conversation_id)
+        conversation_id = (
+            snapshot.conversation_id if snapshot is not None else self.store.create_id()
+        )
+        resolution = self.orchestrator.resolve(request, snapshot)
+        effective_request = request.model_copy(
+            update={
+                "mode": resolution.mode,
+                "start_station_id": resolution.start_station_id,
+                "end_station_id": resolution.end_station_id,
+                "preference": resolution.preference,
+                "route_id": resolution.route_id,
+            }
+        )
+        resolved_slots = _resolved_slots(resolution)
         routes = _extract_routes_from_context(request.context)
         used_tools: list[str] = []
         evidence_source = "request_context" if routes else "none"
 
-        if request.mode == AiMode.SUGGEST and not routes:
-            missing_fields = _missing_station_fields(request)
+        if (
+            not routes
+            and snapshot is not None
+            and snapshot.routes
+            and resolution.action != "recommend"
+        ):
+            routes = list(snapshot.routes)
+            evidence_source = "conversation_snapshot"
+
+        if resolution.action == "alternative":
+            if not routes:
+                return self._clarification_result(
+                    effective_request,
+                    ["conversation_id"],
+                    "当前会话里还没有推荐路线。请先提供起点和终点，让我先生成候选方案。",
+                    conversation_id=conversation_id,
+                    resolved_slots=resolved_slots,
+                )
+            selected = _select_alternative_route(routes, snapshot, resolution.route_index)
+            routes = [selected]
+            used_tools = ["conversation_snapshot"]
+            evidence_source = "conversation_snapshot"
+
+        elif resolution.mode == AiMode.SUGGEST and not routes:
+            missing_fields = _missing_station_fields(effective_request)
             if missing_fields:
                 return self._clarification_result(
-                    request,
+                    effective_request,
                     missing_fields,
                     "请提供完整的起点和终点，我才能查询候选路线、预计到站时间和客载情况。",
+                    conversation_id=conversation_id,
+                    resolved_slots=resolved_slots,
                 )
             recommendation = await self.recommendation_service.recommend(
                 RecommendRoutesRequest(
-                    start_station_id=request.start_station_id,
-                    end_station_id=request.end_station_id,
-                    preference=request.preference,
+                    start_station_id=effective_request.start_station_id,
+                    end_station_id=effective_request.end_station_id,
+                    preference=effective_request.preference,
                 )
             )
             routes = recommendation.items
@@ -62,32 +113,78 @@ class AiTravelService:
             ]
             evidence_source = "recommendation_service"
         elif routes:
-            used_tools = ["provided_route_context"]
+            used_tools = [
+                "conversation_snapshot"
+                if evidence_source == "conversation_snapshot"
+                else "provided_route_context"
+            ]
 
-        if request.mode == AiMode.EXPLAIN and request.route_id:
-            matched = [route for route in routes if route.route_id == request.route_id]
+        if resolution.mode == AiMode.EXPLAIN:
+            if not routes:
+                return self._clarification_result(
+                    effective_request,
+                    ["conversation_id", "context.items"],
+                    "当前没有可解释的推荐快照。请先查询路线，或传入推荐结果。",
+                    conversation_id=conversation_id,
+                    resolved_slots=resolved_slots,
+                )
+            selected_route_id = resolution.route_id or (
+                snapshot.selected_route_id if snapshot else None
+            )
+            if resolution.route_index is not None and resolution.route_index < len(routes):
+                selected_route_id = routes[resolution.route_index].route_id
+            if selected_route_id is None:
+                selected_route_id = routes[0].route_id
+            matched = [route for route in routes if route.route_id == selected_route_id]
             if not matched:
                 return self._clarification_result(
-                    request,
+                    effective_request,
                     ["route_id"],
                     "当前推荐结果中没有找到指定路线，请重新选择一条候选路线后再询问。",
                     related_routes=routes[:5],
+                    conversation_id=conversation_id,
+                    resolved_slots=resolved_slots,
                 )
             routes = matched
+            effective_request = effective_request.model_copy(
+                update={"route_id": selected_route_id}
+            )
+            resolved_slots["route_id"] = selected_route_id
 
-        if request.mode == AiMode.QA and not routes:
+        if resolution.mode == AiMode.QA and not routes:
             return self._clarification_result(
-                request,
+                effective_request,
                 ["context.items"],
                 "当前没有可核验的路线、ETA 或客载数据。请先提供起点和终点并查询路线。",
+                conversation_id=conversation_id,
+                resolved_slots=resolved_slots,
             )
 
         evidence_context = _build_evidence_context(
-            request,
+            effective_request,
             routes,
             source=evidence_source,
         )
         reminders = self._build_reminders(routes)
+
+        selected_route_id = routes[0].route_id if routes else None
+        snapshot_routes = (
+            list(snapshot.routes)
+            if snapshot is not None
+            and snapshot.routes
+            and evidence_source == "conversation_snapshot"
+            else list(routes)
+        )
+        self.store.save(
+            ConversationSnapshot(
+                conversation_id=conversation_id,
+                routes=snapshot_routes,
+                start_station_id=effective_request.start_station_id,
+                end_station_id=effective_request.end_station_id,
+                preference=effective_request.preference,
+                selected_route_id=selected_route_id,
+            )
+        )
 
         if self.client is not None:
             try:
@@ -97,8 +194,8 @@ class AiTravelService:
                         {
                             "role": "user",
                             "content": build_user_prompt(
-                                request.mode.value,
-                                request.question,
+                                resolution.mode.value,
+                                effective_request.question,
                                 evidence_context,
                             ),
                         },
@@ -106,12 +203,14 @@ class AiTravelService:
                 )
                 return AiTravelResult(
                     answer=answer,
-                    mode=request.mode,
+                    mode=resolution.mode,
                     status=AiTravelStatus.COMPLETED,
                     used_tools=[*used_tools, "deepseek"],
                     related_routes=routes[:5],
                     reminders=reminders,
                     fallback=False,
+                    conversation_id=conversation_id,
+                    resolved_slots=resolved_slots,
                 )
             except DeepSeekError as exc:
                 # Do not expose credentials or raw request data.  The exception
@@ -120,32 +219,57 @@ class AiTravelService:
                 reminders.append(f"AI 服务调用失败，已使用本地结果：{exc}")
 
         return AiTravelResult(
-            answer=self._fallback_answer(request, routes),
-            mode=request.mode,
+            answer=self._fallback_answer(effective_request, routes),
+            mode=resolution.mode,
             status=AiTravelStatus.DEGRADED,
             used_tools=used_tools,
             related_routes=routes[:5],
             reminders=reminders,
             fallback=True,
+            conversation_id=conversation_id,
+            resolved_slots=resolved_slots,
         )
 
-    @staticmethod
     def _clarification_result(
+        self,
         request: AiTravelRequest,
         missing_fields: list[str],
         answer: str,
         *,
         related_routes: list[RouteRecommendation] | None = None,
+        conversation_id: str,
+        resolved_slots: dict[str, Any],
     ) -> AiTravelResult:
+        routes = related_routes or []
+        current = self.store.get(conversation_id)
+        stored_routes = list(current.routes) if current and current.routes else list(routes)
+        self.store.save(
+            ConversationSnapshot(
+                conversation_id=conversation_id,
+                routes=stored_routes,
+                start_station_id=request.start_station_id
+                or (current.start_station_id if current else None),
+                end_station_id=request.end_station_id
+                or (current.end_station_id if current else None),
+                preference=request.preference,
+                selected_route_id=(
+                    current.selected_route_id
+                    if current and current.selected_route_id
+                    else (routes[0].route_id if routes else None)
+                ),
+            )
+        )
         return AiTravelResult(
             answer=answer,
             mode=request.mode,
             status=AiTravelStatus.NEEDS_CLARIFICATION,
             missing_fields=missing_fields,
             used_tools=[],
-            related_routes=related_routes or [],
+            related_routes=routes,
             reminders=[],
             fallback=False,
+            conversation_id=conversation_id,
+            resolved_slots=resolved_slots,
         )
 
     @staticmethod
@@ -260,6 +384,36 @@ def _missing_station_fields(request: AiTravelRequest) -> list[str]:
     if request.end_station_id is None:
         missing.append("end_station_id")
     return missing
+
+
+def _resolved_slots(resolution: IntentResolution) -> dict[str, Any]:
+    return {
+        "action": resolution.action,
+        "start_station_id": resolution.start_station_id,
+        "end_station_id": resolution.end_station_id,
+        "preference": resolution.preference.value,
+        "route_id": resolution.route_id,
+    }
+
+
+def _select_alternative_route(
+    routes: list[RouteRecommendation],
+    snapshot: ConversationSnapshot | None,
+    requested_index: int | None,
+) -> RouteRecommendation:
+    if requested_index is not None and requested_index < len(routes):
+        return routes[requested_index]
+    if snapshot is None or snapshot.selected_route_id is None:
+        return routes[1] if len(routes) > 1 else routes[0]
+    current_index = next(
+        (
+            index
+            for index, route in enumerate(routes)
+            if route.route_id == snapshot.selected_route_id
+        ),
+        -1,
+    )
+    return routes[(current_index + 1) % len(routes)]
 
 
 def _extract_routes_from_context(

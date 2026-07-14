@@ -40,7 +40,8 @@ class AiTravelRequest(StrictModel):
         }
     )
 
-    mode: AiMode
+    mode: AiMode | None = None
+    conversation_id: str | None = Field(default=None, min_length=8, max_length=64)
     question: str | None = Field(default=None, min_length=1, max_length=1000)
     route_id: str | None = Field(default=None, max_length=100)
     start_station_id: int | None = Field(default=None, gt=0)
@@ -58,12 +59,8 @@ class AiTravelRequest(StrictModel):
 
     @model_validator(mode="after")
     def validate_mode_fields(self) -> "AiTravelRequest":
-        if self.mode == AiMode.QA and not self.question:
-            raise ValueError("qa mode requires question")
-        if self.mode == AiMode.EXPLAIN and not _context_has_valid_route(self.context):
-            raise ValueError(
-                "explain mode requires context.items with at least one valid route"
-            )
+        if self.mode in (None, AiMode.QA) and not self.question:
+            raise ValueError("automatic and qa modes require question")
         return self
 
 
@@ -76,23 +73,5 @@ class AiTravelResult(StrictModel):
     related_routes: list[RouteRecommendation]
     reminders: list[str]
     fallback: bool
-
-
-def _context_has_valid_route(context: dict[str, Any] | None) -> bool:
-    if not context:
-        return False
-
-    candidate: Any = context
-    if isinstance(candidate.get("data"), dict):
-        candidate = candidate["data"]
-    items = candidate.get("items") if isinstance(candidate, dict) else None
-    if not isinstance(items, list):
-        return False
-
-    for item in items[:10]:
-        try:
-            RouteRecommendation.model_validate(item)
-            return True
-        except Exception:
-            continue
-    return False
+    conversation_id: str
+    resolved_slots: dict[str, Any] = Field(default_factory=dict)
