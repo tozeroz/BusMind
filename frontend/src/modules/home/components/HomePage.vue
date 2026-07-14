@@ -185,58 +185,29 @@
       </Transition>
 
       <Transition name="side-card">
-        <section v-if="isAiChatOpen" class="map-ai-card">
-          <div class="section-title">
-            <div>
-              <p class="eyebrow">AI 出行助手</p>
-              <h3>路线建议</h3>
-            </div>
-            <button class="ghost-button compact-ghost" type="button" @click="isAiChatOpen = false">
-              关闭
-            </button>
-          </div>
-
-          <div class="map-ai-messages">
-            <article v-for="message in aiMessages" :key="message.id" :class="['mini-message', message.role]">
-              <p>{{ message.content }}</p>
-            </article>
-          </div>
-
-          <Transition name="card-pop">
-            <div v-if="aiRecommendation" class="ai-route-result">
-              <div>
-                <p class="eyebrow">推荐路线</p>
-                <h4>{{ aiRecommendation.title }}</h4>
-              </div>
-              <div class="recommend-meta compact-meta">
-                <span>{{ aiRecommendation.eta }} 分钟</span>
-                <span>{{ aiRecommendation.load }}</span>
-                <span>{{ aiRecommendation.score }} 分</span>
-              </div>
-              <button class="primary-button" type="button" @click="applyRecommendedRoute(aiRecommendation)">
-                地图查看
-              </button>
-            </div>
-          </Transition>
-
-          <form class="map-ai-input" @submit.prevent="sendAiMessage">
-            <input v-model="aiInput" placeholder="例如：去滨海湾，想少走路" />
-            <button class="primary-button" type="submit">发送</button>
-          </form>
-        </section>
+        <AiAssistantPanel
+          v-if="isAiChatOpen"
+          :messages="aiMessages"
+          :route="aiRecommendation"
+          :loading="aiSending"
+          :status="aiStatus"
+          :missing-fields="aiMissingFields"
+          :conversation-id="aiConversationId"
+          @close="isAiChatOpen = false"
+          @new-chat="newAiConversation"
+          @send="sendAiMessage"
+          @map="applyRecommendedRoute"
+          @explain="explainAiRoute"
+          @next="nextAiRoute"
+        />
       </Transition>
     </section>
 
-    <button
-      class="ai-floating-button"
-      type="button"
+    <AiAssistantTrigger
       :style="{ left: `${floatPosition.x}px`, top: `${floatPosition.y}px` }"
-      @mousedown.stop="startFloatDrag"
-      @click="toggleAiChat"
-      title="AI 出行助手"
-    >
-      AI
-    </button>
+      @drag-start="startFloatDrag"
+      @toggle="toggleAiChat"
+    />
   </section>
 </template>
 
@@ -246,7 +217,9 @@ import BusMap from '@/modules/map/components/BusMap.vue'
 import RouteResultsPopup from '@/modules/home/components/RouteResultsPopup.vue'
 import SelectedRouteDetailCard from '@/modules/home/components/SelectedRouteDetailCard.vue'
 import SelectedStationDetailCard from '@/modules/home/components/SelectedStationDetailCard.vue'
-import { askAiTravel } from '@/api/ai'
+import AiAssistantPanel from '@/modules/ai-assistant/components/AiAssistantPanel.vue'
+import AiAssistantTrigger from '@/modules/ai-assistant/components/AiAssistantTrigger.vue'
+import { useAiTravelConversation } from '@/modules/ai-assistant/composables/useAiTravelConversation'
 import { getNearbyLocations, searchLocations } from '@/api/location'
 import { getEta } from '@/api/intelligence'
 import { getCachedBusArrival } from '@/api/map'
@@ -275,8 +248,6 @@ let backendHealthTimer = null
 const panelMode = ref('search')
 const isInfoPanelOpen = ref(false)
 const isAiChatOpen = ref(false)
-const aiInput = ref('去滨海湾，想坐最舒适的路线')
-const aiRecommendation = ref(null)
 const selectedInfo = reactive({
   id: '',
   name: '',
@@ -315,14 +286,6 @@ const resolvedJourney = reactive({ startStationId: null, endStationId: null })
 const stationEtaRefreshIntervalMs = 30000
 let stationEtaRefreshTimer = null
 let stationEtaRefreshStop = null
-
-const aiMessages = ref([
-  {
-    id: 1,
-    role: 'assistant',
-    content: '你好，我可以根据目的地、舒适度和等待时间给出路线建议。'
-  }
-])
 
 const panelLabel = computed(() => {
   if (panelMode.value === 'station') return '站点信息'
@@ -484,6 +447,7 @@ const normalizeChart = (chart) => {
 }
 
 const normalizeRecommendation = (route) => ({
+  ...route,
   id: route.line_ids?.[0] || route.route_id,
   routeId: route.route_id,
   title: route.segments?.map((item) => item.line_name).filter(Boolean).join(' → ') || `路线 ${route.route_id}`,
@@ -499,6 +463,28 @@ const normalizeRecommendation = (route) => ({
     Number(100 - (route.transfer_count || 0) * 20),
     Number(100 - (route.total_time_minutes || 0))
   ].filter((value) => Number.isFinite(Number(value)))
+})
+
+const {
+  messages: aiMessages,
+  conversationId: aiConversationId,
+  currentRoute: aiRecommendation,
+  status: aiStatus,
+  missingFields: aiMissingFields,
+  isSending: aiSending,
+  send: sendAiMessage,
+  explainCurrentRoute: explainAiRoute,
+  requestNextRoute: nextAiRoute,
+  newConversation: newAiConversation
+} = useAiTravelConversation({
+  normalizeRoute: normalizeRecommendation,
+  getJourneyContext: () => ({
+    startStationId: resolvedJourney.startStationId,
+    endStationId: resolvedJourney.endStationId,
+    startName: query.start,
+    endName: query.end,
+    rawRoutes: rawRouteOptions.value.slice(0, 10)
+  })
 })
 
 const findRouteForDestination = () => routeOptions.value[0] || null
@@ -755,55 +741,6 @@ const applyRecommendedRoute = (route) => {
   notice.value = `已在地图中定位：${selectedRecommendedRoute.value.title}`
 }
 
-const sendAiMessage = async () => {
-  const text = aiInput.value.trim()
-  if (!text) return
-
-  aiMessages.value.push({ id: Date.now(), role: 'user', content: text })
-  const replyId = Date.now() + 1
-
-  aiMessages.value.push({
-    id: replyId,
-    role: 'assistant',
-    content: '正在请求 DeepSeek 出行助手...'
-  })
-  aiInput.value = ''
-
-  try {
-    const hasStationPair = Number.isFinite(resolvedJourney.startStationId) && Number.isFinite(resolvedJourney.endStationId)
-    const response = await askAiTravel({
-      mode: hasStationPair ? 'suggest' : 'qa',
-      question: text,
-      ...(hasStationPair ? {
-        start_station_id: resolvedJourney.startStationId,
-        end_station_id: resolvedJourney.endStationId
-      } : {}),
-      preference: text.includes('舒适') || text.includes('不挤') ? 'low_load' : 'balanced',
-      context: {
-        current_location: query.start,
-        destination: query.end,
-        items: rawRouteOptions.value.slice(0, 4)
-      }
-    })
-    const target = aiMessages.value.find((message) => message.id === replyId)
-    if (target) {
-      target.content = response.data?.answer || '后端未返回回答。'
-    }
-    const relatedRoute = response.data?.related_routes?.[0]
-    const matchedRoute = relatedRoute ? normalizeRecommendation(relatedRoute) : findRouteForDestination()
-    aiRecommendation.value = matchedRoute ? {
-      ...matchedRoute,
-      title: text.includes('舒适') ? `舒适优先：${matchedRoute.title}` : `综合推荐：${matchedRoute.title}`,
-      reason: response.data?.answer || matchedRoute.reason
-    } : null
-  } catch (error) {
-    const target = aiMessages.value.find((message) => message.id === replyId)
-    if (target) {
-      target.content = getApiErrorMessage(error, '后端 AI 接口暂不可用，请确认后端已启动。')
-    }
-  }
-}
-
 const startFloatDrag = (event) => {
   dragState.dragging = true
   dragState.moved = false
@@ -832,11 +769,7 @@ const stopFloatDrag = () => {
 
 const toggleAiChat = () => {
   if (dragState.moved) return
-  const shouldOpen = !isAiChatOpen.value
-  isAiChatOpen.value = shouldOpen
-  if (shouldOpen && panelMode.value !== 'search') {
-    resetPanel()
-  }
+  isAiChatOpen.value = !isAiChatOpen.value
 }
 
 const closeStationDetail = () => {
