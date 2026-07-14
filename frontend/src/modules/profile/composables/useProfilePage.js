@@ -14,6 +14,7 @@ import {
   updateCurrentUser
 } from '@/api/user'
 import { getApiErrorMessage } from '@/api/response'
+import { getLocalQueryHistory, mergeQueryHistory } from '@/modules/profile/utils/localQueryHistory'
 
 export function useProfilePage() {
   const user = reactive({})
@@ -57,7 +58,7 @@ export function useProfilePage() {
       ])
       Object.assign(user, userResponse.data?.user || userResponse.data || {})
       favorites.value = favoritesResponse.data?.favorites || []
-      histories.value = historyResponse.data?.histories || []
+      histories.value = mergeQueryHistory(historyResponse.data?.histories || [], getLocalQueryHistory())
       syncForm()
     } catch (error) {
       message.value = error?.response?.status === 401
@@ -92,7 +93,7 @@ export function useProfilePage() {
   async function removeFavorite(favoriteId) {
     try {
       await deleteUserFavorite(favoriteId)
-      favorites.value = favorites.value.filter((item) => item.favorite_id !== favoriteId)
+      favorites.value = favorites.value.filter((item) => Number(item.favorite_id) !== Number(favoriteId))
       message.value = '已取消收藏。'
     } catch (error) {
       message.value = getApiErrorMessage(error, '取消收藏失败')

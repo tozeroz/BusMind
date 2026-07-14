@@ -31,8 +31,8 @@
 import { useProfilePage } from '@/modules/profile/composables/useProfilePage'
 import ProfileHero from './ProfileHero.vue'
 import ProfileAccountCard from './ProfileAccountCard.vue'
-import FavoriteRoutesCard from './FavoriteRoutesCard.vue'
-import RecentActivityCard from './RecentActivityCard.vue'
+import FavoriteRoutesCard from './FavoriteLinesCard.vue'
+import RecentActivityCard from './QueryHistoryCard.vue'
 
 const {
   user, favorites, histories, loading, saving, editing, message, profileForm,
