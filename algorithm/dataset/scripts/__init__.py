@@ -1,1 +1,1 @@
-"""Dataset construction scripts for the recommendation model."""
+"""候选线路评分数据集构建脚本。"""

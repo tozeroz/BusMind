@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -13,14 +14,31 @@ if __package__ in {None, ""}:
 import numpy as np
 import pandas as pd
 
-from algorithm.dataset.scripts.recommendation_data import default_dataset_dir
-from algorithm.dataset.scripts.recommendation_feature_contract import numeric_feature_frame, read_frozen_features
+from algorithm.dataset.scripts.feature_contract import numeric_feature_frame, read_frozen_features
+from algorithm.dataset.scripts.paths import features_path, fused_labels_path, rule_labels_path
 from algorithm.model.contracts import MODEL_VERSION, NUMERIC_FEATURE_NAMES
 from algorithm.model.tabpfn_scoring.model import METADATA_PATH
 from algorithm.model.utils.score_mixing import PREFERENCE_MIX, SCORE_NAMES
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _load_project_env() -> None:
+    env_path = PROJECT_ROOT / ".env"
+    if not env_path.is_file():
+        return
+    try:
+        from dotenv import dotenv_values
+    except ImportError:
+        return
+    for key, value in dotenv_values(env_path, encoding="utf-8").items():
+        if value is not None and not os.getenv(key):
+            os.environ[key] = value
+
+
 def _import_tabpfn_regressor():
+    _load_project_env()
     try:
         from tabpfn import TabPFNRegressor
     except ImportError as exc:
@@ -32,7 +50,7 @@ def _import_tabpfn_regressor():
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--features", type=Path, default=default_dataset_dir() / "features.csv")
+    parser.add_argument("--features", type=Path, default=features_path())
     parser.add_argument("--labels", type=Path, default=None)
     parser.add_argument("--output", type=Path, default=METADATA_PATH)
     parser.add_argument("--context-output", type=Path, default=None)
@@ -43,11 +61,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def _default_labels_path() -> Path:
-    dataset_dir = default_dataset_dir()
-    fused = dataset_dir / "rule_llm_fused_pseudo_labels.csv"
+    fused = fused_labels_path()
     if fused.is_file():
         return fused
-    return dataset_dir / "rule_pseudo_labels.csv"
+    return rule_labels_path()
 
 
 def _load_training_frame(features_path: Path, labels_path: Path) -> pd.DataFrame:

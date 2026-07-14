@@ -1,9 +1,4 @@
-"""Build frozen recommendation features from local processed transit data.
-
-This is the single offline dataset entrypoint for the recommendation model.
-It reads processed CSV files, builds backend-style candidate route payloads,
-and writes the frozen `features.csv` contract used by labeling and training.
-"""
+"""从本地 processed 公交数据构建候选路线冻结特征。"""
 
 from __future__ import annotations
 
@@ -20,8 +15,7 @@ import pandas as pd
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[3]))
 
-from algorithm.dataset.scripts.recommendation_data import (
-    default_dataset_dir,
+from algorithm.dataset.scripts.data import (
     default_processed_dir,
     default_raw_dir,
     line_congestion_lookup,
@@ -29,7 +23,8 @@ from algorithm.dataset.scripts.recommendation_data import (
     stop_code_to_station_id,
     station_flow_hourly_lookup,
 )
-from algorithm.dataset.scripts.recommendation_feature_contract import FROZEN_FEATURE_COLUMNS, dump_json
+from algorithm.dataset.scripts.feature_contract import FROZEN_FEATURE_COLUMNS, dump_json
+from algorithm.dataset.scripts.paths import features_path
 from algorithm.routing.transit_graph import GraphNode, RideEdge, TransitGraphSearch, TransitGraphSnapshot
 
 
@@ -38,29 +33,10 @@ def _default_hot_stops_file() -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    """
-    groups 20
-    生成 20 个候选路线组。一个 group 大致对应一个 OD，也就是一组“起点站 -> 终点站”的候选路线。训练排序模型时，同一 group 里的路线互相比较。
-
-    max-attempts 1000
-    最多尝试 1000 个 OD。如果找到 20 个满足条件的 group 就提前结束；如果尝试 1000 次还不够，也会停止。这个防止脚本一直搜下去。
-
-    max-transfer 1
-    候选路线最多允许 1 次换乘。
-    设成 1 比默认 2 快很多，因为搜索空间小很多。后面正式数据可以再考虑是否放回 2。
-
-    max-candidates 5
-    每个 OD 最多保留 5 条候选路线。
-    比如同一个起终点找到 10 条路线，也只取前 5 条。
-
-    min-candidates 2
-    一个 OD 至少要找到 2 条候选路线，才会成为一个 group。因为排序训练需要“同组内可比较”，只有 1 条路线没法排序。
-    """
-
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw-dir", type=Path, default=default_raw_dir())
     parser.add_argument("--processed-dir", type=Path, default=default_processed_dir())
-    parser.add_argument("--output", type=Path, default=default_dataset_dir() / "features.csv")
+    parser.add_argument("--output", type=Path, default=features_path())
     parser.add_argument("--month", default=None, help="Passenger volume month such as 202605")
     parser.add_argument("--groups", type=int, default=1000, help="Target candidate OD groups")
     parser.add_argument("--max-attempts", type=int, default=20000)
@@ -156,12 +132,12 @@ def _candidate_od_pairs_from_processed(
             continue
         hot_positions_by_line[line_id] = eligible
 
-        # 优先采样同一个 OD 被多条线路覆盖的情况，天然更容易形成多候选路线组。
+        # 优先采样同一个 OD 被多条线路覆盖的情况，更容易形成可比较的多候选路线组。
         for left in range(len(eligible) - 1):
             for right in range(left + 1, len(eligible)):
                 pair_lines[(eligible[left][1], eligible[right][1])].add(line_id)
 
-        # 兜底保留一些单线路 OD，避免多线路 OD 不足时完全没有样本。
+        # 兜底保留一部分单线路 OD，避免多线路 OD 不足时完全没有训练样本。
         sample_count = min(40, max(8, len(eligible) // 3))
         for _ in range(sample_count):
             left, right = sorted(rng.sample(range(len(eligible)), 2))

@@ -11,7 +11,7 @@ from typing import Any
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-from algorithm.dataset.scripts.recommendation_feature_contract import (
+from algorithm.dataset.scripts.feature_contract import (
     model_input_routes_from_feature_group,
     read_frozen_features,
 )
@@ -28,10 +28,10 @@ def predict(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _parse_args() -> argparse.Namespace:
-    from algorithm.dataset.scripts.recommendation_data import default_dataset_dir
+    from algorithm.dataset.scripts.paths import features_path
 
     parser = argparse.ArgumentParser(description="Run a small recommendation-model smoke test.")
-    parser.add_argument("--features", type=Path, default=default_dataset_dir() / "features.csv")
+    parser.add_argument("--features", type=Path, default=features_path())
     parser.add_argument("--preference", default="balanced")
     parser.add_argument("--group-id", default=None)
     parser.add_argument("--top-routes", type=int, default=5)

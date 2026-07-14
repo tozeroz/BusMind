@@ -92,23 +92,23 @@ data/processed/process_scripts/__pycache__/
 data/processed/process_scripts/**/*.pyc*
 data/processed/*.csv
 
-# Recommendation model datasets: keep builders/docs, ignore generated training data
-algorithm/dataset/recommendation/*/
-!algorithm/dataset/recommendation/*/.gitkeep
-algorithm/dataset/**/*.csv
-algorithm/dataset/**/*.jsonl
-algorithm/dataset/**/*.parquet
-algorithm/dataset/**/*.pkl
+# Algorithm dataset and model artifacts are committed for reproducible demos.
+!algorithm/dataset/**/*.csv
+!algorithm/dataset/**/*.jsonl
+!algorithm/dataset/**/*.parquet
 
-# Model artifacts: keep code, ignore trained/generated artifacts
-algorithm/model/artifacts/*
-!algorithm/model/artifacts/.gitkeep
+# Legacy model files outside algorithm/model stay local unless explicitly moved.
 algorithm/model_files/*
 !algorithm/model_files/.gitkeep
 *.pkl
 *.joblib
 *.model
 *.onnx
+!algorithm/dataset/**/*.pkl
+!algorithm/model/**/*.pkl
+!algorithm/model/**/*.joblib
+!algorithm/model/**/*.model
+!algorithm/model/**/*.onnx
 
 # Database generated backups/exports
 database/backup/
