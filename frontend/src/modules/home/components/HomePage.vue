@@ -271,7 +271,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import BusMap from '@/modules/map/components/BusMap.vue'
 import RouteResultsPopup from '@/modules/home/components/RouteResultsPopup.vue'
 import SelectedRouteDetailCard from '@/modules/home/components/SelectedRouteDetailCard.vue'
-import SelectedLineDetailCard from '@/modules/home/components/SelectedLineDetailCard.vue'
+import SelectedLineDetailCard from '@/modules/home/components/LineSelectionDetailCard.vue'
 import SelectedStationDetailCard from '@/modules/home/components/SelectedStationDetailCard.vue'
 import AiAssistantPanel from '@/modules/ai-assistant/components/AiAssistantPanel.vue'
 import AiAssistantTrigger from '@/modules/ai-assistant/components/AiAssistantTrigger.vue'
@@ -286,6 +286,7 @@ import { getApiHealth } from '@/api/health'
 import { getRealtimeVehicles } from '@/api/vehicle'
 import { getApiErrorMessage, unwrapData, unwrapList } from '@/api/response'
 import { triggerArrivalRefresh } from '@/api/user'
+import { addLocalQueryHistory } from '@/modules/profile/utils/localQueryHistory'
 
 const refreshArrivals = () => {
   triggerArrivalRefresh().catch(() => {})
@@ -717,6 +718,12 @@ const searchRoutes = async () => {
       ...matchedRoute,
       title: `${startStation.station_name} → ${endStation.station_name}`
     }
+    addLocalQueryHistory({
+      origin_name: startStation.station_name,
+      destination_name: endStation.station_name,
+      selected_route_id: matchedRoute.id || matchedRoute.line_id || null,
+      result_summary: `找到 ${routeOptions.value.length} 条候选路线`
+    })
     notice.value = `已找到 ${routeOptions.value.length} 条候选路线`
   } catch (error) {
     notice.value = getApiErrorMessage(error, '路线检索失败，请检查后端服务和站点数据')
