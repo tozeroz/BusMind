@@ -255,6 +255,7 @@ function getStopRoutes(stopId) {
 
 function clearSelection() {
   selectedStopForRoutes = null
+  areRoutesVisible = false
   setSelectedStopState(null)
   setStopsDimmed(false)
   setSourceData('routes', emptyFeatureCollection)
@@ -443,7 +444,7 @@ function addRouteSources() {
   map.addSource('routes', {
     type: 'geojson',
     promoteId: 'line_id',
-    data: busRoutesGeoJSON
+    data: emptyFeatureCollection
   })
 
   map.addSource('routes-path', {
