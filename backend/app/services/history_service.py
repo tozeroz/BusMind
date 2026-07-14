@@ -11,6 +11,7 @@ from app.cache import memory_cache_provider
 from app.cache.cache_keys import passenger_flow_trend
 from app.models.bus_line import LineStation
 from app.models.history import EtaPrediction, LoadPrediction, PassengerFlowPrediction, PassengerFlowTrend
+from app.services.passenger_flow_forecast_service import ensure_station_prediction
 from app.schemas.history_schema import (
     EtaPredictionDTO,
     LoadPredictionDTO,
@@ -289,6 +290,12 @@ def get_passenger_flow_prediction(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ) -> list[PassengerFlowPredictionDTO]:
+    if target_type == "station" and target_id and start_time is None and end_time is None:
+        try:
+            ensure_station_prediction(db, int(target_id))
+        except ValueError:
+            pass
+
     query = db.query(PassengerFlowPrediction)
     if target_type:
         query = query.filter(PassengerFlowPrediction.target_type == target_type)

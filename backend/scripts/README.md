@@ -5,6 +5,7 @@
 | 脚本 | 用途 |
 |---|---|
 | `check_ai_config.py` | 检查 AI 服务配置是否完整 |
+| `forecast_passenger_flow.py` | 生成站点未来 7 天客流预测并写入 `passenger_flow_prediction` |
 | `import_csv_data.py` | 导入标准 CSV 数据 |
 | `import_csv_simple.py` | 兼容旧数据的简化导入入口 |
 | `inspect_refresh_jobs.py` | 查看后台刷新任务配置与状态 |
