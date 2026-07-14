@@ -316,3 +316,85 @@ python .\algorithm\model\linear_scoring\train.py --labels .\algorithm\dataset\ru
 ```
 
 `linear_scoring/train.py` 会自动读取融合标签中的 `sample_weight`，让高一致性、高置信度样本在训练中占更高权重；如果仍使用普通 `rule_pseudo_labels.csv`，没有 `sample_weight` 时会退回等权训练。
+
+## XGBoost 评分模型训练
+
+XGBoost 作为结构化特征强基线，输入仍然是同一份 `features.csv` 转换后的 12 维数值特征，输出仍然是五维评分；`recommend_score` 继续由 preference 权重后处理得到。
+
+首次使用需要安装依赖：
+
+```powershell
+uv add xgboost
+```
+
+训练命令：
+
+```powershell
+python .\algorithm\model\xgboost_scoring\train.py
+```
+
+如果 `rule_llm_fused_pseudo_labels.csv` 存在，训练脚本会优先使用融合标签；否则退回 `rule_pseudo_labels.csv`。也可以显式指定：
+
+```powershell
+python .\algorithm\model\xgboost_scoring\train.py --labels .\algorithm\dataset\rule_llm_fused_pseudo_labels.csv
+```
+
+训练完成后会生成：
+
+```text
+algorithm/model/xgboost_scoring/artifacts/xgboost_route_scoring.json
+algorithm/model/xgboost_scoring/artifacts/xgboost_time_score.json
+algorithm/model/xgboost_scoring/artifacts/xgboost_comfort_score.json
+algorithm/model/xgboost_scoring/artifacts/xgboost_walk_score.json
+algorithm/model/xgboost_scoring/artifacts/xgboost_transfer_score.json
+algorithm/model/xgboost_scoring/artifacts/xgboost_reliability_score.json
+```
+
+终端会打印每个目标的 `train_rmse` 和 `eval_rmse`；完整指标也会写入 `xgboost_route_scoring.json` 的 `metrics` 字段。
+
+让后端或本地推理切到 XGBoost：
+
+```powershell
+$env:BUSMIND_SCORING_MODEL="xgboost"
+```
+
+如需切回线性模型：
+
+```powershell
+$env:BUSMIND_SCORING_MODEL="linear"
+```
+
+## TabPFN 评分模型训练
+
+TabPFN 是面向小数据集表格学习的实验候选。当前实现同样使用 12 维数值特征，分别拟合五个 `TabPFNRegressor`，再由 preference 权重计算 `recommend_score`。
+
+首次使用需要安装较重的实验依赖：
+
+```powershell
+uv sync --extra algorithm --extra tabpfn
+```
+
+训练命令：
+
+```powershell
+python .\algorithm\model\tabpfn_scoring\train.py --labels .\algorithm\dataset\rule_llm_fused_pseudo_labels.csv
+```
+
+默认只抽取最多 `1000` 条训练样本作为 TabPFN 上下文，适合先做小数据实验。可以调整：
+
+```powershell
+python .\algorithm\model\tabpfn_scoring\train.py --max-train-rows 2000
+```
+
+训练完成后会生成：
+
+```text
+algorithm/model/tabpfn_scoring/artifacts/tabpfn_route_scoring.json
+algorithm/model/tabpfn_scoring/artifacts/tabpfn_training_context.npz
+```
+
+`tabpfn_route_scoring.json` 保存训练参数和指标；`tabpfn_training_context.npz` 保存 TabPFN 推理时需要的训练上下文。让后端或本地推理切到 TabPFN：
+
+```powershell
+$env:BUSMIND_SCORING_MODEL="tabpfn"
+```
