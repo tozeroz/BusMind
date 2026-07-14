@@ -1,4 +1,4 @@
-> 核心判断：当前候选线路评分模型面对的是缺少真实用户选择、点击和满意度标签的数据集，因此需要先构造可靠的伪标签，再训练下游评分模型。本方法将规则伪标签与大模型辅助标注结合，利用 `Roll the dice & look before you leap: Going beyond the creative limits of next-token prediction` 中的 seed-conditioning 思路，把大模型输出的随机性转化为标签一致性和置信度评估
+﻿> 核心判断：当前候选线路评分模型面对的是缺少真实用户选择、点击和满意度标签的数据集，因此需要先构造可靠的伪标签，再训练下游评分模型。本方法将规则伪标签与大模型辅助标注结合，利用 `Roll the dice & look before you leap: Going beyond the creative limits of next-token prediction` 中的 seed-conditioning 思路，把大模型输出的随机性转化为标签一致性和置信度评估
 
 # 一、问题背景
 
@@ -33,7 +33,7 @@ features.csv
     ↓
 规则评分函数
     ↓
-pseudo_labels.csv
+rule_pseudo_labels.csv
 ```
 
 规则方法的优势是：
@@ -222,20 +222,38 @@ training_targets.csv
 当前模型 / XGBoost / TabPFN 对比训练
 ```
 
-当前代码侧已将该流程拆成三个可执行步骤：
+当前代码侧已将该流程拆成四个可执行步骤：
 
 ```powershell
-python .\algorithm\dataset\scripts\llm_assisted_labels.py generate-prompts --seed-count 3
-python .\algorithm\dataset\scripts\llm_assisted_labels.py aggregate
-python .\algorithm\dataset\scripts\llm_assisted_labels.py fuse
+python .\algorithm\dataset\scripts\build_llm_pseudo_labels.py generate-prompts --seed-count 3
+python .\algorithm\dataset\scripts\build_llm_pseudo_labels.py call-deepseek --limit 60
+python .\algorithm\dataset\scripts\build_llm_pseudo_labels.py aggregate
+python .\algorithm\dataset\scripts\build_llm_pseudo_labels.py fuse
 ```
 
 其中：
 
 - `generate-prompts` 读取 `features.csv`，为同一 `candidate_group_id` 生成多个 seed-conditioned LLM 标注请求
-- `aggregate` 读取大模型返回的 `llm_label_responses.jsonl`，按 `candidate_group_id + route_id` 聚合多 seed 的中位数、方差和置信度
-- `fuse` 将规则伪标签与 LLM 聚合标签融合，输出 `pseudo_labels_llm_fused.csv`
-- 当前训练脚本可以通过 `--labels algorithm/dataset/pseudo_labels_llm_fused.csv` 直接使用融合标签，并自动读取 `sample_weight` 进行加权训练
+- `call-deepseek` 读取根目录 `.env` 中的 DeepSeek 配置，逐条调用大模型并保存 `llm_pseudo_label_responses.jsonl`
+- `aggregate` 读取大模型返回的 `llm_pseudo_label_responses.jsonl`，按 `candidate_group_id + route_id` 聚合多 seed 的中位数、方差和置信度
+- `fuse` 将规则伪标签与 LLM 聚合标签融合，输出 `rule_llm_fused_pseudo_labels.csv`
+- 当前训练脚本可以通过 `--labels algorithm/dataset/rule_llm_fused_pseudo_labels.csv` 直接使用融合标签，并自动读取 `sample_weight` 进行加权训练
+
+`call-deepseek` 会产生真实 API 调用成本，建议先用 `--limit 60` 或更小规模检查输出质量。脚本默认启用 JSON mode，并把标注任务的默认 `max_tokens` 提高到至少 1800，减少大模型返回半截 JSON 或漏字段的概率。脚本默认根据 `request_id` 跳过已经写入 `llm_pseudo_label_responses.jsonl` 的请求，因此中断后可以直接续跑；调用失败的请求会写入 `llm_pseudo_label_responses.errors.jsonl`，便于后续单独复查或重试。如果当前 DeepSeek 模型不支持 JSON mode，可临时加 `--no-json-mode`。
+
+如果需要多人并行调用大模型，可以先按 `candidate_group_id` 拆分请求，保证同一个 OD 组的多个 seed 不被拆散：
+
+```powershell
+python .\algorithm\dataset\scripts\build_llm_pseudo_labels.py split-requests --shards 5
+```
+
+每个人只运行自己负责的 shard，输出对应的 response shard。收齐后统一合并：
+
+```powershell
+python .\algorithm\dataset\scripts\build_llm_pseudo_labels.py merge-responses
+python .\algorithm\dataset\scripts\build_llm_pseudo_labels.py aggregate
+python .\algorithm\dataset\scripts\build_llm_pseudo_labels.py fuse
+```
 
 其中 `training_targets.csv` 建议保存：
 

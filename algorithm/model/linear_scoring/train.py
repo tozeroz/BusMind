@@ -23,7 +23,7 @@ from algorithm.model.utils.score_mixing import SCORE_NAMES
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--features", type=Path, default=default_dataset_dir() / "features.csv")
-    parser.add_argument("--labels", type=Path, default=default_dataset_dir() / "pseudo_labels.csv")
+    parser.add_argument("--labels", type=Path, default=default_dataset_dir() / "rule_pseudo_labels.csv")
     parser.add_argument("--output", type=Path, default=ARTIFACT_DIR / "linear_route_scoring.json")
     parser.add_argument("--ridge", type=float, default=0.03)
     return parser.parse_args()

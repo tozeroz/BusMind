@@ -1,13 +1,14 @@
-"""Generate, aggregate, and fuse LLM-assisted pseudo labels.
+"""Generate, call, aggregate, and fuse LLM-assisted pseudo labels.
 
-This script does not call an LLM directly. It creates deterministic
-seed-conditioned request JSONL files, aggregates model responses, and fuses
-them with the existing rule-based pseudo labels.
+The workflow creates deterministic seed-conditioned request JSONL files,
+optionally calls DeepSeek for those requests, aggregates model responses, and
+fuses them with the existing rule-based pseudo labels.
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hashlib
 import json
 import math
@@ -22,7 +23,7 @@ if __package__ in {None, ""}:
 
 import pandas as pd
 
-from algorithm.dataset.scripts.build_labels import PREFERENCE_WEIGHTS
+from algorithm.dataset.scripts.build_rule_pseudo_labels import PREFERENCE_WEIGHTS
 from algorithm.dataset.scripts.recommendation_data import default_dataset_dir
 from algorithm.dataset.scripts.recommendation_feature_contract import (
     model_input_route_from_feature_row,
@@ -30,11 +31,20 @@ from algorithm.dataset.scripts.recommendation_feature_contract import (
 )
 from algorithm.model.contracts import PREFERENCE_NAMES, RouteFeatures
 from algorithm.model.utils.score_mixing import SCORE_NAMES
+from backend.app.core.intelligence_settings import settings
+from llm.providers.deepseek import DeepSeekClient, DeepSeekConfig, DeepSeekError
 
 
 DEFAULT_SEED_COUNT = 3
 REQUEST_SCHEMA_VERSION = "llm_pseudo_label_request"
 RESPONSE_SCHEMA_VERSION = "llm_pseudo_label_response"
+DEFAULT_LABEL_MAX_TOKENS = 1800
+
+
+class DeepSeekLabelError(DeepSeekError):
+    def __init__(self, message: str, raw_content: str | None = None) -> None:
+        super().__init__(message)
+        self.raw_content = raw_content
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,20 +53,46 @@ def parse_args() -> argparse.Namespace:
 
     prompts = subparsers.add_parser("generate-prompts", help="Build seed-conditioned LLM labeling requests")
     prompts.add_argument("--features", type=Path, default=default_dataset_dir() / "features.csv")
-    prompts.add_argument("--output", type=Path, default=default_dataset_dir() / "llm_label_requests.jsonl")
+    prompts.add_argument("--output", type=Path, default=default_dataset_dir() / "llm_pseudo_label_requests.jsonl")
     prompts.add_argument("--seed-count", type=int, default=DEFAULT_SEED_COUNT)
     prompts.add_argument("--max-groups", type=int, default=0)
     prompts.add_argument("--max-routes-per-group", type=int, default=10)
 
+    split = subparsers.add_parser("split-requests", help="Split LLM request JSONL for team labeling")
+    split.add_argument("--requests", type=Path, default=default_dataset_dir() / "llm_pseudo_label_requests.jsonl")
+    split.add_argument("--output-dir", type=Path, default=default_dataset_dir() / "llm_pseudo_label_shards")
+    split.add_argument("--shards", type=int, default=5)
+    split.add_argument("--prefix", type=str, default="llm_pseudo_label_requests")
+
+    call = subparsers.add_parser("call-deepseek", help="Call DeepSeek for request JSONL")
+    call.add_argument("--requests", type=Path, default=default_dataset_dir() / "llm_pseudo_label_requests.jsonl")
+    call.add_argument("--output", type=Path, default=default_dataset_dir() / "llm_pseudo_label_responses.jsonl")
+    call.add_argument("--errors-output", type=Path, default=None)
+    call.add_argument("--limit", type=int, default=0)
+    call.add_argument("--retries", type=int, default=2)
+    call.add_argument("--temperature", type=float, default=None)
+    call.add_argument("--max-tokens", type=int, default=None)
+    call.add_argument("--timeout-seconds", type=float, default=None)
+    call.add_argument("--sleep-seconds", type=float, default=0.0)
+    call.add_argument("--no-json-mode", action="store_false", dest="json_mode")
+    call.add_argument("--overwrite", action="store_true")
+
     aggregate = subparsers.add_parser("aggregate", help="Aggregate JSONL LLM responses across seeds")
-    aggregate.add_argument("--responses", type=Path, default=default_dataset_dir() / "llm_label_responses.jsonl")
-    aggregate.add_argument("--output", type=Path, default=default_dataset_dir() / "llm_labels_aggregated.csv")
+    aggregate.add_argument("--responses", type=Path, default=default_dataset_dir() / "llm_pseudo_label_responses.jsonl")
+    aggregate.add_argument("--output", type=Path, default=default_dataset_dir() / "llm_pseudo_labels.csv")
     aggregate.add_argument("--expected-seeds", type=int, default=DEFAULT_SEED_COUNT)
 
+    merge = subparsers.add_parser("merge-responses", help="Merge team response JSONL shards")
+    merge.add_argument("--input-dir", type=Path, default=default_dataset_dir() / "llm_pseudo_label_shards")
+    merge.add_argument("--pattern", type=str, default="llm_pseudo_label_responses_part_*_of_*.jsonl")
+    merge.add_argument("--inputs", type=Path, nargs="*", default=None)
+    merge.add_argument("--output", type=Path, default=default_dataset_dir() / "llm_pseudo_label_responses.jsonl")
+    merge.add_argument("--skip-invalid", action="store_true")
+
     fuse = subparsers.add_parser("fuse", help="Fuse rule labels and aggregated LLM labels")
-    fuse.add_argument("--rule-labels", type=Path, default=default_dataset_dir() / "pseudo_labels.csv")
-    fuse.add_argument("--llm-labels", type=Path, default=default_dataset_dir() / "llm_labels_aggregated.csv")
-    fuse.add_argument("--output", type=Path, default=default_dataset_dir() / "pseudo_labels_llm_fused.csv")
+    fuse.add_argument("--rule-labels", type=Path, default=default_dataset_dir() / "rule_pseudo_labels.csv")
+    fuse.add_argument("--llm-labels", type=Path, default=default_dataset_dir() / "llm_pseudo_labels.csv")
+    fuse.add_argument("--output", type=Path, default=default_dataset_dir() / "rule_llm_fused_pseudo_labels.csv")
     fuse.add_argument("--rule-weight", type=float, default=1.0)
     fuse.add_argument("--llm-weight", type=float, default=0.55)
     fuse.add_argument("--conflict-threshold", type=float, default=0.45)
@@ -119,7 +155,9 @@ def _system_prompt() -> str:
         "Score each candidate route from 0 to 100 for five dimensions: "
         "time_score, comfort_score, walk_score, transfer_score, reliability_score. "
         "Higher is better. Use the provided numeric route features only. "
-        "Return valid JSON only. Do not include markdown."
+        "Return one JSON object only. The answer must be directly parseable by Python json.loads. "
+        "Use double quotes for every key and string. Put commas between every object field and array item. "
+        "Do not include markdown, comments, trailing commas, code fences, or extra explanation."
     )
 
 
@@ -148,7 +186,31 @@ def _user_prompt(candidate_group_id: str, seed: str, routes: list[dict[str, Any]
                     "transfer_score": "0-100 number",
                     "reliability_score": "0-100 number",
                     "confidence": "0-1 number",
-                    "reason": "short Chinese reason",
+                    "reason": "short Chinese reason without quotes or line breaks",
+                }
+            ],
+        },
+        "strict_output_requirements": [
+            "Return exactly one JSON object.",
+            "Return exactly one label for each route_id in routes.",
+            "Keep route_id identical to the input route_id.",
+            "All score fields must be numbers, not strings.",
+            "reason must be short plain text without quotes, braces, or line breaks.",
+        ],
+        "json_template": {
+            "schema_version": RESPONSE_SCHEMA_VERSION,
+            "candidate_group_id": candidate_group_id,
+            "seed": seed,
+            "labels": [
+                {
+                    "route_id": routes[0]["route_id"] if routes else "route_id_from_input",
+                    "time_score": 80,
+                    "comfort_score": 75,
+                    "walk_score": 90,
+                    "transfer_score": 100,
+                    "reliability_score": 70,
+                    "confidence": 0.75,
+                    "reason": "示例",
                 }
             ],
         },
@@ -191,18 +253,315 @@ def generate_prompts(args: argparse.Namespace) -> None:
     print(f"wrote {written} LLM label requests -> {args.output}")
 
 
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8-sig") as file:
+        for line_number, raw_line in enumerate(file, start=1):
+            raw_line = raw_line.strip()
+            if not raw_line:
+                continue
+            try:
+                row = json.loads(raw_line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{path}: line {line_number} is not valid JSON") from exc
+            if not isinstance(row, dict):
+                raise ValueError(f"{path}: line {line_number} must be a JSON object")
+            rows.append(row)
+    return rows
+
+
+def _request_group_id(row: dict[str, Any]) -> str:
+    group_id = str(row.get("candidate_group_id") or "").strip()
+    if group_id:
+        return group_id
+    request_id = str(row.get("request_id") or "").strip()
+    if "::" in request_id:
+        return request_id.split("::", 1)[0]
+    if request_id:
+        return request_id
+    raise ValueError("request row missing candidate_group_id/request_id")
+
+
+def _request_identity(row: dict[str, Any]) -> str:
+    request_id = str(row.get("request_id") or "").strip()
+    if request_id:
+        return request_id
+    candidate_group_id = str(row.get("candidate_group_id") or "").strip()
+    seed = str(row.get("seed") or "").strip()
+    if candidate_group_id and seed:
+        return f"{candidate_group_id}::{seed}"
+    raise ValueError("response row missing request_id or candidate_group_id+seed")
+
+
+def _part_name(prefix: str, index: int, count: int) -> str:
+    width = max(2, len(str(count)))
+    return f"{prefix}_part_{index:0{width}d}_of_{count:0{width}d}.jsonl"
+
+
+def split_requests(args: argparse.Namespace) -> None:
+    if args.shards < 1:
+        raise ValueError("--shards must be >= 1")
+    requests = _read_jsonl(args.requests)
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for request in requests:
+        grouped.setdefault(_request_group_id(request), []).append(request)
+    if not grouped:
+        raise ValueError(f"No LLM requests found in {args.requests}")
+
+    shards: list[list[dict[str, Any]]] = [[] for _ in range(args.shards)]
+    for index, group_id in enumerate(sorted(grouped)):
+        shards[index % args.shards].extend(grouped[group_id])
+
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    total_written = 0
+    for index, rows in enumerate(shards, start=1):
+        path = args.output_dir / _part_name(args.prefix, index, args.shards)
+        with path.open("w", encoding="utf-8") as file:
+            for row in rows:
+                file.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
+        total_written += len(rows)
+        group_count = len({_request_group_id(row) for row in rows})
+        print(f"part {index}/{args.shards}: requests={len(rows)}, groups={group_count} -> {path}")
+
+    print(f"split {total_written} requests across {args.shards} shards -> {args.output_dir}")
+
+
+def _existing_request_ids(path: Path) -> set[str]:
+    if not path.is_file():
+        return set()
+    completed: set[str] = set()
+    for row in _read_jsonl(path):
+        request_id = str(row.get("request_id") or "").strip()
+        if request_id:
+            completed.add(request_id)
+    return completed
+
+
+def _error_output_path(args: argparse.Namespace) -> Path:
+    if args.errors_output is not None:
+        return args.errors_output
+    return args.output.with_suffix(".errors.jsonl")
+
+
+def _deepseek_config(args: argparse.Namespace) -> DeepSeekConfig:
+    if not settings.deepseek_api_key:
+        raise ValueError("DEEPSEEK_API_KEY is not configured in the project root .env")
+    max_tokens = args.max_tokens if args.max_tokens is not None else max(
+        settings.deepseek_max_tokens,
+        DEFAULT_LABEL_MAX_TOKENS,
+    )
+    return DeepSeekConfig(
+        api_key=settings.deepseek_api_key,
+        base_url=settings.deepseek_base_url,
+        model=settings.deepseek_model,
+        timeout_seconds=args.timeout_seconds or settings.deepseek_timeout_seconds,
+        max_tokens=max_tokens,
+        temperature=args.temperature if args.temperature is not None else settings.deepseek_temperature,
+    )
+
+
+def _request_messages(request: dict[str, Any]) -> list[dict[str, str]]:
+    messages = request.get("messages")
+    if not isinstance(messages, list) or not messages:
+        raise ValueError("request missing messages")
+    normalized: list[dict[str, str]] = []
+    for message in messages:
+        if not isinstance(message, dict):
+            raise ValueError("message must be an object")
+        role = str(message.get("role") or "").strip()
+        content = str(message.get("content") or "").strip()
+        if role not in {"system", "user", "assistant"} or not content:
+            raise ValueError("message role/content is invalid")
+        normalized.append({"role": role, "content": content})
+    return normalized
+
+
+def _validate_deepseek_payload(row: dict[str, Any]) -> None:
+    payload = _response_payload(row)
+    labels = payload.get("labels")
+    if not isinstance(labels, list) or not labels:
+        raise ValueError("DeepSeek response contains no labels")
+    route_ids = {str(route.get("route_id") or "").strip() for route in row.get("routes", [])}
+    for label in labels:
+        route_id = str(label.get("route_id") or "").strip()
+        if not route_id:
+            raise ValueError("DeepSeek response label missing route_id")
+        if route_ids and route_id not in route_ids:
+            raise ValueError(f"DeepSeek response has unknown route_id: {route_id}")
+        for name in SCORE_NAMES:
+            _score_value(label.get(name))
+        _confidence_value(label.get("confidence"))
+
+
+async def _call_deepseek_request(
+    client: DeepSeekClient,
+    request: dict[str, Any],
+    retries: int,
+    json_mode: bool,
+) -> dict[str, Any]:
+    messages = _request_messages(request)
+    last_error: Exception | None = None
+    last_raw_content: str | None = None
+    for attempt in range(retries + 1):
+        try:
+            content = await client.chat(
+                messages,
+                response_format={"type": "json_object"} if json_mode else None,
+            )
+            response = {
+                "schema_version": RESPONSE_SCHEMA_VERSION,
+                "provider": "deepseek",
+                "model": settings.deepseek_model,
+                "request_id": str(request.get("request_id") or ""),
+                "candidate_group_id": str(request.get("candidate_group_id") or ""),
+                "seed": str(request.get("seed") or ""),
+                "content": content,
+            }
+            try:
+                _validate_deepseek_payload({**response, "routes": request.get("routes", [])})
+            except (ValueError, json.JSONDecodeError) as exc:
+                raise DeepSeekLabelError(str(exc), raw_content=content) from exc
+            return response
+        except (DeepSeekError, ValueError, json.JSONDecodeError) as exc:
+            last_error = exc
+            if isinstance(exc, DeepSeekLabelError):
+                last_raw_content = exc.raw_content
+            if attempt < retries:
+                await asyncio.sleep(min(2.0**attempt, 8.0))
+    if last_raw_content is not None:
+        raise DeepSeekLabelError(str(last_error or "DeepSeek labeling failed"), raw_content=last_raw_content)
+    raise DeepSeekError(str(last_error or "DeepSeek labeling failed"))
+
+
+async def _call_deepseek(args: argparse.Namespace) -> None:
+    requests = _read_jsonl(args.requests)
+    completed = set() if args.overwrite else _existing_request_ids(args.output)
+    pending = [
+        request
+        for request in requests
+        if str(request.get("request_id") or "").strip() not in completed
+    ]
+    if args.limit > 0:
+        pending = pending[: args.limit]
+    if not pending:
+        print(f"no pending DeepSeek label requests -> {args.output}")
+        return
+
+    config = _deepseek_config(args)
+    client = DeepSeekClient(config)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    errors_output = _error_output_path(args)
+    errors_output.parent.mkdir(parents=True, exist_ok=True)
+    output_mode = "w" if args.overwrite else "a"
+    error_mode = "w" if args.overwrite else "a"
+
+    succeeded = 0
+    failed = 0
+    with args.output.open(output_mode, encoding="utf-8") as output_file, errors_output.open(
+        error_mode,
+        encoding="utf-8",
+    ) as error_file:
+        for index, request in enumerate(pending, start=1):
+            request_id = str(request.get("request_id") or "").strip()
+            try:
+                response = await _call_deepseek_request(
+                    client,
+                    request,
+                    max(args.retries, 0),
+                    bool(args.json_mode),
+                )
+            except Exception as exc:  # keep the batch resumable
+                failed += 1
+                error_row = {
+                    "request_id": request_id,
+                    "candidate_group_id": str(request.get("candidate_group_id") or ""),
+                    "seed": str(request.get("seed") or ""),
+                    "error": str(exc),
+                }
+                raw_content = getattr(exc, "raw_content", None)
+                if isinstance(raw_content, str) and raw_content:
+                    error_row["raw_content_excerpt"] = raw_content[:4000]
+                error_file.write(json.dumps(error_row, ensure_ascii=False, separators=(",", ":")) + "\n")
+                error_file.flush()
+                print(f"[{index}/{len(pending)}] failed {request_id}: {exc}")
+            else:
+                succeeded += 1
+                output_file.write(json.dumps(response, ensure_ascii=False, separators=(",", ":")) + "\n")
+                output_file.flush()
+                print(f"[{index}/{len(pending)}] labeled {request_id}")
+            if args.sleep_seconds > 0 and index < len(pending):
+                await asyncio.sleep(args.sleep_seconds)
+
+    print(f"DeepSeek labeling complete: succeeded={succeeded}, failed={failed}")
+    print(f"responses -> {args.output}")
+    if failed:
+        print(f"errors -> {errors_output}")
+
+
+def call_deepseek(args: argparse.Namespace) -> None:
+    asyncio.run(_call_deepseek(args))
+
+
+def _merge_input_paths(args: argparse.Namespace) -> list[Path]:
+    if args.inputs:
+        return [path for path in args.inputs if path.is_file()]
+    return sorted(path for path in args.input_dir.glob(args.pattern) if path.is_file())
+
+
+def merge_responses(args: argparse.Namespace) -> None:
+    paths = _merge_input_paths(args)
+    if not paths:
+        raise ValueError(f"No response shards found in {args.input_dir} with pattern {args.pattern!r}")
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    seen: set[str] = set()
+    written = 0
+    skipped_duplicates = 0
+    skipped_invalid = 0
+    with args.output.open("w", encoding="utf-8") as output_file:
+        for path in paths:
+            for line_number, row in enumerate(_read_jsonl(path), start=1):
+                try:
+                    identity = _request_identity(row)
+                    _response_payload(row)
+                except Exception:
+                    if args.skip_invalid:
+                        skipped_invalid += 1
+                        continue
+                    raise ValueError(f"{path}: line {line_number} is not a valid LLM response")
+                if identity in seen:
+                    skipped_duplicates += 1
+                    continue
+                seen.add(identity)
+                output_file.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
+                written += 1
+
+    print(f"merged {written} response rows -> {args.output}")
+    print(f"input_files={len(paths)}, duplicate_rows={skipped_duplicates}, invalid_rows={skipped_invalid}")
+
+
 def _extract_json_object(text: str) -> dict[str, Any]:
     text = text.strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
         text = re.sub(r"```$", "", text).strip()
+    candidate = text
     try:
-        return json.loads(text)
+        payload = json.loads(candidate)
     except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        match = re.search(r"\{.*\}", candidate, flags=re.DOTALL)
         if not match:
             raise
-        return json.loads(match.group(0))
+        candidate = match.group(0)
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            repaired = re.sub(r",(\s*[\]}])", r"\1", candidate)
+            repaired = re.sub(r"}\s*(?={)", "},", repaired)
+            payload = json.loads(repaired)
+    if not isinstance(payload, dict):
+        raise ValueError("LLM response JSON must be an object")
+    return payload
 
 
 def _response_payload(line: dict[str, Any]) -> dict[str, Any]:
@@ -458,8 +817,14 @@ def main() -> None:
     args = parse_args()
     if args.command == "generate-prompts":
         generate_prompts(args)
+    elif args.command == "split-requests":
+        split_requests(args)
+    elif args.command == "call-deepseek":
+        call_deepseek(args)
     elif args.command == "aggregate":
         aggregate_responses(args)
+    elif args.command == "merge-responses":
+        merge_responses(args)
     elif args.command == "fuse":
         fuse_labels(args)
     else:
