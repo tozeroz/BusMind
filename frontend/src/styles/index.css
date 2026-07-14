@@ -902,6 +902,74 @@ label {
   box-shadow: none;
 }
 
+.station-autocomplete {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
+.station-autocomplete > input {
+  width: 100%;
+}
+
+.station-suggestion-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 10px);
+  left: -8px;
+  right: -8px;
+  display: grid;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 14px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.2);
+}
+
+.station-suggestion-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 10px;
+  color: #172033;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.station-suggestion-list button:hover,
+.station-suggestion-list button:focus-visible {
+  background: rgba(42, 132, 145, 0.12);
+  outline: none;
+}
+
+.station-suggestion-list strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.station-suggestion-list small {
+  flex: 0 0 auto;
+  color: rgba(23, 32, 51, 0.55);
+  font-size: 10px;
+}
+
+.station-suggestion-list p {
+  margin: 0;
+  padding: 9px 10px;
+  color: rgba(23, 32, 51, 0.55);
+  font-size: 11px;
+}
+
 .search-submit-chip {
   width: 82px;
   min-height: 38px;
