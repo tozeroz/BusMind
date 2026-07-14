@@ -20,7 +20,7 @@ import { getMapLines, getMapStations, getRoadSegments } from '@/api/map'
 import { createProtomapsStyle } from '@/modules/map/constants/map-style'
 import { PRIORITY_BUS_STOP_CODES } from '@/modules/map/constants/priority-stops'
 
-const emit = defineEmits(['select-stop', 'select-route', 'load-error', 'initial-data-loaded'])
+const emit = defineEmits(['select-stop', 'select-stop-destination', 'select-route', 'load-error', 'initial-data-loaded'])
 
 const mapContainer = ref(null)
 let map = null
@@ -255,6 +255,7 @@ function getStopRoutes(stopId) {
 
 function clearSelection() {
   selectedStopForRoutes = null
+  areRoutesVisible = false
   setSelectedStopState(null)
   setStopsDimmed(false)
   setSourceData('routes', emptyFeatureCollection)
@@ -443,7 +444,7 @@ function addRouteSources() {
   map.addSource('routes', {
     type: 'geojson',
     promoteId: 'line_id',
-    data: busRoutesGeoJSON
+    data: emptyFeatureCollection
   })
 
   map.addSource('routes-path', {
@@ -637,8 +638,8 @@ function addStopLayers() {
     minzoom: 9,
     maxzoom: 15,
     paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 0.6, 11, 1, 13, 2, 14, 3.5, 15, ['case', ['boolean', ['feature-state', 'selected'], false], 7, 5]],
-      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', stopPriorityColorExpression],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 0.6, 11, 1, 13, 2, 14, 3.5, 15, 5],
+      'circle-color': stopPriorityColorExpression,
       'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], stopStroke, '#ffffff'],
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 9, 0, 12, 0.5, 15, 1.5],
       'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0, 12, 0.35, 15, 0.85],
@@ -652,8 +653,8 @@ function addStopLayers() {
     source: 'stops',
     minzoom: 13.5,
     paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 2, 15, ['case', ['boolean', ['feature-state', 'selected'], false], 9, 5], 17, ['case', ['boolean', ['feature-state', 'selected'], false], 12, 7]],
-      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', stopPriorityColorExpression],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 2, 15, 5, 17, 7],
+      'circle-color': stopPriorityColorExpression,
       'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], stopStroke, '#ffffff'],
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 14, 1, 15, 2, 17, 3],
       'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, 0.62, 17, 0.9],
@@ -740,7 +741,21 @@ function bindStopLayerEvents() {
 
     if (!stop) return
 
+    highlightStop(stop.stop_id)
     emit('select-stop', stop)
+    scheduleFocusOnCoordinates([[stop.lng, stop.lat]], 17)
+  })
+
+  map.on('contextmenu', 'stops-hit', (event) => {
+    event.preventDefault()
+    event.originalEvent?.preventDefault()
+    const feature = event.features && event.features[0]
+    const stopId = feature && feature.properties ? feature.properties.stop_id : ''
+    const stop = busStops.find((item) => String(item.stop_id) === String(stopId))
+    if (!stop) return
+
+    highlightStop(stop.stop_id)
+    emit('select-stop-destination', stop)
     scheduleFocusOnCoordinates([[stop.lng, stop.lat]], 17)
   })
 }
