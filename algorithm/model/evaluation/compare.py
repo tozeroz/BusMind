@@ -14,12 +14,12 @@ if __package__ in {None, ""}:
 import numpy as np
 import pandas as pd
 
-from algorithm.dataset.scripts.recommendation_data import default_dataset_dir
-from algorithm.dataset.scripts.recommendation_feature_contract import (
+from algorithm.dataset.scripts.feature_contract import (
     model_input_route_from_feature_row,
     numeric_feature_frame,
     read_frozen_features,
 )
+from algorithm.dataset.scripts.paths import features_path, fused_labels_path, rule_labels_path
 from algorithm.model.contracts import NUMERIC_FEATURE_NAMES, RouteFeatures
 from algorithm.model.evaluation.metrics import (
     mean_absolute_error,
@@ -40,16 +40,15 @@ DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "artifacts"
 
 
 def _default_labels_path() -> Path:
-    dataset_dir = default_dataset_dir()
-    fused = dataset_dir / "rule_llm_fused_pseudo_labels.csv"
+    fused = fused_labels_path()
     if fused.is_file():
         return fused
-    return dataset_dir / "rule_pseudo_labels.csv"
+    return rule_labels_path()
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--features", type=Path, default=default_dataset_dir() / "features.csv")
+    parser.add_argument("--features", type=Path, default=features_path())
     parser.add_argument("--labels", type=Path, default=None)
     parser.add_argument("--models", nargs="+", default=list(DEFAULT_MODELS))
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -119,6 +118,7 @@ def _select_groups(route_frame: pd.DataFrame, max_groups: int, random_state: int
 
 
 def _eval_groups(groups: np.ndarray, test_size: float, random_state: int) -> np.ndarray:
+    # 与训练保持一致：同一个候选路线组必须整体进入同一侧，避免组内路线泄漏到验证集。
     if len(groups) == 0:
         return groups
     if test_size <= 0:
@@ -138,6 +138,7 @@ def _route_from_row(row: dict[str, Any]) -> RouteFeatures:
 
 def _predict_route_scores(model_key: str, route_frame: pd.DataFrame) -> pd.DataFrame:
     if model_key == "tabpfn":
+        # TabPFN 单次调用开销较高，评估时使用批量预测路径。
         return _predict_tabpfn_route_scores(route_frame)
 
     model = get_route_scoring_model(model_key)
@@ -158,6 +159,7 @@ def _predict_route_scores(model_key: str, route_frame: pd.DataFrame) -> pd.DataF
 def _predict_tabpfn_route_scores(route_frame: pd.DataFrame) -> pd.DataFrame:
     from algorithm.model.tabpfn_scoring.model import TabPFNRouteScoringModel
 
+    # 将冻结的 route payload 字段恢复为模型实际使用的 12 维数值特征。
     numeric_features = numeric_feature_frame(route_frame.drop_duplicates(JOIN_KEYS).copy())
     predictions = TabPFNRouteScoringModel().predict_feature_frame(numeric_features[list(NUMERIC_FEATURE_NAMES)])
     output = numeric_features[JOIN_KEYS].copy()

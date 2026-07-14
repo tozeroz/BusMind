@@ -61,6 +61,7 @@ def _read_metadata(path: Path) -> dict[str, Any]:
 
 @lru_cache(maxsize=2)
 def _load_artifact(metadata_path_text: str = str(METADATA_PATH)) -> tuple[dict[str, Any], dict[str, Any]]:
+    # 元数据为每个评分头保存一个 booster 文件；缓存可避免每次请求重复读盘。
     metadata_path = Path(metadata_path_text)
     metadata = _read_metadata(metadata_path)
     xgb = _import_xgboost()
@@ -89,10 +90,12 @@ def _d_matrix(vector: np.ndarray):
 
 
 def _predict_contributions(models: dict[str, Any], dmatrix: Any, preference: str) -> dict[str, float]:
+    # 使用与 recommend_score 相同的偏好权重混合各评分头的贡献向量。
     preference_mix = PREFERENCE_MIX[preference]
     total = np.zeros(len(NUMERIC_FEATURE_NAMES), dtype=float)
     for score_index, score_name in enumerate(SCORE_NAMES):
         try:
+            # XGBoost 会在 pred_contribs 末尾追加 bias 项，这里只返回特征贡献。
             contribution = models[score_name].predict(dmatrix, pred_contribs=True)[0]
         except Exception:
             return {feature: 0.0 for feature in NUMERIC_FEATURE_NAMES}

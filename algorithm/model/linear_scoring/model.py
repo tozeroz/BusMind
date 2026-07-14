@@ -28,8 +28,8 @@ SUBSCORE_MODEL_PATH = ARTIFACT_DIR / "linear_route_scoring.json"
 DEFAULT_MEAN = np.array([10.0, 25.0, 8.0, 600.0, 0.6, 70.0, 70.0, 70.0, 120.0, 80.0, 85.0, 10.0])
 DEFAULT_STD = np.array([8.0, 18.0, 6.0, 500.0, 0.8, 22.0, 22.0, 22.0, 120.0, 25.0, 20.0, 7.0])
 
-# Rows map 12 normalized features to five scores:
-# time, comfort, walk, transfer, reliability.
+# 每一行把 12 个归一化特征映射到一个子评分：
+# 时间、舒适度、步行、换乘、可靠性。
 DEFAULT_SUBSCORE_COEFFICIENTS = np.array(
     [
         [-0.65, -0.45, -0.20, -0.05, -0.05, 0.00, 0.00, 0.08, 0.00, 0.00, 0.00, -0.25],

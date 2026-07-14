@@ -87,6 +87,7 @@ def _context_path(metadata_path: Path, metadata: dict[str, Any]) -> Path:
 
 
 def _fit_regressors(metadata_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    # TabPFN 推理依赖训练上下文，因此 artifact 会保存拟合后的上下文样本。
     metadata = _read_metadata(metadata_path)
     context = np.load(_context_path(metadata_path, metadata), allow_pickle=False)
     feature_names = list(NUMERIC_FEATURE_NAMES)
@@ -114,7 +115,7 @@ def _feature_frame(route: RouteFeatures) -> pd.DataFrame:
 
 
 def _predict_contributions(preference: str) -> dict[str, float]:
-    # TabPFN does not expose cheap per-row feature attributions in the core package.
+    # TabPFN 官方核心包没有提供轻量的逐样本特征归因。
     return {feature: 0.0 for feature in NUMERIC_FEATURE_NAMES}
 
 
@@ -130,6 +131,7 @@ class TabPFNRouteScoringModel:
         return _load_artifact(str(self.artifact_path))
 
     def predict_feature_frame(self, features: pd.DataFrame) -> np.ndarray:
+        # 批量预测比逐条路线调用 predict 更快，尤其是在 GPU 环境下。
         _metadata, models = self._artifact()
         x = features[list(NUMERIC_FEATURE_NAMES)].astype(float)
         predictions = np.zeros((len(x), len(SCORE_NAMES)), dtype=float)

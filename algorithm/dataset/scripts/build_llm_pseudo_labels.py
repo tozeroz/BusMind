@@ -1,9 +1,4 @@
-"""Generate, call, aggregate, and fuse LLM-assisted pseudo labels.
-
-The workflow creates deterministic seed-conditioned request JSONL files,
-optionally calls DeepSeek for those requests, aggregates model responses, and
-fuses them with the existing rule-based pseudo labels.
-"""
+"""生成、调用、聚合并融合 LLM-assisted 伪标签。"""
 
 from __future__ import annotations
 
@@ -24,10 +19,20 @@ if __package__ in {None, ""}:
 import pandas as pd
 
 from algorithm.dataset.scripts.build_rule_pseudo_labels import PREFERENCE_WEIGHTS
-from algorithm.dataset.scripts.recommendation_data import default_dataset_dir
-from algorithm.dataset.scripts.recommendation_feature_contract import (
+from algorithm.dataset.scripts.feature_contract import (
     model_input_route_from_feature_row,
     read_frozen_features,
+)
+from algorithm.dataset.scripts.paths import (
+    canonical_llm_requests_path,
+    canonical_llm_responses_path,
+    features_path,
+    fused_labels_path,
+    llm_labels_path,
+    llm_requests_path,
+    llm_responses_path,
+    llm_shards_dir,
+    rule_labels_path,
 )
 from algorithm.model.contracts import PREFERENCE_NAMES, RouteFeatures
 from algorithm.model.utils.score_mixing import SCORE_NAMES
@@ -52,21 +57,21 @@ def parse_args() -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     prompts = subparsers.add_parser("generate-prompts", help="Build seed-conditioned LLM labeling requests")
-    prompts.add_argument("--features", type=Path, default=default_dataset_dir() / "features.csv")
-    prompts.add_argument("--output", type=Path, default=default_dataset_dir() / "llm_pseudo_label_requests.jsonl")
+    prompts.add_argument("--features", type=Path, default=features_path())
+    prompts.add_argument("--output", type=Path, default=canonical_llm_requests_path())
     prompts.add_argument("--seed-count", type=int, default=DEFAULT_SEED_COUNT)
     prompts.add_argument("--max-groups", type=int, default=0)
     prompts.add_argument("--max-routes-per-group", type=int, default=10)
 
     split = subparsers.add_parser("split-requests", help="Split LLM request JSONL for team labeling")
-    split.add_argument("--requests", type=Path, default=default_dataset_dir() / "llm_pseudo_label_requests.jsonl")
-    split.add_argument("--output-dir", type=Path, default=default_dataset_dir() / "llm_pseudo_label_shards")
+    split.add_argument("--requests", type=Path, default=llm_requests_path())
+    split.add_argument("--output-dir", type=Path, default=llm_shards_dir())
     split.add_argument("--shards", type=int, default=5)
     split.add_argument("--prefix", type=str, default="llm_pseudo_label_requests")
 
     call = subparsers.add_parser("call-deepseek", help="Call DeepSeek for request JSONL")
-    call.add_argument("--requests", type=Path, default=default_dataset_dir() / "llm_pseudo_label_requests.jsonl")
-    call.add_argument("--output", type=Path, default=default_dataset_dir() / "llm_pseudo_label_responses.jsonl")
+    call.add_argument("--requests", type=Path, default=llm_requests_path())
+    call.add_argument("--output", type=Path, default=llm_responses_path())
     call.add_argument("--errors-output", type=Path, default=None)
     call.add_argument("--limit", type=int, default=0)
     call.add_argument("--retries", type=int, default=2)
@@ -78,21 +83,21 @@ def parse_args() -> argparse.Namespace:
     call.add_argument("--overwrite", action="store_true")
 
     aggregate = subparsers.add_parser("aggregate", help="Aggregate JSONL LLM responses across seeds")
-    aggregate.add_argument("--responses", type=Path, default=default_dataset_dir() / "llm_pseudo_label_responses.jsonl")
-    aggregate.add_argument("--output", type=Path, default=default_dataset_dir() / "llm_pseudo_labels.csv")
+    aggregate.add_argument("--responses", type=Path, default=llm_responses_path())
+    aggregate.add_argument("--output", type=Path, default=llm_labels_path())
     aggregate.add_argument("--expected-seeds", type=int, default=DEFAULT_SEED_COUNT)
 
     merge = subparsers.add_parser("merge-responses", help="Merge team response JSONL shards")
-    merge.add_argument("--input-dir", type=Path, default=default_dataset_dir() / "llm_pseudo_label_shards")
+    merge.add_argument("--input-dir", type=Path, default=llm_shards_dir())
     merge.add_argument("--pattern", type=str, default="llm_pseudo_label_responses_part_*_of_*.jsonl")
     merge.add_argument("--inputs", type=Path, nargs="*", default=None)
-    merge.add_argument("--output", type=Path, default=default_dataset_dir() / "llm_pseudo_label_responses.jsonl")
+    merge.add_argument("--output", type=Path, default=canonical_llm_responses_path())
     merge.add_argument("--skip-invalid", action="store_true")
 
     fuse = subparsers.add_parser("fuse", help="Fuse rule labels and aggregated LLM labels")
-    fuse.add_argument("--rule-labels", type=Path, default=default_dataset_dir() / "rule_pseudo_labels.csv")
-    fuse.add_argument("--llm-labels", type=Path, default=default_dataset_dir() / "llm_pseudo_labels.csv")
-    fuse.add_argument("--output", type=Path, default=default_dataset_dir() / "rule_llm_fused_pseudo_labels.csv")
+    fuse.add_argument("--rule-labels", type=Path, default=rule_labels_path())
+    fuse.add_argument("--llm-labels", type=Path, default=llm_labels_path())
+    fuse.add_argument("--output", type=Path, default=fused_labels_path())
     fuse.add_argument("--rule-weight", type=float, default=1.0)
     fuse.add_argument("--llm-weight", type=float, default=0.55)
     fuse.add_argument("--conflict-threshold", type=float, default=0.45)
@@ -470,7 +475,7 @@ async def _call_deepseek(args: argparse.Namespace) -> None:
                     max(args.retries, 0),
                     bool(args.json_mode),
                 )
-            except Exception as exc:  # keep the batch resumable
+            except Exception as exc:  # 保持批处理可续跑
                 failed += 1
                 error_row = {
                     "request_id": request_id,

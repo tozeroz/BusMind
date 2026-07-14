@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from algorithm.dataset.scripts.recommendation_feature_contract import numeric_feature_frame, read_frozen_features
+from algorithm.dataset.scripts.feature_contract import numeric_feature_frame, read_frozen_features
 from algorithm.model.contracts import NUMERIC_FEATURE_NAMES
 
 

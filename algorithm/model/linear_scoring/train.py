@@ -13,8 +13,8 @@ if __package__ in {None, ""}:
 import numpy as np
 import pandas as pd
 
-from algorithm.dataset.scripts.recommendation_data import default_dataset_dir
-from algorithm.dataset.scripts.recommendation_feature_contract import numeric_feature_frame, read_frozen_features
+from algorithm.dataset.scripts.feature_contract import numeric_feature_frame, read_frozen_features
+from algorithm.dataset.scripts.paths import features_path, fused_labels_path, rule_labels_path
 from algorithm.model.contracts import MODEL_VERSION, NUMERIC_FEATURE_NAMES
 from algorithm.model.linear_scoring.model import ARTIFACT_DIR
 from algorithm.model.utils.score_mixing import PREFERENCE_MIX, SCORE_NAMES
@@ -22,7 +22,7 @@ from algorithm.model.utils.score_mixing import PREFERENCE_MIX, SCORE_NAMES
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--features", type=Path, default=default_dataset_dir() / "features.csv")
+    parser.add_argument("--features", type=Path, default=features_path())
     parser.add_argument("--labels", type=Path, default=None)
     parser.add_argument("--output", type=Path, default=ARTIFACT_DIR / "linear_route_scoring.json")
     parser.add_argument("--ridge", type=float, default=0.03)
@@ -32,11 +32,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def _default_labels_path() -> Path:
-    dataset_dir = default_dataset_dir()
-    fused = dataset_dir / "rule_llm_fused_pseudo_labels.csv"
+    fused = fused_labels_path()
     if fused.is_file():
         return fused
-    return dataset_dir / "rule_pseudo_labels.csv"
+    return rule_labels_path()
 
 
 def _logit(values: np.ndarray) -> np.ndarray:
@@ -79,6 +78,7 @@ def _load_training_frame(features_path: Path, labels_path: Path) -> pd.DataFrame
     target_columns = [*join_keys, *SCORE_NAMES]
     if "sample_weight" in labels.columns:
         target_columns.append("sample_weight")
+    # 融合标签按偏好展开，但五个子评分是路线级目标，训练前需要按路线去重。
     score_targets = labels.drop_duplicates(join_keys)[target_columns]
     dataset = numeric_features.merge(score_targets, on=join_keys, how="inner", validate="one_to_one")
     if dataset.empty:
@@ -87,6 +87,7 @@ def _load_training_frame(features_path: Path, labels_path: Path) -> pd.DataFrame
 
 
 def _group_train_eval_mask(dataset: pd.DataFrame, test_size: float, random_state: int) -> np.ndarray:
+    # 同一个候选路线组必须整体进入训练集或验证集，避免组内比较信息泄漏。
     groups = np.array(sorted(dataset["candidate_group_id"].astype(str).unique()))
     if len(groups) < 5 or test_size <= 0:
         return np.ones(len(dataset), dtype=bool)
@@ -130,6 +131,7 @@ def main() -> None:
     train_frame = dataset.loc[train_mask].copy()
     eval_frame = dataset.loc[~train_mask].copy()
 
+    # 归一化参数只用训练集拟合，验证集不能参与模型参数估计。
     mean = train_frame[feature_names].mean()
     std = train_frame[feature_names].std(ddof=0).replace(0, 1.0)
     x_train = ((train_frame[feature_names] - mean) / std).to_numpy(dtype=float)
