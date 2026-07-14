@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from datetime import timedelta
 from math import asin, cos, radians, sin, sqrt
@@ -270,12 +271,11 @@ class MySQLTransitGateway:
     async def _run_with_lock(func, /, *args):
         """Run a sync graph call from the async gateway surface.
 
-        The graph builder/search runs purely in memory after snapshot build, so a
-        direct call yields the loop without blocking on the database. Kept as a
-        helper so future concurrency guards (asyncio.Lock, thread pool) can be
-        added without touching callers.
+        Snapshot building and graph search are synchronous and can take long
+        enough to starve health checks during route search, so run them off the
+        event loop.
         """
-        return func(*args)
+        return await asyncio.to_thread(func, *args)
 
     async def find_nearest_station(self, longitude: float, latitude: float) -> StationData:
         station = self.repository.find_nearest_station(longitude, latitude)

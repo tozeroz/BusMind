@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 from dataclasses import dataclass
@@ -125,7 +126,7 @@ class RecommendationService:
             (perf_counter() - started) * 1000,
         )
         started = perf_counter()
-        built_routes, model_scores = self._apply_model_scores(
+        built_routes, model_scores = await self._apply_model_scores(
             built_routes,
             request.preference,
             start_station_id,
@@ -334,7 +335,7 @@ class RecommendationService:
             reliability_score=reliability_score,
         )
 
-    def _apply_model_scores(
+    async def _apply_model_scores(
         self,
         built_routes: list[BuiltRoute],
         preference: Preference,
@@ -354,7 +355,7 @@ class RecommendationService:
             "routes": [route.model_payload for route in scoreable_routes],
         }
         try:
-            model_result = self._predict_with_route_model(payload)
+            model_result = await asyncio.to_thread(self._predict_with_route_model, payload)
         except Exception:
             return built_routes, {}
 

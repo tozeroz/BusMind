@@ -244,9 +244,15 @@ const query = reactive({ start: 'Aft Braddell Rd', end: 'New Tech Pk' })
 const notice = ref('')
 const recommendation = ref(null)
 const isSearching = ref(false)
-const backendHealth = reactive({ state: 'checking', label: '\u540e\u7aef\u76d1\u542c\uff1a\u68c0\u67e5\u4e2d' })
-const backendHealthIntervalMs = 3000
-const backendHealthTimeoutMs = 2500
+const backendHealth = reactive({
+  state: 'checking',
+  label: '\u540e\u7aef\u76d1\u542c\uff1a\u68c0\u67e5\u4e2d',
+  lastOnlineLabel: '',
+  consecutiveFailures: 0
+})
+const backendHealthIntervalMs = 5000
+const backendHealthTimeoutMs = 6000
+const backendHealthOfflineThreshold = 2
 let backendHealthRequestPending = false
 let backendHealthTimer = null
 const panelMode = ref('search')
@@ -522,6 +528,8 @@ const searchRoutes = async () => {
 
   notice.value = '正在搜索站点并生成推荐路线...'
   isSearching.value = true
+  backendHealth.state = backendHealth.lastOnlineLabel ? 'online' : 'checking'
+  backendHealth.label = '\u540e\u7aef\u76d1\u542c\uff1a\u6b63\u5728\u5904\u7406\u68c0\u7d22'
   try {
     const [startStation, endStation] = await Promise.all([
       searchStation(query.start),
@@ -562,20 +570,42 @@ const searchRoutes = async () => {
     notice.value = getApiErrorMessage(error, '路线检索失败，请检查后端服务和站点数据')
   } finally {
     isSearching.value = false
+    checkBackendHealth()
   }
 }
 
 const checkBackendHealth = async () => {
   if (backendHealthRequestPending) return
+  if (isSearching.value) {
+    backendHealth.state = backendHealth.lastOnlineLabel ? 'online' : 'checking'
+    backendHealth.label = '\u540e\u7aef\u76d1\u542c\uff1a\u6b63\u5728\u5904\u7406\u68c0\u7d22'
+    return
+  }
   backendHealthRequestPending = true
   try {
     const data = unwrapData(await getApiHealth({ timeout: backendHealthTimeoutMs }), {})
     if (data.status !== 'ok') throw new Error('Unexpected health status')
     backendHealth.state = 'online'
     backendHealth.label = `\u540e\u7aef\u76d1\u542c\uff1a\u6b63\u5e38${data.version ? ` \u00b7 ${data.version}` : ''}`
+    backendHealth.lastOnlineLabel = backendHealth.label
+    backendHealth.consecutiveFailures = 0
   } catch {
-    backendHealth.state = 'offline'
-    backendHealth.label = '\u540e\u7aef\u76d1\u542c\uff1a\u672a\u8fde\u63a5'
+    if (isSearching.value) {
+      backendHealth.state = backendHealth.lastOnlineLabel ? 'online' : 'checking'
+      backendHealth.label = '\u540e\u7aef\u76d1\u542c\uff1a\u6b63\u5728\u5904\u7406\u68c0\u7d22'
+      return
+    }
+    backendHealth.consecutiveFailures += 1
+    if (backendHealth.consecutiveFailures >= backendHealthOfflineThreshold) {
+      backendHealth.state = 'offline'
+      backendHealth.label = '\u540e\u7aef\u76d1\u542c\uff1a\u672a\u8fde\u63a5'
+    } else if (backendHealth.lastOnlineLabel) {
+      backendHealth.state = 'online'
+      backendHealth.label = backendHealth.lastOnlineLabel
+    } else {
+      backendHealth.state = 'checking'
+      backendHealth.label = '\u540e\u7aef\u76d1\u542c\uff1a\u91cd\u8bd5\u4e2d'
+    }
   } finally {
     backendHealthRequestPending = false
   }
