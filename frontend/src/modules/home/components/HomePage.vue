@@ -69,14 +69,50 @@
             <form class="destination-search floating-search" @submit.prevent="searchRoutes">
               <label class="search-header-line current-location-row">
                 <span>当前位置</span>
-                <input v-model="query.start" placeholder="输入当前位置" />
+                <div class="station-autocomplete">
+                  <input
+                    v-model="query.start"
+                    placeholder="输入当前位置"
+                    autocomplete="off"
+                    @input="handleStationInput('start')"
+                    @focus="openStationSuggestions('start')"
+                    @blur="closeStationSuggestions('start')"
+                  />
+                  <div v-if="stationSuggestionOpen.start" class="station-suggestion-list">
+                    <button
+                      v-for="station in stationSuggestions.start"
+                      :key="station.station_id"
+                      type="button"
+                      @mousedown.prevent="chooseStationSuggestion('start', station)"
+                    ><strong>{{ station.station_name }}</strong><small>{{ station.station_code || station.bus_stop_code || '' }}</small></button>
+                    <p v-if="stationSuggestionLoading.start">&#x6B63;&#x5728;&#x641C;&#x7D22;&#x7AD9;&#x70B9;...</p>
+                  </div>
+                </div>
                 <button class="locate-current-button" type="button" @click="getCurrentLocation">
                   定位
                 </button>
               </label>
               <label class="search-box-row">
                 <span>目标地点</span>
-                <input v-model="query.end" placeholder="搜索地点、公交站、线路" />
+                <div class="station-autocomplete">
+                  <input
+                    v-model="query.end"
+                    placeholder="搜索地点、公交站、线路"
+                    autocomplete="off"
+                    @input="handleStationInput('end')"
+                    @focus="openStationSuggestions('end')"
+                    @blur="closeStationSuggestions('end')"
+                  />
+                  <div v-if="stationSuggestionOpen.end" class="station-suggestion-list">
+                    <button
+                      v-for="station in stationSuggestions.end"
+                      :key="station.station_id"
+                      type="button"
+                      @mousedown.prevent="chooseStationSuggestion('end', station)"
+                    ><strong>{{ station.station_name }}</strong><small>{{ station.station_code || station.bus_stop_code || '' }}</small></button>
+                    <p v-if="stationSuggestionLoading.end">&#x6B63;&#x5728;&#x641C;&#x7D22;&#x7AD9;&#x70B9;...</p>
+                  </div>
+                </div>
                 <button class="search-submit-chip" type="submit" :disabled="isSearching">
                   {{ isSearching ? '检索中…' : '检索' }}
                 </button>
@@ -176,13 +212,22 @@
           :route="selectedRecommendedRoute"
           @close="selectedRecommendedRoute = null"
         />
+        <SelectedLineDetailCard
+          v-else-if="selectedLineDetail"
+          :line="selectedLineDetail"
+          :station-id="selectedLineStation.id"
+          :station-name="selectedLineStation.name"
+          :loads="selectedLineLoads"
+          :loading="isSelectedLineLoading"
+          :error="selectedLineLoadError"
+          @close="closeSelectedLineDetail"
+        />
         <SelectedStationDetailCard
           v-else-if="isStationDetailOpen"
           :station="selectedInfo"
           :is-routes-expanded="isRoutesExpanded"
           @close="closeStationDetail"
           @show-routes="handleShowRoutes"
-          @show-eta="handleShowEta"
           @close-routes="handleCloseRoutes"
           @select-route="handleSelectRoute"
         />
@@ -220,20 +265,21 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import BusMap from '@/modules/map/components/BusMap.vue'
 import RouteResultsPopup from '@/modules/home/components/RouteResultsPopup.vue'
 import SelectedRouteDetailCard from '@/modules/home/components/SelectedRouteDetailCard.vue'
+import SelectedLineDetailCard from '@/modules/home/components/SelectedLineDetailCard.vue'
 import SelectedStationDetailCard from '@/modules/home/components/SelectedStationDetailCard.vue'
 import AiAssistantPanel from '@/modules/ai-assistant/components/AiAssistantPanel.vue'
 import AiAssistantTrigger from '@/modules/ai-assistant/components/AiAssistantTrigger.vue'
 import { useAiTravelConversation } from '@/modules/ai-assistant/composables/useAiTravelConversation'
-import { getNearbyLocations, searchLocations } from '@/api/location'
-import { getEta } from '@/api/intelligence'
-import { getCachedBusArrival } from '@/api/map'
+import { searchLocations } from '@/api/location'
+import { getEta, getRealtimePassengerLoad } from '@/api/intelligence'
+import { getCachedBusArrival, getTrafficHeatmap } from '@/api/map'
 import { getProgressiveRouteRecommendations, RECOMMENDATION_PREFERENCES } from '@/api/recommendation'
 import { getPassengerFlowTrend } from '@/api/history'
+import { getLineDetail, getStationDetail } from '@/api/transit'
 import { getApiHealth } from '@/api/health'
 import { getRealtimeVehicles } from '@/api/vehicle'
 import { getApiErrorMessage, unwrapData, unwrapList } from '@/api/response'
 import { triggerArrivalRefresh } from '@/api/user'
-import { INJECTED_LOCATION } from '@/utils/location'
 
 const refreshArrivals = () => {
   triggerArrivalRefresh().catch(() => {})
@@ -241,6 +287,12 @@ const refreshArrivals = () => {
 
 const busMapRef = ref(null)
 const query = reactive({ start: 'Aft Braddell Rd', end: 'New Tech Pk' })
+const selectedJourneyStations = reactive({ start: null, end: null })
+const stationSuggestions = reactive({ start: [], end: [] })
+const stationSuggestionOpen = reactive({ start: false, end: false })
+const stationSuggestionLoading = reactive({ start: false, end: false })
+const stationSuggestionSequence = { start: 0, end: 0 }
+const stationSuggestionTimers = { start: null, end: null }
 const notice = ref('')
 const recommendation = ref(null)
 const isSearching = ref(false)
@@ -268,7 +320,10 @@ const selectedInfo = reactive({
   chart: [42, 70, 56, 88, 64],
   flowSource: 'local',
   flowSummary: '',
-  routesList: []
+  routesList: [],
+  stationCode: '',
+  busStopCode: '',
+  stationStatus: ''
 })
 const floatPosition = reactive({ x: window.innerWidth - 112, y: window.innerHeight - 120 })
 const dragState = reactive({
@@ -289,6 +344,12 @@ const localTips = [
 
 const routeOptions = ref([])
 const selectedRecommendedRoute = ref(null)
+const selectedLineDetail = ref(null)
+const selectedLineLoads = ref([])
+const selectedLineStation = reactive({ id: null, name: '' })
+const isSelectedLineLoading = ref(false)
+const selectedLineLoadError = ref('')
+let selectedLineRequestSequence = 0
 const isStationDetailOpen = ref(false)
 const isRoutesExpanded = ref(false)
 const rawRouteOptions = ref([])
@@ -503,11 +564,96 @@ const searchStation = async (keyword) => {
   const response = await searchLocations({
     keyword: keyword.trim(),
     page: 1,
-    limit: 5,
-    active_only: true
+    limit: 10,
+    active_only: false
   })
-  const stations = response.data?.stations || response.data?.items || []
-  return stations[0] || null
+  const stations = unwrapList(response, 'stations')
+  const normalizedKeyword = keyword.trim().toLocaleLowerCase()
+  return stations.find((station) =>
+    String(station.station_name || '').trim().toLocaleLowerCase() === normalizedKeyword
+    || String(station.station_code || station.bus_stop_code || '').trim().toLocaleLowerCase() === normalizedKeyword
+  ) || stations[0] || null
+}
+
+const stationIdOf = (station) => {
+  const stationId = Number(station?.station_id ?? station?.stop_id ?? station?.id)
+  return Number.isInteger(stationId) && stationId > 0 ? stationId : null
+}
+
+const stationNameOf = (station) => String(station?.station_name || station?.stop_name || station?.name || '').trim()
+
+const rememberJourneyStation = (type, station, { focus = true } = {}) => {
+  const stationId = stationIdOf(station)
+  const stationName = stationNameOf(station)
+  if (!stationId || !stationName) return null
+
+  const normalizedStation = { ...station, station_id: stationId, station_name: stationName }
+  selectedJourneyStations[type] = normalizedStation
+  query[type] = stationName
+  resolvedJourney[type === 'start' ? 'startStationId' : 'endStationId'] = stationId
+  stationSuggestions[type] = []
+  stationSuggestionOpen[type] = false
+  clearJourneyResults()
+  if (focus) busMapRef.value?.focusStopByName(stationName)
+  return normalizedStation
+}
+
+const loadStationSuggestions = async (type) => {
+  const keyword = query[type].trim()
+  const sequence = ++stationSuggestionSequence[type]
+  if (!keyword) {
+    stationSuggestions[type] = []
+    stationSuggestionOpen[type] = false
+    return
+  }
+
+  stationSuggestionLoading[type] = true
+  try {
+    const response = await searchLocations({ keyword, page: 1, limit: 8, active_only: false })
+    if (sequence !== stationSuggestionSequence[type]) return
+    stationSuggestions[type] = unwrapList(response, 'stations')
+    stationSuggestionOpen[type] = true
+  } catch {
+    if (sequence === stationSuggestionSequence[type]) stationSuggestions[type] = []
+  } finally {
+    if (sequence === stationSuggestionSequence[type]) stationSuggestionLoading[type] = false
+  }
+}
+
+const handleStationInput = (type) => {
+  selectedJourneyStations[type] = null
+  resolvedJourney[type === 'start' ? 'startStationId' : 'endStationId'] = null
+  clearJourneyResults()
+  if (stationSuggestionTimers[type]) window.clearTimeout(stationSuggestionTimers[type])
+  stationSuggestionTimers[type] = window.setTimeout(() => loadStationSuggestions(type), 180)
+}
+
+const openStationSuggestions = (type) => {
+  if (stationSuggestions[type].length) stationSuggestionOpen[type] = true
+  else if (query[type].trim()) loadStationSuggestions(type)
+}
+
+const closeStationSuggestions = (type) => {
+  window.setTimeout(() => { stationSuggestionOpen[type] = false }, 120)
+}
+
+const chooseStationSuggestion = (type, station) => {
+  const selected = rememberJourneyStation(type, station)
+  if (!selected) return
+  notice.value = type === 'start'
+    ? `\u5df2\u5c06 ${selected.station_name} \u8bbe\u4e3a\u8d77\u70b9`
+    : `\u5df2\u5c06 ${selected.station_name} \u8bbe\u4e3a\u76ee\u7684\u5730`
+}
+
+const resolveJourneyStation = async (type) => {
+  const remembered = selectedJourneyStations[type]
+  if (remembered && stationIdOf(remembered) && stationNameOf(remembered) === query[type].trim()) return remembered
+
+  const stationId = resolvedJourney[type === 'start' ? 'startStationId' : 'endStationId']
+  if (stationId) return { station_id: stationId, station_name: query[type].trim() }
+
+  const station = await searchStation(query[type])
+  return station ? rememberJourneyStation(type, station, { focus: false }) : null
 }
 
 const searchRoutes = async () => {
@@ -519,8 +665,6 @@ const searchRoutes = async () => {
   clearStationEtaRefreshTimer()
   routeOptions.value = []
   rawRouteOptions.value = []
-  resolvedJourney.startStationId = null
-  resolvedJourney.endStationId = null
   if (!query.start.trim() || !query.end.trim()) {
     notice.value = '请输入完整的起点和终点'
     return
@@ -532,8 +676,8 @@ const searchRoutes = async () => {
   backendHealth.label = '\u540e\u7aef\u76d1\u542c\uff1a\u6b63\u5728\u5904\u7406\u68c0\u7d22'
   try {
     const [startStation, endStation] = await Promise.all([
-      searchStation(query.start),
-      searchStation(query.end)
+      resolveJourneyStation('start'),
+      resolveJourneyStation('end')
     ])
     if (!startStation || !endStation) {
       notice.value = '没有找到匹配站点，请输入更准确的站点名称'
@@ -543,6 +687,8 @@ const searchRoutes = async () => {
       notice.value = '起点和终点不能是同一站点'
       return
     }
+    query.start = stationNameOf(startStation)
+    query.end = stationNameOf(endStation)
 
     const { result } = await getProgressiveRouteRecommendations({
       startStationId: startStation.station_id,
@@ -612,28 +758,27 @@ const checkBackendHealth = async () => {
 }
 
 const getCurrentLocation = async () => {
-  const { name, latitude, longitude, radiusKm } = INJECTED_LOCATION
-  notice.value = `正在定位到：${name}...`
+  const currentName = query.start.trim() || 'Aft Braddell Rd'
+  query.start = currentName
+  const remembered = selectedJourneyStations.start
+  if (remembered && stationNameOf(remembered) === currentName) {
+    busMapRef.value?.focusStopByName(currentName)
+    notice.value = `\u5df2\u5b9a\u4f4d\u5230\u7ad9\u70b9\uff1a${currentName}`
+    return
+  }
 
   try {
-    const response = await getNearbyLocations({
-      latitude,
-      longitude,
-      radius_km: radiusKm,
-      active_only: true
-    })
-    const stations = response.data?.stations || response.data?.items || []
-    const targetStation = stations.find((station) => station.station_name === name) || stations[0]
+    const focusedStop = busMapRef.value?.focusStopByName(currentName)
+    const targetStation = focusedStop || await searchStation(currentName)
     if (!targetStation) {
-      notice.value = `${name} 附近 ${radiusKm} 公里内没有公交站`
+      notice.value = `\u6ca1\u6709\u627e\u5230\u5339\u914d\u7ad9\u70b9\uff1a${currentName}`
       return
     }
 
-    query.start = targetStation.station_name
-    busMapRef.value?.focusStopByName(targetStation.station_name)
-    notice.value = `已定位到站点：${targetStation.station_name}`
+    const selected = rememberJourneyStation('start', targetStation)
+    notice.value = `\u5df2\u5b9a\u4f4d\u5230\u7ad9\u70b9\uff1a${selected.station_name}`
   } catch (error) {
-    notice.value = getApiErrorMessage(error, `无法定位到站点：${name}`)
+    notice.value = getApiErrorMessage(error, `\u65e0\u6cd5\u5b9a\u4f4d\u5230\u7ad9\u70b9\uff1a${currentName}`)
   }
 }
 
@@ -657,6 +802,34 @@ const reloadMapData = async () => {
   }
 }
 
+const loadSelectedStationDetail = async (stop) => {
+  const stationId = stationIdOf(stop)
+  if (!stationId) return
+
+  try {
+    const detail = unwrapData(await getStationDetail(stationId), {})
+    if (String(selectedInfo.id) !== String(stationId)) return
+
+    selectedInfo.name = detail.station_name || selectedInfo.name
+    selectedInfo.stationCode = detail.station_code || detail.bus_stop_code || ''
+    selectedInfo.busStopCode = detail.bus_stop_code || detail.station_code || ''
+    selectedInfo.stationStatus = detail.status || ''
+  } catch {
+    if (String(selectedInfo.id) !== String(stationId)) return
+    selectedInfo.stationStatus = '\u8be6\u60c5\u6682\u65f6\u4e0d\u53ef\u7528'
+  }
+}
+
+const loadSelectedStationRoutes = () => {
+  const routes = busMapRef.value?.getStopRoutes(selectedInfo.id) || []
+  selectedInfo.routesList = routes.map(route => ({
+    ...route.properties,
+    id: route.id,
+    color: route.properties.color || route.properties.display_color
+  }))
+  isRoutesExpanded.value = true
+}
+
 const resetPanel = () => {
   clearStationEtaRefreshTimer()
   busMapRef.value?.clearSelection()
@@ -672,6 +845,9 @@ const resetPanel = () => {
   selectedInfo.flowSource = 'local'
   selectedInfo.flowSummary = ''
   selectedInfo.routesList = []
+  selectedInfo.stationCode = ''
+  selectedInfo.busStopCode = ''
+  selectedInfo.stationStatus = ''
   isStationDetailOpen.value = false
   isRoutesExpanded.value = false
   busMapRef.value?.hideRoutes()
@@ -689,8 +865,9 @@ const selectStation = (stop) => {
   isInfoPanelOpen.value = true
   isAiChatOpen.value = false
   selectedRecommendedRoute.value = null
+  selectedLineDetail.value = null
   isStationDetailOpen.value = true
-  isRoutesExpanded.value = false
+  isRoutesExpanded.value = true
   selectedInfo.id = stop.stop_id
   selectedInfo.name = stop.stop_name
   selectedInfo.crowd = stop.crowd_level ? loadLevelText(stop.crowd_level) : '暂无实时客流'
@@ -702,43 +879,46 @@ const selectStation = (stop) => {
   selectedInfo.chart = stop.crowd_level === 'high' ? [68, 74, 82, 90, 76] : [34, 48, 56, 52, 44]
   selectedInfo.flowSource = 'local'
   selectedInfo.flowSummary = ''
-  selectedInfo.routesList = stop.routesList || []
+  selectedInfo.routesList = []
+  selectedInfo.stationCode = stop.station_code || stop.bus_stop_code || ''
+  selectedInfo.busStopCode = stop.bus_stop_code || stop.station_code || ''
+  selectedInfo.stationStatus = stop.status || 'active'
+  loadSelectedStationDetail(stop)
+  loadSelectedStationRoutes()
   loadStationFlowChart(stop)
   loadStationRealtime(stop)
   startStationEtaRefreshTimer(stop)
 }
 
 const clearJourneyResults = () => {
+  selectedLineRequestSequence += 1
   recommendation.value = null
+  selectedLineDetail.value = null
+  selectedLineLoads.value = []
+  selectedLineLoadError.value = ''
+  isSelectedLineLoading.value = false
+  busMapRef.value?.hideTrafficHeatmap()
   routeOptions.value = []
   rawRouteOptions.value = []
   selectedRecommendedRoute.value = null
 }
 
 const selectMapStop = (stop) => {
-  const stopName = stop?.stop_name || stop?.station_name || ''
-  const stopId = Number(stop?.stop_id ?? stop?.station_id)
-  if (stopName) query.start = stopName
-  resolvedJourney.startStationId = Number.isInteger(stopId) && stopId > 0 ? stopId : null
-  clearJourneyResults()
-  notice.value = stopName ? `\u5df2\u5c06 ${stopName} \u8bbe\u4e3a\u8d77\u70b9` : ''
+  const selected = rememberJourneyStation('start', stop, { focus: false })
+  notice.value = selected ? `\u5df2\u5c06 ${selected.station_name} \u8bbe\u4e3a\u8d77\u70b9` : ''
   selectStation(stop)
 }
 
 const selectMapDestination = (stop) => {
-  const stopName = stop?.stop_name || stop?.station_name || ''
-  const stopId = Number(stop?.stop_id ?? stop?.station_id)
-  if (!stopName) return
-  query.end = stopName
-  resolvedJourney.endStationId = Number.isInteger(stopId) && stopId > 0 ? stopId : null
-  clearJourneyResults()
+  const selected = rememberJourneyStation('end', stop, { focus: false })
+  if (!selected) return
   panelMode.value = 'search'
   isInfoPanelOpen.value = true
   isAiChatOpen.value = false
   isStationDetailOpen.value = false
   isRoutesExpanded.value = false
   clearStationEtaRefreshTimer()
-  notice.value = `\u5df2\u5c06 ${stopName} \u8bbe\u4e3a\u76ee\u7684\u5730\uff0c\u53ef\u76f4\u63a5\u70b9\u51fb\u68c0\u7d22`
+  notice.value = `\u5df2\u5c06 ${selected.station_name} \u8bbe\u4e3a\u76ee\u7684\u5730\uff0c\u53ef\u76f4\u63a5\u70b9\u51fb\u68c0\u7d22`
 }
 
 const selectRoad = (route) => {
@@ -761,13 +941,7 @@ const selectMapRoute = (route) => {
 
 const handleShowRoutes = () => {
   if (!selectedInfo.id) return
-  isRoutesExpanded.value = true
-  const routes = busMapRef.value?.getStopRoutes(selectedInfo.id) || []
-  selectedInfo.routesList = routes.map(route => ({
-    ...route.properties,
-    id: route.id,
-    color: route.properties.color || route.properties.display_color
-  }))
+  loadSelectedStationRoutes()
   busMapRef.value?.showStationRoutes({ stop_id: selectedInfo.id, stop_name: selectedInfo.name })
 }
 
@@ -781,17 +955,115 @@ const handleShowEta = () => {
   if (stationEtaRefreshStop) loadStationRealtime(stationEtaRefreshStop)
 }
 
-const handleSelectRoute = (route) => {
-  if (selectedInfo.id) {
-    busMapRef.value?.showStationRoutes({ stop_id: selectedInfo.id, stop_name: selectedInfo.name })
+const closeSelectedLineDetail = () => {
+  selectedLineRequestSequence += 1
+  selectedLineDetail.value = null
+  selectedLineLoads.value = []
+  busMapRef.value?.hideTrafficHeatmap()
+  selectedLineLoadError.value = ''
+  isSelectedLineLoading.value = false
+}
+
+const loadLineFromSelectedStation = async (route, stationId, stationName) => {
+  const lineId = Number(route?.line_id ?? route?.id)
+  if (!Number.isInteger(lineId) || lineId <= 0 || !stationId) return
+
+  const sequence = ++selectedLineRequestSequence
+  selectedLineDetail.value = { ...route, line_id: lineId }
+  selectedLineStation.id = stationId
+  selectedLineStation.name = stationName
+  selectedLineLoads.value = []
+  selectedLineLoadError.value = ''
+  isSelectedLineLoading.value = true
+
+  const [lineOutcome, vehiclesOutcome, heatmapOutcome] = await Promise.allSettled([
+    getLineDetail(lineId),
+    getRealtimeVehicles({ line_id: lineId }),
+    getTrafficHeatmap({ line_id: lineId })
+  ])
+  if (sequence !== selectedLineRequestSequence) return
+
+  if (lineOutcome.status === 'fulfilled') {
+    selectedLineDetail.value = {
+      ...route,
+      ...unwrapData(lineOutcome.value, {}),
+      line_id: lineId
+    }
+  } else {
+    notice.value = getApiErrorMessage(lineOutcome.reason, '\u7ebf\u8def\u57fa\u7840\u4fe1\u606f\u6682\u65f6\u65e0\u6cd5\u8bfb\u53d6')
   }
-  busMapRef.value?.focusRouteById(route.line_id || route.id, { preserveStopId: selectedInfo.id })
-  selectMapRoute(route)
+
+  if (heatmapOutcome.status === 'fulfilled') {
+    const heatmap = unwrapData(heatmapOutcome.value, {})
+    const segmentCount = busMapRef.value?.showTrafficHeatmap(heatmap.traffic_segments || []) || 0
+    notice.value = segmentCount
+      ? `\u5df2\u52a0\u8f7d ${segmentCount} \u4e2a\u9053\u8def\u62e5\u5835\u70ed\u529b\u5206\u6bb5`
+      : '\u5f53\u524d\u7ebf\u8def\u6682\u65e0\u53ef\u7528\u9053\u8def\u62e5\u5835\u70ed\u529b\u6570\u636e'
+  } else {
+    busMapRef.value?.hideTrafficHeatmap()
+    notice.value = getApiErrorMessage(heatmapOutcome.reason, '\u9053\u8def\u62e5\u5835\u70ed\u529b\u6570\u636e\u6682\u65f6\u65e0\u6cd5\u8bfb\u53d6')
+  }
+
+  if (vehiclesOutcome.status !== 'fulfilled') {
+    selectedLineLoadError.value = getApiErrorMessage(vehiclesOutcome.reason, '\u5f53\u524d\u7ebf\u8def\u8f66\u8f86\u6682\u65f6\u65e0\u6cd5\u8bfb\u53d6')
+    isSelectedLineLoading.value = false
+    return
+  }
+
+  const vehicles = unwrapList(vehiclesOutcome.value, 'vehicles').filter((vehicle) => vehicle.status !== 'offline')
+  if (!vehicles.length) {
+    isSelectedLineLoading.value = false
+    return
+  }
+
+  const loadOutcomes = await Promise.allSettled(vehicles.map((vehicle) => getRealtimePassengerLoad({
+    line_id: lineId,
+    station_id: Number(stationId),
+    vehicle_id: Number(vehicle.vehicle_id),
+    current_onboard_count: Number(vehicle.onboard_count) || 0,
+    capacity: Number(vehicle.capacity) || 60
+  })))
+  if (sequence !== selectedLineRequestSequence) return
+
+  selectedLineLoads.value = loadOutcomes.flatMap((outcome, index) => {
+    if (outcome.status !== 'fulfilled') return []
+    const load = unwrapData(outcome.value, {})
+    const vehicle = vehicles[index]
+    return [{
+      ...load,
+      vehicle_id: load.vehicle_id || vehicle.vehicle_id,
+      vehicle_code: vehicle.vehicle_code || '',
+      current_station_name: vehicle.current_station_name || '',
+      vehicle_status: vehicle.status || ''
+    }]
+  })
+  if (!selectedLineLoads.value.length) {
+    selectedLineLoadError.value = '\u5ba2\u8f7d\u63a5\u53e3\u6682\u65f6\u6ca1\u6709\u8fd4\u56de\u53ef\u7528\u6570\u636e'
+  }
+  isSelectedLineLoading.value = false
+}
+
+const handleSelectRoute = (route) => {
+  const stationId = Number(selectedInfo.id)
+  const stationName = selectedInfo.name
+  if (!Number.isInteger(stationId) || stationId <= 0) return
+
+  clearStationEtaRefreshTimer()
+  selectedRecommendedRoute.value = null
+  isStationDetailOpen.value = false
   isRoutesExpanded.value = false
+  panelMode.value = 'search'
+  isInfoPanelOpen.value = true
+  isAiChatOpen.value = false
+  busMapRef.value?.focusRouteById(route.line_id || route.id, { preserveStopId: stationId })
+  busMapRef.value?.hideTrafficHeatmap()
+  loadLineFromSelectedStation(route, stationId, stationName)
+  notice.value = `\u6b63\u5728\u8bfb\u53d6 ${route.line_name || route.title || '\u5f53\u524d\u7ebf\u8def'} \u8be6\u60c5`
 }
 
 const applyRecommendedRoute = (route) => {
   clearStationEtaRefreshTimer()
+  selectedLineDetail.value = null
   isStationDetailOpen.value = false
   const focusedRoute = busMapRef.value?.focusRouteById(route.id || route.line_id)
   selectedRecommendedRoute.value = {
@@ -848,6 +1120,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearStationEtaRefreshTimer()
+  Object.values(stationSuggestionTimers).forEach((timer) => {
+    if (timer) window.clearTimeout(timer)
+  })
   if (backendHealthTimer) window.clearInterval(backendHealthTimer)
 })
 </script>

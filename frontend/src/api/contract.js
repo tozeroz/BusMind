@@ -47,6 +47,7 @@ export const API_OPERATION_CONTRACT = [
   { method: 'GET', path: '/api/v1/map/lines', wrapper: 'getMapLines', status: 'connected', note: '首页地图', deprecated: false },
   { method: 'GET', path: '/api/v1/map/road-segments', wrapper: 'getRoadSegments', status: 'connected', note: '首页地图线路几何兜底', deprecated: false },
   { method: 'GET', path: '/api/v1/map/stations', wrapper: 'getMapStations', status: 'connected', note: '首页地图', deprecated: false },
+  { method: 'GET', path: '/api/v1/map/traffic-heatmap', wrapper: 'getTrafficHeatmap', status: 'connected', note: '首页站点选线交通热力分段', deprecated: false },
   { method: 'POST', path: '/api/v1/passenger-load-prediction', wrapper: 'predictPassengerLoad', status: 'connected', note: '首页/线路/车辆', deprecated: false },
   { method: 'POST', path: '/api/v1/recommend-routes', wrapper: 'recommendRoutes', status: 'connected', note: '首页', deprecated: false },
   { method: 'POST', path: '/api/v1/simulation/lta-bus-arrival/refresh', wrapper: 'refreshLtaBusArrival', status: 'deprecated', note: '仅保留旧调用兼容', deprecated: true },
