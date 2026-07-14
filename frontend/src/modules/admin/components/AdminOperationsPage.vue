@@ -47,9 +47,9 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import LineListPage from '@/modules/line/components/LineListPage.vue'
-import VehiclePage from '@/modules/vehicle/components/VehiclePage.vue'
-import PassengerFlowPage from '@/modules/passenger-flow/components/PassengerFlowPage.vue'
+import AdminLinePage from '@/modules/admin/components/AdminLinePage.vue'
+import AdminVehiclePage from '@/modules/admin/components/AdminVehiclePage.vue'
+import AdminPassengerFlowPage from '@/modules/admin/components/AdminPassengerFlowPage.vue'
 import { clearAuthToken } from '@/api/user'
 
 const sections = [
@@ -74,16 +74,16 @@ const sections = [
 ]
 
 const componentMap = {
-  lines: LineListPage,
-  vehicles: VehiclePage,
-  'passenger-flow': PassengerFlowPage
+  lines: AdminLinePage,
+  vehicles: AdminVehiclePage,
+  'passenger-flow': AdminPassengerFlowPage
 }
 
 const activeSection = ref('lines')
 const activeSectionMeta = computed(
   () => sections.find((item) => item.key === activeSection.value) || sections[0]
 )
-const activeComponent = computed(() => componentMap[activeSection.value] || LineListPage)
+const activeComponent = computed(() => componentMap[activeSection.value] || AdminLinePage)
 </script>
 
 <style scoped>
@@ -92,6 +92,31 @@ const activeComponent = computed(() => componentMap[activeSection.value] || Line
   min-height: 0;
   overflow: hidden;
 }
+
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.admin-sidebar .nav-list,
+.admin-sidebar .nav-list button {
+  width: 100%;
+}
+
+.admin-sidebar .nav-list button {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.admin-exit {
+  width: 100%;
+  margin-top: auto;
+  text-align: center;
+}
+
+
+
 
 .admin-client-main {
   height: 100vh;
