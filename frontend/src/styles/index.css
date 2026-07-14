@@ -172,7 +172,7 @@ button {
 .main-panel {
   height: 100vh;
   overflow: hidden;
-  padding: 78px 16px 16px;
+  padding: 78px clamp(16px, 1.15vw, 24px) 16px;
 }
 
 .topbar {
@@ -1178,10 +1178,10 @@ label {
 
 .map-chart-card {
   position: absolute;
-  right: clamp(56px, 4.8vw, 96px);
-  top: 22px;
+  right: clamp(76px, 5.6vw, 124px);
+  top: clamp(22px, 2.1vh, 28px);
   z-index: 8;
-  width: min(clamp(360px, 21vw, 430px), calc(100% - 44px));
+  width: min(clamp(410px, 21.4vw, 460px), calc(100% - 56px));
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 8px;
   padding: 16px;
@@ -1335,12 +1335,12 @@ label {
 
 .map-player-panel {
   position: absolute;
-  left: 22px;
+  left: clamp(24px, 1.35vw, 34px);
   top: auto;
-  bottom: 22px;
+  bottom: clamp(26px, 3.5vh, 44px);
   z-index: 12;
-  width: min(clamp(340px, 20vw, 410px), calc(100% - 44px));
-  height: 128px;
+  width: min(clamp(398px, 20.8vw, 448px), calc(100% - 56px));
+  height: clamp(128px, 12.4vh, 150px);
   min-height: 0;
   color: #fff;
   backdrop-filter: blur(24px);
@@ -1481,10 +1481,10 @@ label {
 }
 
 .map-info-dock {
-  top: 22px;
-  bottom: 162px;
-  left: 22px;
-  width: min(clamp(340px, 20vw, 410px), calc(100% - 44px));
+  top: clamp(22px, 2.1vh, 28px);
+  bottom: clamp(184px, 18vh, 220px);
+  left: clamp(24px, 1.35vw, 34px);
+  width: min(clamp(398px, 20.8vw, 448px), calc(100% - 56px));
   height: auto;
   min-height: 0;
   display: flex;
@@ -1498,18 +1498,23 @@ label {
   .map-info-dock,
   .map-chart-card,
   .map-player-panel {
-    padding: 16px;
+    padding: clamp(15px, 0.82vw, 18px);
+  }
+
+  .route-results-popup {
+    left: clamp(478px, 23.5vw, 520px);
+    width: min(400px, calc(100% - 560px));
   }
 
   .floating-search .search-header-line,
   .floating-search .search-box-row {
-    grid-template-columns: 76px minmax(0, 1fr) 64px;
+    grid-template-columns: clamp(72px, 4.2vw, 84px) minmax(0, 1fr) clamp(64px, 3.6vw, 72px);
     min-height: 48px;
   }
 
   .floating-search .locate-current-button,
   .floating-search .search-submit-chip {
-    width: 64px;
+    width: clamp(64px, 3.6vw, 72px);
   }
 }
 
@@ -1526,13 +1531,13 @@ label {
 
   .map-info-dock {
     top: 16px;
-    bottom: 132px;
+    bottom: 166px;
     padding: 12px;
   }
 
   .map-player-panel {
     bottom: 14px;
-    height: 104px;
+    height: 136px;
   }
 
   .home-waterfall-cards {
