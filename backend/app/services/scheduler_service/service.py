@@ -297,6 +297,13 @@ class BusArrivalRefreshScheduler:
         self._stop_event.set()
         try:
             await asyncio.wait_for(self._task, timeout=max(5, self.interval_seconds))
+        except asyncio.CancelledError:
+            logger.info("BusArrivalRefreshScheduler cancelled during shutdown")
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
         except asyncio.TimeoutError:
             logger.warning("BusArrivalRefreshScheduler stop timed out; cancelling")
             self._task.cancel()
@@ -349,6 +356,9 @@ class BusArrivalRefreshScheduler:
         while not self._stop_event.is_set():
             try:
                 await self._tick(collector, sync)
+            except asyncio.CancelledError:
+                self.last_tick_finished_at = now_local().isoformat()
+                break
             except Exception as exc:  # pragma: no cover - keep scheduler alive
                 self.last_tick_error = f"{type(exc).__name__}: {exc}"
                 self.last_tick_finished_at = now_local().isoformat()
@@ -425,6 +435,27 @@ class BusArrivalRefreshScheduler:
 
                     result = await asyncio.to_thread(_sync_result)
                     return ("ok", result.processed, result.skipped)
+                except asyncio.TimeoutError:
+                    failure = (
+                        f"{job.bus_stop_code}/{job.service_no}: "
+                        f"TimeoutError: exceeded {self.per_job_deadline_seconds:.1f}s"
+                    )
+                    failures.append(failure)
+                    logger.warning(
+                        "refresh_bus_arrival timed out for %s/%s after %.1fs",
+                        job.bus_stop_code,
+                        job.service_no,
+                        self.per_job_deadline_seconds,
+                    )
+                    server_logger.warning(
+                        "refresh_bus_arrival timed out for %s/%s after %.1fs",
+                        job.bus_stop_code,
+                        job.service_no,
+                        self.per_job_deadline_seconds,
+                    )
+                    return ("fail", 0, 1)
+                except asyncio.CancelledError:
+                    raise
                 except Exception as exc:
                     failure = (
                         f"{job.bus_stop_code}/{job.service_no}: "
@@ -507,4 +538,5 @@ def build_default_scheduler() -> BusArrivalRefreshScheduler:
         lta_client=client,
         max_lines=10,
         stops_per_line=2,
+        per_job_deadline_seconds=max(8.0, settings.lta_timeout_seconds + 1.0),
     )

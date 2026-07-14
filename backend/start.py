@@ -23,4 +23,6 @@ if __name__ == "__main__":
         host="::",
         port=8001,
         reload=True,
+        reload_dirs=[str(BACKEND_ROOT / "app")],
+        reload_excludes=["tests/*", "scripts/*"],
     )

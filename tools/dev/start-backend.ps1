@@ -30,4 +30,4 @@ Set-Location $backendRoot
 Write-Host "Using shared env file: $envPath"
 Write-Host "Using database: $databaseUrl"
 Write-Host 'Starting backend on http://127.0.0.1:8001 ...'
-uv run python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+uv run python -m uvicorn app.main:app --reload --reload-dir app --host 127.0.0.1 --port 8001

@@ -1178,10 +1178,10 @@ label {
 
 .map-chart-card {
   position: absolute;
-  right: 78px;
+  right: clamp(56px, 4.8vw, 96px);
   top: 22px;
   z-index: 8;
-  width: min(360px, calc(100% - 44px));
+  width: min(clamp(360px, 21vw, 430px), calc(100% - 44px));
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 8px;
   padding: 16px;
@@ -1339,7 +1339,7 @@ label {
   top: auto;
   bottom: 22px;
   z-index: 12;
-  width: min(340px, calc(100% - 44px));
+  width: min(clamp(340px, 20vw, 410px), calc(100% - 44px));
   height: 128px;
   min-height: 0;
   color: #fff;
@@ -1484,7 +1484,7 @@ label {
   top: 22px;
   bottom: 162px;
   left: 22px;
-  width: min(340px, calc(100% - 44px));
+  width: min(clamp(340px, 20vw, 410px), calc(100% - 44px));
   height: auto;
   min-height: 0;
   display: flex;
@@ -1492,6 +1492,76 @@ label {
   overflow: auto;
   padding: 14px;
   transform-origin: top left;
+}
+
+@media (min-width: 1500px) {
+  .map-info-dock,
+  .map-chart-card,
+  .map-player-panel {
+    padding: 16px;
+  }
+
+  .floating-search .search-header-line,
+  .floating-search .search-box-row {
+    grid-template-columns: 76px minmax(0, 1fr) 64px;
+    min-height: 48px;
+  }
+
+  .floating-search .locate-current-button,
+  .floating-search .search-submit-chip {
+    width: 64px;
+  }
+}
+
+@media (max-height: 820px) and (min-width: 901px) {
+  .main-panel {
+    padding-top: 72px;
+    padding-bottom: 10px;
+  }
+
+  .home-map-layout,
+  .fullscreen-map-layout {
+    height: calc(100vh - 82px);
+  }
+
+  .map-info-dock {
+    top: 16px;
+    bottom: 132px;
+    padding: 12px;
+  }
+
+  .map-player-panel {
+    bottom: 14px;
+    height: 104px;
+  }
+
+  .home-waterfall-cards {
+    margin-top: 10px;
+  }
+
+  .life-card {
+    gap: 4px;
+    margin-bottom: 8px;
+    padding: 10px;
+  }
+
+  .life-card:nth-child(2n) {
+    padding-bottom: 12px;
+  }
+
+  .life-card strong {
+    font-size: 16px;
+  }
+
+  .life-card p {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .map-chart-card {
+    top: 16px;
+    padding: 13px;
+  }
 }
 
 .map-info-dock.weather-cloudy {

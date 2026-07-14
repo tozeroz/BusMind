@@ -18,6 +18,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 
 import { getMapLines, getMapStations, getRoadSegments } from '@/api/map'
 import { createProtomapsStyle } from '@/modules/map/constants/map-style'
+import { PRIORITY_BUS_STOP_CODES } from '@/modules/map/constants/priority-stops'
 
 const emit = defineEmits(['select-stop', 'select-route', 'load-error', 'initial-data-loaded'])
 
@@ -60,8 +61,10 @@ const routePalette = ['#FDE14E', '#FDE14E', '#F58329', '#BE9106', '#D6CB00', '#5
 const routeColorExpression = ['coalesce', ['get', 'display_color'], routeMuted]
 const routeBg = '#ffffff'
 const stopFill = '#e11d2e'
+const stopDefaultFill = '#2f80ed'
 const stopStroke = '#e11d2e'
 const stopMutedStroke = '#e11d2e'
+const stopPriorityColorExpression = ['case', ['boolean', ['get', 'is_priority_stop'], false], stopFill, stopDefaultFill]
 const stopsOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 9, 1, 15, 1]
 const stopsDimmedOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 9, 0.3, 15, 0.3]
 const stopLabelsOpacityByZoom = ['interpolate', ['linear'], ['zoom'], 15, 1, 16, 1, 17, 1]
@@ -187,18 +190,48 @@ function routeFeatureMatchesValues(feature, values) {
   return candidates.some((item) => values.has(String(item || '').toLowerCase()))
 }
 
+function resolveStop(stopOrId) {
+  if (stopOrId === undefined || stopOrId === null) return null
+
+  const stopId = typeof stopOrId === 'object'
+    ? (stopOrId.stop_id ?? stopOrId.station_id ?? stopOrId.id)
+    : stopOrId
+  const knownStop = busStops.find((item) => String(item.stop_id) === String(stopId))
+
+  if (typeof stopOrId === 'object') {
+    return knownStop ? { ...knownStop, ...stopOrId } : stopOrId
+  }
+  return knownStop || null
+}
+
+function stopCoordinate(stop) {
+  const lng = Number(stop?.lng ?? stop?.longitude)
+  const lat = Number(stop?.lat ?? stop?.latitude)
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
+  return [lng, lat]
+}
+
 function routeFeatureContainsStop(feature, stop) {
   const coordinates = feature.geometry?.coordinates || []
-  return coordinates.some((coordinate) => coordinatesMatch(coordinate, [stop.lng, stop.lat]))
+  const coordinate = stopCoordinate(stop)
+  if (!coordinate) return false
+  return coordinates.some((routeCoordinate) => coordinatesMatch(routeCoordinate, coordinate))
 }
 
 function reachableRouteFeatures(stop) {
-  const routeValues = normalizeRouteValues([...(stop.passing_routes || []), ...(stop.line_ids || [])])
+  const resolvedStop = resolveStop(stop)
+  if (!resolvedStop) return []
+
+  const routeValues = normalizeRouteValues([...(resolvedStop.passing_routes || []), ...(resolvedStop.line_ids || [])])
   const matchedByRoute = busRoutesGeoJSON.features.filter((feature) => routeFeatureMatchesValues(feature, routeValues))
+  const matchedAndPassing = matchedByRoute.filter((feature) => routeFeatureContainsStop(feature, resolvedStop))
 
-  if (matchedByRoute.length) return matchedByRoute
+  if (matchedAndPassing.length) return matchedAndPassing
 
-  return busRoutesGeoJSON.features.filter((feature) => routeFeatureContainsStop(feature, stop))
+  const matchedByCoordinate = busRoutesGeoJSON.features.filter((feature) => routeFeatureContainsStop(feature, resolvedStop))
+  if (matchedByCoordinate.length) return matchedByCoordinate
+
+  return matchedByRoute
 }
 
 function findRouteFeature(routeId) {
@@ -213,9 +246,9 @@ function findStopFeature(stopId) {
 }
 
 function getStopRoutes(stopId) {
-  const stopFeature = findStopFeature(stopId)
+  const stop = resolveStop(stopId)
+  const stopFeature = findStopFeature(stop?.stop_id ?? stopId)
   if (!stopFeature) return []
-  const stop = busStops.find((item) => String(item.stop_id) === String(stopId))
   if (!stop) return []
   return reachableRouteFeatures(stop)
 }
@@ -230,15 +263,23 @@ function clearSelection() {
   setSourceData('stops-highlight-selected', emptyFeatureCollection)
 }
 
-function highlightRoute(feature) {
+function highlightRoute(feature, options = {}) {
+  const preservedStopId = options.preserveStopId ?? null
+  const preservedStopFeature = preservedStopId !== null
+    ? findStopFeature(preservedStopId)
+    : null
+
   selectedStopForRoutes = null
-  setSelectedStopState(null)
+  setSelectedStopState(preservedStopId)
   setStopsDimmed(true)
   const routeCoordinates = feature.geometry.coordinates
   setSourceData('routes', emptyFeatureCollection)
   setSourceData('routes-path', createFeatureCollection([feature]))
   setSourceData('stops-highlight', createFeatureCollection(routeStopFeatures(routeCoordinates)))
-  setSourceData('stops-highlight-selected', emptyFeatureCollection)
+  setSourceData(
+    'stops-highlight-selected',
+    preservedStopFeature ? createFeatureCollection([preservedStopFeature]) : emptyFeatureCollection
+  )
 }
 
 function highlightStop(stopId) {
@@ -253,11 +294,14 @@ function highlightStop(stopId) {
 }
 
 function highlightStopReachableRoutes(stop) {
-  selectedStopForRoutes = stop
-  setSelectedStopState(stop.stop_id)
+  const resolvedStop = resolveStop(stop)
+  if (!resolvedStop) return []
+
+  selectedStopForRoutes = resolvedStop
+  setSelectedStopState(resolvedStop.stop_id)
   setStopsDimmed(true)
-  const feature = findStopFeature(stop.stop_id)
-  const routes = reachableRouteFeatures(stop)
+  const feature = findStopFeature(resolvedStop.stop_id)
+  const routes = reachableRouteFeatures(resolvedStop)
 
   setSourceData('routes', createFeatureCollection(routes))
   setSourceData('routes-path', emptyFeatureCollection)
@@ -580,7 +624,7 @@ function addStopLayers() {
     filter: ['>=', ['to-number', ['get', 'service_count']], 3],
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 2, 10.5, 2.8, 12, 3.4],
-      'circle-color': stopFill,
+      'circle-color': stopPriorityColorExpression,
       'circle-stroke-color': '#ffffff',
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 9, 0.4, 11, 0.7],
       'circle-opacity': 0.82
@@ -594,7 +638,7 @@ function addStopLayers() {
     maxzoom: 15,
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 0.6, 11, 1, 13, 2, 14, 3.5, 15, ['case', ['boolean', ['feature-state', 'selected'], false], 7, 5]],
-      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', stopFill],
+      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', stopPriorityColorExpression],
       'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], stopStroke, '#ffffff'],
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 9, 0, 12, 0.5, 15, 1.5],
       'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0, 12, 0.35, 15, 0.85],
@@ -609,7 +653,7 @@ function addStopLayers() {
     minzoom: 13.5,
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 2, 15, ['case', ['boolean', ['feature-state', 'selected'], false], 9, 5], 17, ['case', ['boolean', ['feature-state', 'selected'], false], 12, 7]],
-      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', stopFill],
+      'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', stopPriorityColorExpression],
       'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], stopStroke, '#ffffff'],
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 14, 1, 15, 2, 17, 3],
       'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, 0.62, 17, 0.9],
@@ -646,7 +690,7 @@ function addStopLayers() {
     source: 'stops-highlight',
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 10.5, 0.9, 11.5, 1.4, 13, 2, 15, 3.1, 17, 4.4],
-      'circle-color': stopFill,
+      'circle-color': stopPriorityColorExpression,
       'circle-stroke-color': '#ffffff',
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10.5, 0, 14, 0.4, 17, 0.75],
       'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 10.5, 0, 14, 0.34, 17, 0.62],
@@ -731,11 +775,11 @@ function bindRouteLayerEvents() {
   })
 }
 
-function focusRouteById(routeId) {
+function focusRouteById(routeId, options = {}) {
   const feature = findRouteFeature(routeId)
   if (!feature || !map || !map.getSource('routes-path')) return null
 
-  highlightRoute(feature)
+  highlightRoute(feature, options)
   scheduleFocusOnCoordinates(feature.geometry.coordinates, 14)
 
   return {
@@ -762,6 +806,9 @@ function focusStopByName(name) {
 }
 
 function stationToFeature(station) {
+  const stationCode = String(station.station_code || station.bus_stop_code || '').padStart(5, '0')
+  const isPriorityStop = PRIORITY_BUS_STOP_CODES.has(stationCode)
+
   return {
     type: 'Feature',
     id: String(station.station_id),
@@ -772,8 +819,9 @@ function stationToFeature(station) {
     properties: {
       stop_id: String(station.station_id),
       stop_name: station.station_name,
-      station_code: station.station_code || station.bus_stop_code || '',
+      station_code: stationCode,
       road_name: station.road_name || station.address || '',
+      is_priority_stop: isPriorityStop,
       line_ids: JSON.stringify(station.line_ids || []),
       service_nos: Array.isArray(station.service_nos) ? station.service_nos.join('|') : station.service_nos || '',
       service_count: Array.isArray(station.service_nos) ? station.service_nos.length : Number(station.service_count) || 0
@@ -846,6 +894,7 @@ function lineToFeature(line) {
       line_name: line.line_name,
       line_code: line.line_code,
       service_no: line.service_no,
+      direction: line.direction,
       start_station: line.start_station,
       end_station: line.end_station,
       color: line.color,
@@ -1046,10 +1095,12 @@ async function reloadMapData() {
 
 function showStationRoutes(stop) {
   if (!map || !map.getSource('routes')) return
-  selectedStopForRoutes = stop
+  const resolvedStop = resolveStop(stop)
+  if (!resolvedStop) return
+  selectedStopForRoutes = resolvedStop
   areRoutesVisible = true
-  highlightStopReachableRoutes(stop)
-  const feature = findStopFeature(stop.stop_id)
+  highlightStopReachableRoutes(resolvedStop)
+  const feature = findStopFeature(resolvedStop.stop_id)
   if (feature) {
     scheduleFocusOnCoordinates([feature.geometry.coordinates], 15)
   }

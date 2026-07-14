@@ -95,6 +95,32 @@ export const recommendRoutes = (options, config = {}) =>
 
 const routeById = (items, routeId) => items.find((route) => route.route_id === routeId) || null
 
+const pickBestBy = (items, scorer) =>
+  items.reduce((best, item) => (best === null || scorer(item) > scorer(best) ? item : best), null)
+
+const pickLowestBy = (items, scorer) =>
+  items.reduce((best, item) => (best === null || scorer(item) < scorer(best) ? item : best), null)
+
+const buildOptimalRoutes = (items, data = {}) => {
+  if (!items.length) {
+    return {
+      bestExperience: null,
+      fastest: null,
+      leastCrowded: null,
+      leastWalking: null,
+      leastTransfer: null
+    }
+  }
+
+  return {
+    bestExperience: routeById(items, data.best_experience_route_id) || pickBestBy(items, (route) => Number(route.experience_score) || 0),
+    fastest: routeById(items, data.fastest_route_id) || pickLowestBy(items, (route) => Number(route.total_time_minutes ?? route.predicted_eta_minutes) || Number.MAX_SAFE_INTEGER),
+    leastCrowded: routeById(items, data.least_crowded_route_id) || pickBestBy(items, (route) => Number(route.predicted_load?.load_score) || 0),
+    leastWalking: routeById(items, data.least_walking_route_id) || pickLowestBy(items, (route) => Number(route.walk_time_minutes) || Number.MAX_SAFE_INTEGER),
+    leastTransfer: routeById(items, data.least_transfer_route_id) || pickLowestBy(items, (route) => Number(route.transfer_count) || Number.MAX_SAFE_INTEGER)
+  }
+}
+
 /**
  * 返回适合组件直接消费的推荐结果，并将五种最优 route_id 解析成路线对象。
  */
@@ -106,13 +132,7 @@ export async function getRouteRecommendations(options, config = {}) {
   return {
     ...data,
     items,
-    optimal: {
-      bestExperience: routeById(items, data.best_experience_route_id),
-      fastest: routeById(items, data.fastest_route_id),
-      leastCrowded: routeById(items, data.least_crowded_route_id),
-      leastWalking: routeById(items, data.least_walking_route_id),
-      leastTransfer: routeById(items, data.least_transfer_route_id)
-    }
+    optimal: buildOptimalRoutes(items, data)
   }
 }
 const isNoRouteError = (error) =>
@@ -130,16 +150,26 @@ export async function getProgressiveRouteRecommendations(options, config = {}) {
   }
 
   try {
-    const result = await getRouteRecommendations({
-      ...transferOptions,
-      allowTransfer: false,
-      maxTransferCount: 0
-    }, config)
-    return { result, searchMode: 'direct' }
+    const result = await getRouteRecommendations(transferOptions, config)
+    const directItems = transferOptions.allowTransfer
+      ? result.items.filter((route) => Number(route.transfer_count) === 0)
+      : []
+
+    if (directItems.length) {
+      return {
+        result: {
+          ...result,
+          items: directItems,
+          optimal: buildOptimalRoutes(directItems, result)
+        },
+        searchMode: 'direct'
+      }
+    }
+
+    return { result, searchMode: transferOptions.allowTransfer ? 'transfer' : 'direct' }
   } catch (error) {
-    if (!isNoRouteError(error) || !transferOptions.allowTransfer) throw error
+    if (!isNoRouteError(error)) throw error
   }
 
-  const result = await getRouteRecommendations(transferOptions, config)
-  return { result, searchMode: 'transfer' }
+  throw new Error('No route recommendation found')
 }
