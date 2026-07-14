@@ -8,7 +8,6 @@
   <section class="profile-card favorites-card">
     <header class="profile-card-header">
       <div><p>线路收藏</p><h2>常用路线</h2></div>
-      <RouterLink class="profile-pill-button" to="/home">去地图查看</RouterLink>
     </header>
     <div class="profile-route-list">
       <article v-for="(item, index) in visibleFavorites" :key="item.favorite_id || index">
