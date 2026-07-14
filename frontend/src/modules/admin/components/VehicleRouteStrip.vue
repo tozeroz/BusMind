@@ -100,7 +100,7 @@ watch(() => [props.vehicle?.vehicle_id, props.stations.length], centerCurrentSta
 </script>
 
 <style scoped>
-.vehicle-route-card { min-height:360px; display:grid; grid-template-rows:auto minmax(230px,1fr) auto; gap:16px; border:1px solid rgba(255,255,255,.2); border-radius:10px; padding:20px; overflow:hidden; background:rgba(255,255,255,.07); }
+.vehicle-route-card { min-height:360px; display:grid; grid-template-rows:auto minmax(230px,1fr) auto; gap:16px; border:1px solid rgba(255,255,255,.2); border-radius:10px; padding:20px; overflow:hidden; background:linear-gradient(145deg,rgba(255,255,255,.11),rgba(69,107,147,.26)); box-shadow:inset 0 1px rgba(255,255,255,.11),0 18px 42px rgba(9,28,49,.14); backdrop-filter:blur(18px) saturate(125%); -webkit-backdrop-filter:blur(18px) saturate(125%); }
 header,footer { display:flex; align-items:center; justify-content:space-between; gap:18px; } header p,header h3 { margin:0; } header h3 { margin-top:5px; font-size:22px; } header>span,footer { color:rgba(255,255,255,.62); font-size:12px; }
 .route-strip-viewport { min-width:0; overflow-x:auto; overflow-y:hidden; overscroll-behavior-inline:contain; cursor:grab; scrollbar-color:rgba(141,228,206,.7) rgba(255,255,255,.08); scrollbar-width:thin; }.route-strip-viewport:active { cursor:grabbing; }
 .route-strip-track { --item-width:150px; position:relative; display:grid; grid-template-columns:repeat(var(--station-count),var(--item-width)); width:max-content; min-width:100%; padding:58px 75px 28px; }.route-strip-track::before { content:''; position:absolute; top:93px; left:75px; right:75px; height:4px; border-radius:999px; background:linear-gradient(90deg,#5cc7ae,#9dded2); }

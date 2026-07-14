@@ -141,8 +141,10 @@ const isSelected = (vehicle) => String(selectedVehicle.value?.vehicle_id) === St
 .vehicle-detail-empty {
   border: 1px solid rgba(255, 255, 255, .2);
   border-radius: 10px;
-  background: rgba(255, 255, 255, .07);
-  box-shadow: 0 18px 42px rgba(9, 28, 49, .14);
+  background: linear-gradient(145deg, rgba(255,255,255,.11), rgba(69,107,147,.26));
+  box-shadow: inset 0 1px rgba(255,255,255,.11), 0 18px 42px rgba(9, 28, 49, .14);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
 }
 
 .vehicle-list-panel {
@@ -231,7 +233,7 @@ const isSelected = (vehicle) => String(selectedVehicle.value?.vehicle_id) === St
 .vehicle-status.is-muted { color: rgba(255,255,255,.7); background: rgba(255,255,255,.12); }
 
 .vehicle-metric-grid { display: grid; grid-template-columns: 1.35fr repeat(3, 1fr); gap: 12px; margin-top: 18px; }
-.vehicle-metric-grid article { min-width: 0; border-radius: 8px; padding: 14px; background: rgba(8,32,54,.28); }
+.vehicle-metric-grid article { min-width: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; padding: 14px; background: linear-gradient(145deg,rgba(255,255,255,.08),rgba(8,32,54,.18)); backdrop-filter: blur(12px); }
 .vehicle-metric-grid article > span { display: block; color: rgba(255,255,255,.56); font-size: 11px; }
 .vehicle-metric-grid strong { display: block; margin-top: 7px; overflow: hidden; color: #fff; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
 .vehicle-metric-grid small { color: rgba(255,255,255,.5); font-size: 11px; font-weight: 500; }

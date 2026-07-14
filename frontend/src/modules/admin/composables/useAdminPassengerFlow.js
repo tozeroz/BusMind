@@ -74,7 +74,13 @@ export function useAdminPassengerFlow() {
       const trend = unwrapData(trendResponse, {})
       trendItems.value = Array.isArray(trend.items) ? trend.items : []
       summary.value = { ...emptySummary(), ...(trend.summary || {}) }
-      predictionItems.value = unwrapList(predictionResponse, 'items')
+      const predictions = unwrapList(predictionResponse, 'items')
+      const latestBatchTime = predictions.reduce((latest, item) => {
+        const timestamp = new Date(item?.prediction_time).getTime()
+        return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest
+      }, 0)
+      predictionItems.value = predictions
+        .filter((item) => !latestBatchTime || new Date(item?.prediction_time).getTime() === latestBatchTime)
         .slice()
         .sort((a, b) => new Date(a.predict_time) - new Date(b.predict_time))
     } catch (error) {

@@ -196,14 +196,20 @@
       </Transition>
       <Transition name="side-card">
         <aside v-if="isInfoPanelOpen" class="map-player-panel map-player-slot">
-          <div>
-            <p class="eyebrow">语音播报</p>
-            <strong>{{ selectedInfo.name || '\u51fa\u884c\u64ad\u653e\u5668' }}</strong>
-            <span>{{ panelMode === 'search' ? '\u5f85\u9009\u62e9\u7ad9\u70b9\u6216\u7ebf\u8def' : chartCaption }}</span>
+          <div class="map-player-heading">
+            <div>
+              <p class="eyebrow">网易云播客</p>
+              <strong>出行播放器</strong>
+            </div>
+            <span>点击播放器开始或暂停</span>
           </div>
-          <div class="player-control-row" aria-hidden="true">
-            <i></i><b></b><i></i>
-          </div>
+          <iframe
+            class="netease-cloud-player"
+            title="网易云音乐播客播放器"
+            src="https://music.163.com/outchain/player?type=3&id=3087083007&auto=1&height=66"
+            frameborder="0"
+            allow="autoplay"
+          ></iframe>
         </aside>
       </Transition>
       <Transition name="side-card">
