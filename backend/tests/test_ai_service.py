@@ -6,6 +6,7 @@ from app.schemas.ai_travel import AiMode, AiTravelRequest, AiTravelStatus
 from app.schemas.recommendation import Preference, RecommendRoutesRequest
 from app.services.ai_service import AiTravelService
 from app.services.ai_service import service as ai_service_module
+from app.services.ai_service.orchestration import ConversationStore
 from app.services.eta_service import EtaService
 from app.services.intelligence_gateway import DemoIntelligenceGateway
 from app.services.load_service import PassengerLoadService
@@ -169,6 +170,94 @@ def test_ai_request_normalizes_legacy_low_load_preference():
     )
 
     assert request.preference == Preference.COMFORT
+
+
+@pytest.mark.asyncio
+async def test_ai_service_completes_recommend_explain_alternative_conversation():
+    recommendation_service = _recommendation_service()
+    original_recommend = recommendation_service.recommend
+    calls = 0
+
+    async def counted_recommend(request):
+        nonlocal calls
+        calls += 1
+        return await original_recommend(request)
+
+    recommendation_service.recommend = counted_recommend
+    service = AiTravelService(
+        recommendation_service,
+        client=FakeDeepSeekClient(),
+        store=ConversationStore(),
+    )
+
+    first = await service.answer(
+        AiTravelRequest(question="从站点1到站点12怎么走，想舒适一点")
+    )
+    assert first.mode == AiMode.SUGGEST
+    assert first.resolved_slots["start_station_id"] == 1
+    assert first.resolved_slots["end_station_id"] == 12
+    assert first.resolved_slots["preference"] == "comfort"
+    assert len(first.related_routes) > 1
+    first_route_id = first.related_routes[0].route_id
+
+    explained = await service.answer(
+        AiTravelRequest(
+            question="为什么推荐这条？",
+            conversation_id=first.conversation_id,
+        )
+    )
+    assert explained.mode == AiMode.EXPLAIN
+    assert explained.related_routes[0].route_id == first_route_id
+    assert explained.used_tools == ["conversation_snapshot", "deepseek"]
+
+    alternative = await service.answer(
+        AiTravelRequest(
+            question="换一条",
+            conversation_id=first.conversation_id,
+        )
+    )
+    assert alternative.mode == AiMode.SUGGEST
+    assert alternative.related_routes[0].route_id != first_route_id
+    assert alternative.used_tools == ["conversation_snapshot", "deepseek"]
+    assert calls == 1
+
+    refreshed = await service.answer(
+        AiTravelRequest(
+            question="从站点2到站点5怎么走",
+            conversation_id=first.conversation_id,
+        )
+    )
+    assert refreshed.resolved_slots["start_station_id"] == 2
+    assert refreshed.resolved_slots["end_station_id"] == 5
+    assert "recommend_routes" in refreshed.used_tools
+    assert calls == 2
+
+    preference_refreshed = await service.answer(
+        AiTravelRequest(
+            question="改成最快的方案",
+            conversation_id=first.conversation_id,
+        )
+    )
+    assert preference_refreshed.mode == AiMode.SUGGEST
+    assert preference_refreshed.resolved_slots["preference"] == "fastest"
+    assert "recommend_routes" in preference_refreshed.used_tools
+    assert calls == 3
+
+
+@pytest.mark.asyncio
+async def test_ai_service_explain_without_snapshot_returns_clarification():
+    service = AiTravelService(
+        _recommendation_service(),
+        client=FakeDeepSeekClient(),
+        store=ConversationStore(),
+    )
+
+    result = await service.answer(AiTravelRequest(question="为什么推荐这条？"))
+
+    assert result.mode == AiMode.EXPLAIN
+    assert result.status == AiTravelStatus.NEEDS_CLARIFICATION
+    assert result.missing_fields == ["conversation_id", "context.items"]
+    assert result.conversation_id
 
 
 def test_default_client_is_built_from_loaded_settings(monkeypatch):
